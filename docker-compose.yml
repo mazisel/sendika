@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  web:
+    container_name: sendika-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    # Portainer üzerinden gizli anahtarları yönetmek için isterseniz aşağıdaki satırı aktive edin
+    # env_file:
+    #   - .env.production
