@@ -19,5 +19,5 @@ services:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     # Portainer üzerinden gizli anahtarları yönetmek için isterseniz aşağıdaki satırı aktive edin
-    env_file:
-      - .env.production
+    # env_file:
+    #   - .env.production
