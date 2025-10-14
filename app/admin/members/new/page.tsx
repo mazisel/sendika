@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key } from 'lucide-react';
 
 interface FormData {
   first_name: string;
@@ -59,6 +59,8 @@ export default function NewMemberPage() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     // Kullanıcı bilgilerini al
@@ -88,6 +90,23 @@ export default function NewMemberPage() {
         [name]: ''
       }));
     }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    setErrors(prev => ({
+      ...prev,
+      password: '',
+      confirmPassword: ''
+    }));
+  };
+
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+    setErrors(prev => ({
+      ...prev,
+      confirmPassword: ''
+    }));
   };
 
   const validateForm = (): boolean => {
@@ -122,6 +141,20 @@ export default function NewMemberPage() {
     // Şube yöneticisi şehir kontrolü
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
+    }
+
+    if (password) {
+      if (password.length < 6) {
+        newErrors.password = 'Şifre en az 6 karakter olmalıdır';
+      }
+
+      if (confirmPassword !== password) {
+        newErrors.confirmPassword = 'Şifreler eşleşmiyor';
+      }
+    }
+
+    if (!password && confirmPassword) {
+      newErrors.password = 'Lütfen bir şifre giriniz';
     }
 
     setErrors(newErrors);
@@ -166,11 +199,32 @@ export default function NewMemberPage() {
         throw error;
       }
 
+      if (password) {
+        const response = await fetch(`/api/members/${data.id}/password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ password })
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload?.message || 'Şifre oluşturulurken bir hata oluştu.');
+        }
+
+        setPassword('');
+        setConfirmPassword('');
+      }
+
       alert(`Üye başarıyla eklendi! Üye numarası: ${data.membership_number}`);
       router.push('/admin/members');
     } catch (error) {
       console.error('Üye eklenirken hata:', error);
-      alert('Üye eklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+      const message = error instanceof Error
+        ? error.message
+        : 'Üye eklenirken bir hata oluştu. Lütfen tekrar deneyin.';
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -620,6 +674,57 @@ export default function NewMemberPage() {
                 <option value="Arkadaş">Arkadaş</option>
                 <option value="Diğer">Diğer</option>
               </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Üye Giriş Bilgileri */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Key className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Üye Giriş Bilgileri</h3>
+              <p className="text-sm text-slate-600">
+                Mobil uygulamaya giriş için şifre belirleyin. Bu alanı boş bırakırsanız üyenin şifresini daha sonra güncelleyebilirsiniz.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Şifre
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => handlePasswordChange(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="En az 6 karakter"
+                autoComplete="new-password"
+              />
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Şifre (Tekrar)
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Şifreyi tekrar girin"
+                autoComplete="new-password"
+              />
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
             </div>
           </div>
         </div>

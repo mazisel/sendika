@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, AlertTriangle, Key } from 'lucide-react';
 
 interface FormData {
   first_name: string;
@@ -68,6 +68,11 @@ export default function EditMemberPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [membershipNumber, setMembershipNumber] = useState<string>('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     // Kullanıcı bilgilerini al
@@ -121,6 +126,54 @@ export default function EditMemberPage() {
       router.push('/admin/members');
     } finally {
       setPageLoading(false);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    setPasswordError('');
+    setConfirmPasswordError('');
+
+    if (!password) {
+      setPasswordError('Lütfen bir şifre giriniz');
+      return;
+    }
+
+    if (password.length < 6) {
+      setPasswordError('Şifre en az 6 karakter olmalıdır');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('Şifreler eşleşmiyor');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const response = await fetch(`/api/members/${memberId}/password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.message || 'Şifre güncellenemedi');
+      }
+
+      alert('Üye şifresi başarıyla güncellendi.');
+      setPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Şifre güncellenirken hata:', error);
+      const message = error instanceof Error
+        ? error.message
+        : 'Şifre güncellenirken bir hata oluştu. Lütfen tekrar deneyin.';
+      alert(message);
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -722,6 +775,74 @@ export default function EditMemberPage() {
                 <option value="Diğer">Diğer</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Üye Giriş Bilgileri */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Key className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Şifre Yönetimi</h3>
+              <p className="text-sm text-slate-600">
+                Üyenin mobil uygulamaya giriş şifresini burada güncelleyebilirsiniz. Şifre en az 6 karakter olmalıdır.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Yeni Şifre
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="En az 6 karakter"
+                autoComplete="new-password"
+              />
+              {passwordError && (
+                <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Yeni Şifre (Tekrar)
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setConfirmPasswordError('');
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Şifreyi tekrar girin"
+                autoComplete="new-password"
+              />
+              {confirmPasswordError && (
+                <p className="mt-1 text-sm text-red-600">{confirmPasswordError}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={handlePasswordUpdate}
+              disabled={passwordLoading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {passwordLoading ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
+            </button>
           </div>
         </div>
 
