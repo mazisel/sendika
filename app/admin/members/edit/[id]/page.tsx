@@ -155,6 +155,7 @@ export default function EditMemberPage() {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ password })
       });
 

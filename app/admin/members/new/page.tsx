@@ -205,6 +205,7 @@ export default function NewMemberPage() {
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({ password })
         });
 
