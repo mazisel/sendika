@@ -148,12 +148,21 @@ export default function EditMemberPage() {
       return;
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData?.session;
+
+    if (!session?.access_token) {
+      alert('Oturumunuz geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın.');
+      return;
+    }
+
     setPasswordLoading(true);
     try {
       const response = await fetch(`/api/members/${memberId}/password`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
         },
         credentials: 'include',
         body: JSON.stringify({ password })

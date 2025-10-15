@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
@@ -19,16 +20,57 @@ export async function POST(
       data: { user }
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    let authenticatedUser = user;
+
+    if (!authenticatedUser) {
+      const authHeader = request.headers.get('authorization');
+      const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.slice(7).trim()
+        : authHeader?.trim();
+
+      if (token) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+          console.error('Supabase yapılandırma değişkenleri eksik: NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY');
+        } else {
+          const supabaseWithToken = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false
+            }
+          });
+
+          const {
+            data: tokenData,
+            error: tokenError
+          } = await supabaseWithToken.auth.getUser(token);
+
+          if (tokenError) {
+            console.error('Supabase access token doğrulanamadı:', tokenError);
+          } else {
+            authenticatedUser = tokenData.user ?? null;
+          }
+        }
+      }
+    }
+
+    if (!authenticatedUser) {
       return NextResponse.json({ message: 'Yetkisiz erişim.' }, { status: 401 });
     }
 
-    const { data: adminUser } = await supabase
+    const { data: adminUser, error: adminError } = await supabaseAdmin
       .from('admin_users')
       .select('id, is_active')
-      .eq('id', user.id)
+      .eq('id', authenticatedUser.id)
       .eq('is_active', true)
       .maybeSingle();
+
+    if (adminError) {
+      console.error('Admin kullanıcı doğrulaması başarısız:', adminError);
+      return NextResponse.json({ message: 'Admin yetkisi doğrulanamadı.' }, { status: 500 });
+    }
 
     if (!adminUser) {
       return NextResponse.json({ message: 'Admin yetkisi bulunamadı.' }, { status: 403 });
