@@ -60,16 +60,34 @@ export async function POST(
       return NextResponse.json({ message: 'Yetkisiz erişim.' }, { status: 401 });
     }
 
-    const { data: adminUser, error: adminError } = await supabaseAdmin
+    const { data: adminUserById, error: adminErrorById } = await supabaseAdmin
       .from('admin_users')
       .select('id, is_active')
       .eq('id', authenticatedUser.id)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (adminError) {
-      console.error('Admin kullanıcı doğrulaması başarısız:', adminError);
+    if (adminErrorById) {
+      console.error('Admin kullanıcı doğrulaması başarısız (id sorgusu):', adminErrorById);
       return NextResponse.json({ message: 'Admin yetkisi doğrulanamadı.' }, { status: 500 });
+    }
+
+    let adminUser = adminUserById;
+
+    if (!adminUser && authenticatedUser.email) {
+      const { data: adminUserByEmail, error: adminErrorByEmail } = await supabaseAdmin
+        .from('admin_users')
+        .select('id, is_active')
+        .eq('email', authenticatedUser.email)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (adminErrorByEmail) {
+        console.error('Admin kullanıcı doğrulaması başarısız (email sorgusu):', adminErrorByEmail);
+        return NextResponse.json({ message: 'Admin yetkisi doğrulanamadı.' }, { status: 500 });
+      }
+
+      adminUser = adminUserByEmail ?? null;
     }
 
     if (!adminUser) {
