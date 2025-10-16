@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/application/auth_controller.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/home/presentation/home_shell.dart';
+import 'theme/app_theme.dart';
 
 class SendikaApp extends ConsumerWidget {
   const SendikaApp({super.key});
@@ -15,12 +16,8 @@ class SendikaApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Ulaştırma Kamu Çalışanları Sendikası',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1D4ED8),
-        scaffoldBackgroundColor: const Color(0xFFF5F6FA),
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-      ),
+      theme: AppTheme.dark(),
+      themeMode: ThemeMode.dark,
       home: Builder(
         builder: (context) {
           if (!authState.initialized) {
@@ -44,17 +41,36 @@ class _SplashView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Uygulama hazırlanıyor...',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Uygulama hazırlanıyor...',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
         ),
       ),
     );

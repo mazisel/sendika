@@ -10,6 +10,7 @@ class AnnouncementsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final announcementsAsync = ref.watch(announcementsFutureProvider);
+    final theme = Theme.of(context);
 
     return announcementsAsync.when(
       data: (items) => RefreshIndicator(
@@ -17,9 +18,16 @@ class AnnouncementsPage extends ConsumerWidget {
         child: items.isEmpty
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: Text('Aktif duyuru bulunmuyor.')),
+                children: [
+                  const SizedBox(height: 120),
+                  Center(
+                    child: Text(
+                      'Aktif duyuru bulunmuyor.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ),
                 ],
               )
             : ListView.builder(
@@ -43,11 +51,13 @@ class AnnouncementsPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                const Icon(Icons.error_outline, size: 48),
+                Icon(Icons.error_outline,
+                    size: 48, color: theme.colorScheme.error),
                 const SizedBox(height: 12),
                 Text(
                   'Duyurular yüklenemedi.\n${error.toString()}',
                   textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 FilledButton(

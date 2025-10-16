@@ -38,9 +38,9 @@ class AnnouncementCard extends StatelessWidget {
     ].join(' - ');
 
     return Card(
-      elevation: 0.5,
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 1.5,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -70,25 +70,26 @@ class AnnouncementCard extends StatelessWidget {
                 if (dateText.isNotEmpty)
                   Text(
                     dateText,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: Colors.blueGrey),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
                   ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               announcement.title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
               announcement.content,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.blueGrey.shade700),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                  ),
             ),
           ],
         ),

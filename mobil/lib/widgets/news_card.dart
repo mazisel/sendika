@@ -15,10 +15,12 @@ class NewsCard extends StatelessWidget {
         ? DateFormat('d MMMM y', 'tr_TR').format(item.publishedAt!.toLocal())
         : null;
 
+    final theme = Theme.of(context);
+
     return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -28,13 +30,26 @@ class NewsCard extends StatelessWidget {
             if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
               AspectRatio(
                 aspectRatio: 16 / 9,
-                child: Image.network(
-                  item.imageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.blueGrey.shade50,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.newspaper, size: 48),
+                child: ShaderMask(
+                  shaderCallback: (rect) => LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.85),
+                      Colors.transparent,
+                    ],
+                  ).createShader(rect),
+                  blendMode: BlendMode.darken,
+                  child: Image.network(
+                    item.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: theme.colorScheme.surfaceContainerHigh
+                          .withValues(alpha: 0.35),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.newspaper,
+                          size: 48, color: theme.colorScheme.primary),
+                    ),
                   ),
                 ),
               ),
@@ -46,16 +61,17 @@ class NewsCard extends StatelessWidget {
                   if (dateLabel != null) ...[
                     Text(
                       dateLabel,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelSmall?.copyWith(color: Colors.blueGrey),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.55),
+                      ),
                     ),
                     const SizedBox(height: 8),
                   ],
                   Text(
                     item.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -63,8 +79,8 @@ class NewsCard extends StatelessWidget {
                     item.preview,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.blueGrey.shade700,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
                     ),
                   ),
                 ],

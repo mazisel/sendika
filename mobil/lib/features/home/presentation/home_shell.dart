@@ -36,22 +36,32 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Oturumu kapat'),
-        content: const Text(
-          'Uygulamadan çıkış yapmak istediğinize emin misiniz?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgeç'),
+      builder: (context) {
+        final dialogTheme = Theme.of(context);
+        return AlertDialog(
+          backgroundColor: dialogTheme.cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Oturumu kapat',
+            style: dialogTheme.textTheme.titleMedium,
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Çıkış Yap'),
+          content: Text(
+            'Uygulamadan çıkış yapmak istediğinize emin misiniz?',
+            style: dialogTheme.textTheme.bodyMedium
+                ?.copyWith(color: Colors.white.withValues(alpha: 0.72)),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Çıkış Yap'),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirmed == true) {
@@ -63,18 +73,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final member = authState.member;
+    final theme = Theme.of(context);
 
     return Scaffold(
+      extendBody: true,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Sendika Üye Portalı'),
+            Text(
+              'Sendika Üye Portalı',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             if (member != null)
               Text(
                 member.fullName,
-                style: Theme.of(context).textTheme.labelMedium,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
               ),
           ],
         ),
@@ -91,13 +113,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: const [NewsPage(), AnnouncementsPage(), DigitalIdPage()],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              theme.colorScheme.surface,
+            ],
+          ),
+        ),
+        child: IndexedStack(
+          index: _currentIndex,
+          children: const [NewsPage(), AnnouncementsPage(), DigitalIdPage()],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         height: 72,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (index) {
           setState(() {
             _currentIndex = index;
