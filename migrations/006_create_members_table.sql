@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS members (
   start_date DATE,
   membership_number VARCHAR(20) UNIQUE,
   membership_status VARCHAR(20) DEFAULT 'pending' CHECK (membership_status IN ('pending', 'active', 'inactive', 'suspended')),
+  membership_date DATE,
   emergency_contact_name VARCHAR(200),
   emergency_contact_phone VARCHAR(20),
   emergency_contact_relation VARCHAR(50),

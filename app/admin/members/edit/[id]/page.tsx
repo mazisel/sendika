@@ -30,6 +30,7 @@ interface FormData {
   notes: string;
   membership_status: string;
   is_active: boolean;
+  membership_date: string;
 }
 
 const initialFormData: FormData = {
@@ -54,7 +55,8 @@ const initialFormData: FormData = {
   children_count: 0,
   notes: '',
   membership_status: 'active',
-  is_active: true
+  is_active: true,
+  membership_date: ''
 };
 
 export default function EditMemberPage() {
@@ -116,7 +118,8 @@ export default function EditMemberPage() {
           children_count: data.children_count || 0,
           notes: data.notes || '',
           membership_status: data.membership_status || 'active',
-          is_active: data.is_active || true
+          is_active: data.is_active || true,
+          membership_date: data.membership_date || ''
         });
         setMembershipNumber(data.membership_number || '');
       }
@@ -204,6 +207,8 @@ export default function EditMemberPage() {
     }
   };
 
+  const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -233,6 +238,19 @@ export default function EditMemberPage() {
       newErrors.phone = 'Geçerli bir telefon numarası giriniz';
     }
 
+    // Tarih formatı kontrolü
+    if (formData.birth_date && !isValidDateString(formData.birth_date)) {
+      newErrors.birth_date = 'Geçerli bir tarih seçiniz';
+    }
+
+    if (formData.start_date && !isValidDateString(formData.start_date)) {
+      newErrors.start_date = 'Geçerli bir tarih seçiniz';
+    }
+
+    if (formData.membership_date && !isValidDateString(formData.membership_date)) {
+      newErrors.membership_date = 'Geçerli bir tarih seçiniz';
+    }
+
     // Şube yöneticisi şehir kontrolü
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
@@ -252,12 +270,36 @@ export default function EditMemberPage() {
     setLoading(true);
 
     try {
+      const updatedData = {
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        tc_identity: formData.tc_identity.trim(),
+        birth_date: formData.birth_date || null,
+        gender: formData.gender,
+        city: formData.city.trim(),
+        district: formData.district.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        address: formData.address.trim(),
+        workplace: formData.workplace.trim(),
+        position: formData.position.trim(),
+        start_date: formData.start_date ? formData.start_date : null,
+        emergency_contact_name: formData.emergency_contact_name.trim(),
+        emergency_contact_phone: formData.emergency_contact_phone.trim(),
+        emergency_contact_relation: formData.emergency_contact_relation.trim(),
+        education_level: formData.education_level.trim(),
+        marital_status: formData.marital_status.trim(),
+        children_count: formData.children_count,
+        notes: formData.notes.trim(),
+        membership_date: formData.membership_date ? formData.membership_date : null,
+        membership_status: formData.membership_status,
+        is_active: formData.is_active,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('members')
-        .update({
-          ...formData,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatedData)
         .eq('id', memberId);
 
       if (error) {
@@ -350,7 +392,7 @@ export default function EditMemberPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Üye Numarası
@@ -382,6 +424,24 @@ export default function EditMemberPage() {
                 <option value="inactive">Pasif</option>
                 <option value="suspended">Askıda</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Üye Kayıt Tarihi
+              </label>
+              <input
+                type="date"
+                name="membership_date"
+                value={formData.membership_date}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.membership_date ? 'border-red-500' : 'border-slate-300'
+                }`}
+              />
+              {errors.membership_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
+              )}
             </div>
           </div>
         </div>
@@ -720,6 +780,9 @@ export default function EditMemberPage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              {errors.start_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
+              )}
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ export default function NewUser() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'admin' | 'super_admin' | 'branch_manager'>('admin');
+  const [role, setRole] = useState<'admin' | 'super_admin' | 'branch_manager'>('super_admin');
   const [roleType, setRoleType] = useState<'general_manager' | 'branch_manager'>('general_manager');
   const [city, setCity] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ export default function NewUser() {
     }
 
     // Sadece super_admin kullanıcıları yeni kullanıcı oluşturabilir
-    if (currentUser.role !== 'super_admin') {
+    if (currentUser.role !== 'super_admin' && currentUser.role_type !== 'general_manager') {
       setError('Bu işlem için yetkiniz bulunmuyor');
       setLoading(false);
       return;

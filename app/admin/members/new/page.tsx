@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash } from 'lucide-react';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 interface FormData {
   first_name: string;
@@ -28,6 +29,8 @@ interface FormData {
   marital_status: string;
   children_count: number;
   notes: string;
+  membership_number: string;
+  membership_date: string;
 }
 
 const initialFormData: FormData = {
@@ -50,7 +53,34 @@ const initialFormData: FormData = {
   education_level: '',
   marital_status: '',
   children_count: 0,
-  notes: ''
+  notes: '',
+  membership_number: '',
+  membership_date: ''
+};
+
+const fieldLabels: Record<string, string> = {
+  first_name: 'Ad',
+  last_name: 'Soyad',
+  tc_identity: 'TC Kimlik No',
+  birth_date: 'Doğum tarihi',
+  gender: 'Cinsiyet',
+  city: 'İl',
+  district: 'İlçe',
+  phone: 'Telefon',
+  email: 'E-posta',
+  address: 'Adres',
+  workplace: 'Çalıştığı kurum',
+  position: 'Görevi',
+  start_date: 'Başlangıç tarihi',
+  emergency_contact_name: 'Acil durum kişi adı',
+  emergency_contact_phone: 'Acil durum kişi telefonu',
+  emergency_contact_relation: 'Acil durum kişi ilişki',
+  education_level: 'Eğitim durumu',
+  marital_status: 'Medeni durumu',
+  children_count: 'Çocuk sayısı',
+  notes: 'Notlar',
+  membership_number: 'Üye numarası',
+  membership_date: 'Üye kayıt tarihi'
 };
 
 export default function NewMemberPage() {
@@ -109,6 +139,74 @@ export default function NewMemberPage() {
     }));
   };
 
+  const extractColumnName = (text?: string | null): string | null => {
+    if (!text) return null;
+    const keyMatch = text.match(/Key \(([^)]+)\)/);
+    if (keyMatch?.[1]) {
+      return keyMatch[1].split(',')[0].trim();
+    }
+    const columnMatch = text.match(/column \"?([a-z_]+)\"?/i);
+    if (columnMatch?.[1]) {
+      return columnMatch[1];
+    }
+    return null;
+  };
+
+  const handleInsertError = (error: PostgrestError) => {
+    const searchField = (content?: string | null) => {
+      if (!content) return null;
+      const lowered = content.toLowerCase();
+      return (['tc_identity', 'email', 'membership_number'] as const).find(field =>
+        lowered.includes(field)
+      );
+    };
+
+    if (error.code === '23505') {
+      const field = searchField(error.message) || searchField(error.details) || extractColumnName(error.details);
+      if (field) {
+        const label = fieldLabels[field] || field;
+        const message = `Bu ${label.toLowerCase()} ile kayıtlı bir üye zaten mevcut.`;
+        setErrors(prev => ({ ...prev, [field]: message }));
+        return message;
+      }
+      return 'Girilen bilgilere sahip başka bir üye mevcut. Lütfen kontrol edin.';
+    }
+
+    if (error.code === '23502') {
+      const column = extractColumnName(error.message) || extractColumnName(error.details);
+      if (column && fieldLabels[column]) {
+        const message = `${fieldLabels[column]} alanı zorunludur.`;
+        setErrors(prev => ({ ...prev, [column]: message }));
+        return message;
+      }
+      return 'Zorunlu alanlardan biri eksik görünüyor. Lütfen formu kontrol edin.';
+    }
+
+    if (error.code === '23514') {
+      const column = extractColumnName(error.message) || extractColumnName(error.details);
+      if (column && fieldLabels[column]) {
+        const message = `${fieldLabels[column]} için geçersiz bir değer girdiniz.`;
+        setErrors(prev => ({ ...prev, [column]: message }));
+        return message;
+      }
+      return 'Bazı alanlarda geçersiz değerler var. Lütfen bilgileri kontrol edin.';
+    }
+
+    if (error.code === '22P02') {
+      const column = extractColumnName(error.message) || extractColumnName(error.details);
+      if (column && fieldLabels[column]) {
+        const message = `${fieldLabels[column]} alanındaki değer geçersiz. Lütfen kontrol edin.`;
+        setErrors(prev => ({ ...prev, [column]: message }));
+        return message;
+      }
+      return 'Sayı veya tarih alanlarında geçersiz karakterler var. Lütfen girişleri kontrol edin.';
+    }
+
+    return error.details || error.message || 'Üye eklenirken beklenmedik bir hata oluştu.';
+  };
+
+  const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -122,6 +220,7 @@ export default function NewMemberPage() {
     if (!formData.district.trim()) newErrors.district = 'İlçe zorunludur';
     if (!formData.phone.trim()) newErrors.phone = 'Telefon zorunludur';
     if (!formData.email.trim()) newErrors.email = 'E-posta zorunludur';
+    if (!formData.membership_number.trim()) newErrors.membership_number = 'Üye numarası zorunludur';
 
     // TC Kimlik No kontrolü
     if (formData.tc_identity && formData.tc_identity.length !== 11) {
@@ -136,6 +235,19 @@ export default function NewMemberPage() {
     // Telefon formatı kontrolü
     if (formData.phone && !/^[0-9]{10,11}$/.test(formData.phone.replace(/\s/g, ''))) {
       newErrors.phone = 'Geçerli bir telefon numarası giriniz';
+    }
+
+    // Tarih formatı kontrolü
+    if (formData.birth_date && !isValidDateString(formData.birth_date)) {
+      newErrors.birth_date = 'Geçerli bir tarih seçiniz';
+    }
+
+    if (formData.start_date && !isValidDateString(formData.start_date)) {
+      newErrors.start_date = 'Geçerli bir tarih seçiniz';
+    }
+
+    if (formData.membership_date && !isValidDateString(formData.membership_date)) {
+      newErrors.membership_date = 'Geçerli bir tarih seçiniz';
     }
 
     // Şube yöneticisi şehir kontrolü
@@ -171,9 +283,29 @@ export default function NewMemberPage() {
     setLoading(true);
 
     try {
-      // Üye numarası veritabanı trigger'ı tarafından otomatik oluşturulacak
       const memberData = {
-        ...formData,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        tc_identity: formData.tc_identity.trim(),
+        birth_date: formData.birth_date || null,
+        gender: formData.gender,
+        city: formData.city.trim(),
+        district: formData.district.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        address: formData.address.trim(),
+        workplace: formData.workplace.trim(),
+        position: formData.position.trim(),
+        start_date: formData.start_date ? formData.start_date : null,
+        emergency_contact_name: formData.emergency_contact_name.trim(),
+        emergency_contact_phone: formData.emergency_contact_phone.trim(),
+        emergency_contact_relation: formData.emergency_contact_relation.trim(),
+        education_level: formData.education_level.trim(),
+        marital_status: formData.marital_status.trim(),
+        children_count: formData.children_count,
+        notes: formData.notes.trim(),
+        membership_number: formData.membership_number.trim(),
+        membership_date: formData.membership_date ? formData.membership_date : null,
         membership_status: 'active', // Admin tarafından eklenen üyeler direkt aktif
         is_active: true
       };
@@ -185,18 +317,9 @@ export default function NewMemberPage() {
         .single();
 
       if (error) {
-        if (error.code === '23505') {
-          // Unique constraint violation
-          if (error.message.includes('tc_identity')) {
-            setErrors({ tc_identity: 'Bu TC Kimlik No ile kayıtlı bir üye zaten mevcut' });
-          } else if (error.message.includes('email')) {
-            setErrors({ email: 'Bu e-posta adresi ile kayıtlı bir üye zaten mevcut' });
-          } else {
-            throw error;
-          }
-          return;
-        }
-        throw error;
+        const message = handleInsertError(error);
+        alert(message);
+        return;
       }
 
       if (password) {
@@ -276,6 +399,64 @@ export default function NewMemberPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Üyelik Bilgileri */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <Hash className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Üyelik Bilgileri</h3>
+              <p className="text-sm text-slate-600">Üyeye verilecek benzersiz üye numarasını belirleyin</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Üye Numarası <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="membership_number"
+                value={formData.membership_number}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.membership_number ? 'border-red-500' : 'border-slate-300'
+                }`}
+                placeholder="Örn: UYE-000123"
+              />
+              {errors.membership_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.membership_number}</p>
+              )}
+              <p className="mt-2 text-sm text-slate-500">
+                Bu numara üyeye giriş ve diğer işlemler için kullanılacaktır. Benzersiz olmalıdır.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Üye Kayıt Tarihi
+              </label>
+              <input
+                type="date"
+                name="membership_date"
+                value={formData.membership_date}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.membership_date ? 'border-red-500' : 'border-slate-300'
+                }`}
+              />
+              {errors.membership_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
+              )}
+              <p className="mt-2 text-sm text-slate-500">
+                Üyenin sendikaya resmi olarak kaydedildiği tarihi seçiniz.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Kişisel Bilgiler */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center space-x-3 mb-6">
@@ -611,6 +792,9 @@ export default function NewMemberPage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              {errors.start_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
+              )}
             </div>
           </div>
         </div>

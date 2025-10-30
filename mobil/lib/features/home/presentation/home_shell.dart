@@ -86,7 +86,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sendika Üye Portalı',
+              'Kamu Ulaşım Sen',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
