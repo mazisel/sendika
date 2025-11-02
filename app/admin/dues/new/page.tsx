@@ -66,23 +66,25 @@ export default function CreateDuePeriodPage() {
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = event.target;
-    if (type === 'checkbox' && event.target instanceof HTMLInputElement) {
+    const target = event.target;
+    const fieldName = target.name;
+
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
       setForm(prev => ({
         ...prev,
-        [name]: event.target.checked
+        [fieldName]: target.checked
       }));
     } else {
       setForm(prev => ({
         ...prev,
-        [name]: value
+        [fieldName]: target.value
       }));
     }
 
-    if (errors[name as keyof CreatePeriodForm]) {
+    if (errors[fieldName as keyof CreatePeriodForm]) {
       setErrors(prev => ({
         ...prev,
-        [name]: ''
+        [fieldName]: ''
       }));
     }
   };

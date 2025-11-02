@@ -239,17 +239,18 @@ export default function DuesDashboardPage() {
   const handleMonthlyInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = event.target;
+    const target = event.target;
+    const fieldName = target.name;
 
-    if (type === 'checkbox' && event.target instanceof HTMLInputElement) {
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
       setMonthlyForm(prev => ({
         ...prev,
-        [name]: event.target.checked
+        [fieldName]: target.checked
       }));
     } else {
       setMonthlyForm(prev => ({
         ...prev,
-        [name]: value
+        [fieldName]: target.value
       }));
     }
   };

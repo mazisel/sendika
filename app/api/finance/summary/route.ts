@@ -124,16 +124,20 @@ export async function GET(request: NextRequest) {
     }, 0);
 
     const categoryBreakdown = (transactions ?? []).reduce<Record<string, any>>((acc, item) => {
-      if (!item.finance_categories) {
+      const categoryData = Array.isArray(item.finance_categories)
+        ? item.finance_categories[0]
+        : item.finance_categories;
+
+      if (!categoryData) {
         return acc;
       }
 
-      const key = `${item.finance_categories.category_type}_${item.finance_categories.id}`;
+      const key = `${categoryData.category_type}_${categoryData.id}`;
       if (!acc[key]) {
         acc[key] = {
-          category_id: item.finance_categories.id,
-          category_name: item.finance_categories.name,
-          category_type: item.finance_categories.category_type,
+          category_id: categoryData.id,
+          category_name: categoryData.name,
+          category_type: categoryData.category_type,
           total_amount: 0
         };
       }

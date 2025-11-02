@@ -347,13 +347,15 @@ export default function DuePeriodDetailPage() {
   const handlePaymentFormChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = event.target;
-    if (type === 'checkbox' && event.target instanceof HTMLInputElement) {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      const { name, checked } = target;
       setPaymentForm(prev => ({
         ...prev,
-        [name]: event.target.checked
+        [name]: checked
       }));
     } else {
+      const { name, value } = target;
       setPaymentForm(prev => ({
         ...prev,
         [name]: value
