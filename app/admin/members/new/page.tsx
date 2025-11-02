@@ -323,10 +323,18 @@ export default function NewMemberPage() {
       }
 
       if (password) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+
+        if (!accessToken) {
+          throw new Error('Oturumunuz geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın.');
+        }
+
         const response = await fetch(`/api/members/${data.id}/password`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
           },
           credentials: 'include',
           body: JSON.stringify({ password })

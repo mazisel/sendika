@@ -45,6 +45,22 @@ export class PermissionManager {
     return user.role === 'super_admin' || user.role_type === 'general_manager';
   }
 
+  static canManageDues(user: AdminUser): boolean {
+    return user.role === 'super_admin' || user.role_type === 'general_manager';
+  }
+
+  static canViewDues(user: AdminUser): boolean {
+    return true;
+  }
+
+  static canManageFinance(user: AdminUser): boolean {
+    return user.role === 'super_admin' || user.role_type === 'general_manager';
+  }
+
+  static canViewFinance(user: AdminUser): boolean {
+    return user.role === 'super_admin' || user.role_type === 'general_manager' || user.role === 'admin';
+  }
+
   static getUserAccessibleCities(user: AdminUser): string[] {
     if (this.canAccessAllMembers(user)) {
       return []; // Boş array tüm şehirlere erişim anlamına gelir
@@ -64,6 +80,14 @@ export class PermissionManager {
 
     // Üye yönetimi - tüm yöneticiler görebilir
     baseItems.push({ name: 'Üyeler', href: '/admin/members', icon: 'users' });
+
+    if (this.canViewDues(user)) {
+      baseItems.push({ name: 'Aidatlar', href: '/admin/dues', icon: 'dues' });
+    }
+
+    if (this.canViewFinance(user)) {
+      baseItems.push({ name: 'Finans', href: '/admin/finance', icon: 'finance' });
+    }
 
     // Sadece genel merkez yöneticileri görebilir
     if (this.canManageNews(user)) {

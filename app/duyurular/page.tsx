@@ -187,8 +187,10 @@ export default function AnnouncementsPage() {
                       </h3>
 
                       {/* Content */}
-                      <p className="text-gray-600 mb-4 line-clamp-4">
-                        {announcement.content.substring(0, 200) + '...'}
+                      <p className="text-gray-600 mb-4 line-clamp-4 whitespace-pre-line">
+                        {announcement.content.length > 200
+                          ? `${announcement.content.substring(0, 200)}...`
+                          : announcement.content}
                       </p>
 
                       {/* Author */}
@@ -200,10 +202,13 @@ export default function AnnouncementsPage() {
                       )}
 
                       {/* Read More */}
-                      <button className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700 transition-colors">
+                      <Link
+                        href={`/duyurular/${announcement.id}`}
+                        className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700 transition-colors"
+                      >
                         Devamını Oku
                         <ChevronRight className="w-4 h-4 ml-1" />
-                      </button>
+                      </Link>
                     </div>
                   </article>
                 ))}

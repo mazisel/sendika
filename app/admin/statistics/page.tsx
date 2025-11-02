@@ -62,6 +62,10 @@ export default function StatisticsPage() {
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const cardClass =
+    'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-6 transition-colors';
+  const miniCardClass =
+    'rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-4 transition-colors';
 
   useEffect(() => {
     loadStatistics();
@@ -436,26 +440,26 @@ export default function StatisticsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex items-center space-x-3">
-          <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
-          <span className="text-lg text-slate-600">İstatistikler yükleniyor...</span>
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
+          <span className="text-lg text-slate-600 dark:text-slate-300">İstatistikler yükleniyor...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-slate-900 dark:text-slate-100">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">İstatistikler</h1>
-          <p className="text-slate-600 mt-2">Detaylı üye istatistikleri ve analiz raporları</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">İstatistikler</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">Detaylı üye istatistikleri ve analiz raporları</p>
         </div>
         <div className="flex items-center space-x-3">
           <select
             value={selectedTimeRange}
             onChange={(e) => setSelectedTimeRange(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
           >
             <option value="all">Tüm Zamanlar</option>
             <option value="year">Son 1 Yıl</option>
@@ -482,51 +486,51 @@ export default function StatisticsPage() {
 
       {/* Genel İstatistikler */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Toplam Üye</p>
-              <p className="text-3xl font-bold text-slate-900">{memberStats?.totalMembers || 0}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Toplam Üye</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{memberStats?.totalMembers || 0}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <Users className="w-6 h-6 text-blue-600 dark:text-blue-300" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Aktif Üye</p>
-              <p className="text-3xl font-bold text-green-600">{memberStats?.activeMembers || 0}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Aktif Üye</p>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-400">{memberStats?.activeMembers || 0}</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <UserCheck className="w-6 h-6 text-green-600" />
+            <div className="w-12 h-12 bg-green-100 dark:bg-green-500/20 rounded-lg flex items-center justify-center">
+              <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Bekleyen Üye</p>
-              <p className="text-3xl font-bold text-yellow-600">{memberStats?.pendingMembers || 0}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Bekleyen Üye</p>
+              <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-300">{memberStats?.pendingMembers || 0}</p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-yellow-600" />
+            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/20 rounded-lg flex items-center justify-center">
+              <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-300" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Bu Ay Yeni</p>
-              <p className="text-3xl font-bold text-blue-600">{memberStats?.newMembersThisMonth || 0}</p>
-              <p className="text-sm text-slate-500 mt-1">{getGrowthPercentage()}</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Bu Ay Yeni</p>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{memberStats?.newMembersThisMonth || 0}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{getGrowthPercentage()}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
@@ -535,30 +539,30 @@ export default function StatisticsPage() {
       {/* Demografik İstatistikler */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Cinsiyet Dağılımı */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <Users className="w-5 h-5 text-purple-600 dark:text-purple-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Cinsiyet Dağılımı</h3>
-              <p className="text-sm text-slate-600">Üyelerin cinsiyet bazlı dağılımı</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Cinsiyet Dağılımı</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin cinsiyet bazlı dağılımı</p>
             </div>
           </div>
           <div className="space-y-4">
             {demographicStats?.genderDistribution.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.gender}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.gender}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-purple-600 h-2 rounded-full" 
+                      className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -566,30 +570,30 @@ export default function StatisticsPage() {
         </div>
 
         {/* Yaş Grupları */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-orange-600" />
+            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-500/20 rounded-lg flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Yaş Grupları</h3>
-              <p className="text-sm text-slate-600">Üyelerin yaş bazlı dağılımı</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Yaş Grupları</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin yaş bazlı dağılımı</p>
             </div>
           </div>
           <div className="space-y-4">
             {demographicStats?.ageGroups.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.ageGroup}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.ageGroup}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-orange-600 h-2 rounded-full" 
+                      className="bg-orange-600 dark:bg-orange-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -597,30 +601,30 @@ export default function StatisticsPage() {
         </div>
 
         {/* Medeni Durum */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-pink-600" />
+            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-500/20 rounded-lg flex items-center justify-center">
+              <Heart className="w-5 h-5 text-pink-600 dark:text-pink-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Medeni Durum</h3>
-              <p className="text-sm text-slate-600">Üyelerin medeni durum dağılımı</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Medeni Durum</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin medeni durum dağılımı</p>
             </div>
           </div>
           <div className="space-y-4">
             {demographicStats?.maritalStatus.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.status}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.status}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-pink-600 h-2 rounded-full" 
+                      className="bg-pink-600 dark:bg-pink-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -628,30 +632,30 @@ export default function StatisticsPage() {
         </div>
 
         {/* Eğitim Seviyeleri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-indigo-600" />
+            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
+              <GraduationCap className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Eğitim Seviyeleri</h3>
-              <p className="text-sm text-slate-600">Üyelerin eğitim durumu</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Eğitim Seviyeleri</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin eğitim durumu</p>
             </div>
           </div>
           <div className="space-y-4">
             {demographicStats?.educationLevels.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.level}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.level}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-indigo-600 h-2 rounded-full" 
+                      className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -662,30 +666,30 @@ export default function StatisticsPage() {
       {/* Coğrafi ve İş İstatistikleri */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* En Çok Üyesi Olan Şehirler */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-green-600" />
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-500/20 rounded-lg flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-green-600 dark:text-green-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">En Çok Üyesi Olan Şehirler</h3>
-              <p className="text-sm text-slate-600">Coğrafi dağılım analizi</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">En Çok Üyesi Olan Şehirler</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Coğrafi dağılım analizi</p>
             </div>
           </div>
           <div className="space-y-4">
             {geographicStats?.topCities.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.city}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.city}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-green-600 h-2 rounded-full" 
+                      className="bg-green-600 dark:bg-green-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (geographicStats?.topCities[0]?.count || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -693,30 +697,30 @@ export default function StatisticsPage() {
         </div>
 
         {/* En Çok Çalışanı Olan İşyerleri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-blue-600 dark:text-blue-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">En Çok Çalışanı Olan İşyerleri</h3>
-              <p className="text-sm text-slate-600">İşyeri bazlı üye dağılımı</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">En Çok Çalışanı Olan İşyerleri</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">İşyeri bazlı üye dağılımı</p>
             </div>
           </div>
           <div className="space-y-4">
             {workplaceStats?.topWorkplaces.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700 truncate">{item.workplace}</span>
+                <span className="text-slate-700 dark:text-slate-300 truncate">{item.workplace}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full" 
+                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (workplaceStats?.topWorkplaces[0]?.count || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -727,30 +731,30 @@ export default function StatisticsPage() {
       {/* Çocuk Sayısı ve Pozisyon İstatistikleri */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Çocuk Sayısı İstatistikleri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Baby className="w-5 h-5 text-yellow-600" />
+            <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-500/20 rounded-lg flex items-center justify-center">
+              <Baby className="w-5 h-5 text-yellow-600 dark:text-yellow-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Çocuk Sayısı Dağılımı</h3>
-              <p className="text-sm text-slate-600">Üyelerin çocuk sayısı analizi</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Çocuk Sayısı Dağılımı</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin çocuk sayısı analizi</p>
             </div>
           </div>
           <div className="space-y-4">
             {demographicStats?.childrenStats.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700">{item.range}</span>
+                <span className="text-slate-700 dark:text-slate-300">{item.range}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-yellow-600 h-2 rounded-full" 
+                      className="bg-yellow-600 dark:bg-yellow-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -758,30 +762,30 @@ export default function StatisticsPage() {
         </div>
 
         {/* Pozisyon Dağılımı */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className={cardClass}>
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-teal-600" />
+            <div className="w-10 h-10 bg-teal-100 dark:bg-teal-500/20 rounded-lg flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-teal-600 dark:text-teal-300" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Pozisyon Dağılımı</h3>
-              <p className="text-sm text-slate-600">Üyelerin iş pozisyonları</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Pozisyon Dağılımı</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin iş pozisyonları</p>
             </div>
           </div>
           <div className="space-y-4">
             {workplaceStats?.positionDistribution.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-slate-700 truncate">{item.position}</span>
+                <span className="text-slate-700 dark:text-slate-300 truncate">{item.position}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 rounded-full h-2">
+                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                     <div 
-                      className="bg-teal-600 h-2 rounded-full" 
+                      className="bg-teal-600 dark:bg-teal-400 h-2 rounded-full" 
                       style={{ 
                         width: `${(item.count / (workplaceStats?.positionDistribution[0]?.count || 1)) * 100}%` 
                       }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-slate-900 w-12 text-right">{item.count}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
                 </div>
               </div>
             ))}
@@ -790,34 +794,34 @@ export default function StatisticsPage() {
       </div>
 
       {/* Zaman Bazlı İstatistikler */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className={cardClass}>
         <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-indigo-600" />
+          <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
+            <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Üyelik Trendleri</h3>
-            <p className="text-sm text-slate-600">Katılım tarihi bazlı analiz</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Üyelik Trendleri</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Katılım tarihi bazlı analiz</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Son 12 Ay Trend */}
           <div>
-            <h4 className="text-md font-medium text-slate-800 mb-4">Son 12 Ayın Üyelik Trendleri</h4>
+            <h4 className="text-md font-medium text-slate-800 dark:text-slate-200 mb-4">Son 12 Ayın Üyelik Trendleri</h4>
             <div className="space-y-3">
               {timeStats?.membershipTrends.slice(-6).map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
-                  <span className="text-slate-700">{item.month}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{item.month}</span>
                   <div className="flex items-center space-x-3">
-                    <div className="w-24 bg-slate-200 rounded-full h-2">
+                    <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                       <div 
-                        className="bg-indigo-600 h-2 rounded-full" 
+                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
                         style={{ 
                           width: `${(item.count / Math.max(...(timeStats?.membershipTrends.map(t => t.count) || [1]))) * 100}%` 
                         }}
                       />
                     </div>
-                    <span className="text-sm font-medium text-slate-900 w-8 text-right">{item.count}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-8 text-right">{item.count}</span>
                   </div>
                 </div>
               ))}
@@ -826,21 +830,21 @@ export default function StatisticsPage() {
 
           {/* Katılım Süresi Analizi */}
           <div>
-            <h4 className="text-md font-medium text-slate-800 mb-4">Katılım Süresi Dağılımı</h4>
+            <h4 className="text-md font-medium text-slate-800 dark:text-slate-200 mb-4">Katılım Süresi Dağılımı</h4>
             <div className="space-y-3">
               {timeStats?.joinDateAnalysis.map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
-                  <span className="text-slate-700">{item.period}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{item.period}</span>
                   <div className="flex items-center space-x-3">
-                    <div className="w-24 bg-slate-200 rounded-full h-2">
+                    <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                       <div 
-                        className="bg-indigo-600 h-2 rounded-full" 
+                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
                         style={{ 
                           width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
                         }}
                       />
                     </div>
-                    <span className="text-sm font-medium text-slate-900 w-8 text-right">{item.count}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-8 text-right">{item.count}</span>
                   </div>
                 </div>
               ))}
@@ -850,25 +854,25 @@ export default function StatisticsPage() {
       </div>
 
       {/* Özet Kartları */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">İstatistik Özeti</h3>
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-slate-900/60 dark:from-slate-900 dark:to-slate-900 rounded-xl p-6 border border-blue-200 dark:border-slate-800">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">İstatistik Özeti</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-sm text-slate-600">Aktiflik Oranı</div>
-            <div className="text-2xl font-bold text-green-600">
+          <div className={miniCardClass}>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Aktiflik Oranı</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-300">
               {memberStats?.totalMembers ? 
                 Math.round((memberStats.activeMembers / memberStats.totalMembers) * 100) : 0}%
             </div>
           </div>
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-sm text-slate-600">Bu Ay Büyüme</div>
-            <div className="text-2xl font-bold text-blue-600">
+          <div className={miniCardClass}>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Bu Ay Büyüme</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
               {getGrowthPercentage()}
             </div>
           </div>
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="text-sm text-slate-600">En Popüler Şehir</div>
-            <div className="text-lg font-bold text-slate-900">
+          <div className={miniCardClass}>
+            <div className="text-sm text-slate-600 dark:text-slate-400">En Popüler Şehir</div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100">
               {geographicStats?.topCities[0]?.city || 'Veri yok'}
             </div>
           </div>

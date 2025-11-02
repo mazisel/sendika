@@ -158,10 +158,10 @@ export default function AdminMembersPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'Beklemede' },
-      active: { color: 'bg-green-100 text-green-800', icon: UserCheck, text: 'Aktif' },
-      inactive: { color: 'bg-gray-100 text-gray-800', icon: UserX, text: 'Pasif' },
-      suspended: { color: 'bg-red-100 text-red-800', icon: X, text: 'Askıda' }
+      pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300', icon: Clock, text: 'Beklemede' },
+      active: { color: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300', icon: UserCheck, text: 'Aktif' },
+      inactive: { color: 'bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200', icon: UserX, text: 'Pasif' },
+      suspended: { color: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300', icon: X, text: 'Askıda' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -180,50 +180,50 @@ export default function AdminMembersPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Üyeler yükleniyor...</p>
+          <p className="mt-4 text-gray-600 dark:text-slate-400">Üyeler yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 text-slate-900 dark:text-slate-100">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Üye Yönetimi</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Üye Yönetimi</h1>
+        <p className="text-gray-600 dark:text-slate-400 mt-1">
           {currentUser?.role_type === 'branch_manager' && currentUser.city
             ? `${currentUser.city} şubesi üyelerini görüntüleyin ve yönetin`
             : 'Sendika üyelerini görüntüleyin ve yönetin'
           }
         </p>
         {currentUser?.role_type === 'branch_manager' && currentUser.city && (
-          <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-            <MapPin className="w-4 h-4 mr-1" />
+          <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300">
+            <MapPin className="w-4 h-4 mr-1 text-blue-600 dark:text-blue-300" />
             {currentUser.city} Şubesi
           </div>
         )}
       </div>
 
       {/* Filtreler ve Arama */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+      <div className="bg-white dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 rounded-lg shadow-sm dark:shadow-slate-900/40 p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 w-5 h-5" />
             <input
               type="text"
               placeholder="Ad, soyad, TC, e-posta veya telefon ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-900/60 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
             />
           </div>
 
           <div className="flex items-center space-x-2">
-            <Filter className="text-gray-400 w-5 h-5" />
+            <Filter className="text-gray-400 dark:text-slate-500 w-5 h-5" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-900/60 text-gray-900 dark:text-slate-100"
             >
               <option value="all">Tüm Durumlar</option>
               <option value="pending">Beklemede</option>
@@ -251,15 +251,15 @@ export default function AdminMembersPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-slate-400">
           <span>Toplam {filteredMembers.length} üye bulundu</span>
           <div className="flex items-center space-x-4">
             <span className="flex items-center">
-              <span className="w-3 h-3 bg-yellow-100 rounded-full mr-1"></span>
+              <span className="w-3 h-3 bg-yellow-100 dark:bg-yellow-500/40 rounded-full mr-1"></span>
               Beklemede: {members.filter(m => m.membership_status === 'pending').length}
             </span>
             <span className="flex items-center">
-              <span className="w-3 h-3 bg-green-100 rounded-full mr-1"></span>
+              <span className="w-3 h-3 bg-green-100 dark:bg-green-500/40 rounded-full mr-1"></span>
               Aktif: {members.filter(m => m.membership_status === 'active').length}
             </span>
           </div>
@@ -267,68 +267,68 @@ export default function AdminMembersPage() {
       </div>
 
       {/* Üye Listesi */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 rounded-lg shadow-sm dark:shadow-slate-900/40 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
+            <thead className="bg-gray-50 dark:bg-slate-900/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Üye No
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Ad Soyad
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   TC Kimlik
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   İletişim
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Konum
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Durum
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Kayıt Tarihi
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-slate-800">
               {filteredMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-slate-100">
                     {member.membership_number || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 dark:text-slate-100">
                         {member.first_name} {member.last_name}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 dark:text-slate-400">
                         {member.gender} • {member.birth_date ? new Date(member.birth_date).toLocaleDateString('tr-TR') : '-'}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-slate-100">
                     {member.tc_identity}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{member.phone}</div>
-                    <div className="text-sm text-gray-500">{member.email}</div>
+                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.phone}</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{member.city}</div>
-                    <div className="text-sm text-gray-500">{member.district}</div>
+                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.city}</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.district}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(member.membership_status)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
                     {new Date(member.created_at).toLocaleDateString('tr-TR')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -382,123 +382,123 @@ export default function AdminMembersPage() {
 
       {/* Üye Detay Modal */}
       {showDetails && selectedMember && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Üye Detayları</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-slate-700 w-full max-w-4xl shadow-lg dark:shadow-slate-900/40 rounded-md bg-white dark:bg-slate-900">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Üye Detayları</h3>
               <button
                 onClick={() => setShowDetails(false)}
-                className="text-gray-400 hover:text-gray-500"
+                className="text-gray-400 dark:text-slate-500 hover:text-gray-500 dark:hover:text-slate-300"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-900 dark:text-slate-100">
               {/* Kişisel Bilgiler */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-3">Kişisel Bilgiler</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">Kişisel Bilgiler</h4>
                 <dl className="space-y-2">
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Üye No</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.membership_number || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Üye No</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.membership_number || '-'}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Ad Soyad</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.first_name} {selectedMember.last_name}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Ad Soyad</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.first_name} {selectedMember.last_name}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">TC Kimlik</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.tc_identity}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">TC Kimlik</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.tc_identity}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Doğum Tarihi</dt>
-                    <dd className="text-sm text-gray-900">
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Doğum Tarihi</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">
                       {selectedMember.birth_date ? new Date(selectedMember.birth_date).toLocaleDateString('tr-TR') : '-'}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Cinsiyet</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.gender}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Cinsiyet</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.gender}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Medeni Durum</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.marital_status || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Medeni Durum</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.marital_status || '-'}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Çocuk Sayısı</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.children_count}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Çocuk Sayısı</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.children_count}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Eğitim Durumu</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.education_level || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Eğitim Durumu</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.education_level || '-'}</dd>
                   </div>
                 </dl>
               </div>
 
               {/* İletişim Bilgileri */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-3">İletişim Bilgileri</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">İletişim Bilgileri</h4>
                 <dl className="space-y-2">
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Telefon</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.phone}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Telefon</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.phone}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">E-posta</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.email}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">E-posta</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.email}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">İl / İlçe</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.city} / {selectedMember.district}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">İl / İlçe</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.city} / {selectedMember.district}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Adres</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.address || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Adres</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.address || '-'}</dd>
                   </div>
                 </dl>
               </div>
 
               {/* İş Bilgileri */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-3">İş Bilgileri</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">İş Bilgileri</h4>
                 <dl className="space-y-2">
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">İşyeri</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.workplace || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">İşyeri</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.workplace || '-'}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Pozisyon</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.position || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Pozisyon</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.position || '-'}</dd>
                   </div>
                 </dl>
               </div>
 
               {/* Acil Durum */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-3">Acil Durum İletişim</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">Acil Durum İletişim</h4>
                 <dl className="space-y-2">
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Kişi</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.emergency_contact_name || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Kişi</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.emergency_contact_name || '-'}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Telefon</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.emergency_contact_phone || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Telefon</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.emergency_contact_phone || '-'}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Yakınlık</dt>
-                    <dd className="text-sm text-gray-900">{selectedMember.emergency_contact_relation || '-'}</dd>
+                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Yakınlık</dt>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.emergency_contact_relation || '-'}</dd>
                   </div>
                 </dl>
               </div>
             </div>
 
             {/* Durum ve İşlemler */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-gray-500 mr-2">Mevcut Durum:</span>
+                  <span className="text-sm font-medium text-gray-500 dark:text-slate-400 mr-2">Mevcut Durum:</span>
                   {getStatusBadge(selectedMember.membership_status)}
                 </div>
                 <div className="flex space-x-3">

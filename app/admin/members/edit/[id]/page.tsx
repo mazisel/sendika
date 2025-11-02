@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, AlertTriangle, Key } from 'lucide-react';
+import type { MemberDue } from '@/types/dues';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, AlertTriangle, Key, Wallet, CircleDollarSign, CheckCircle2, TrendingDown, Loader2, ArrowRight } from 'lucide-react';
 
 interface FormData {
   first_name: string;
@@ -59,6 +61,39 @@ const initialFormData: FormData = {
   membership_date: ''
 };
 
+const emptyMemberDueSummary = {
+  total_expected: 0,
+  total_paid: 0,
+  total_outstanding: 0,
+  paid_count: 0,
+  partial_count: 0,
+  overdue_count: 0,
+  pending_count: 0
+};
+
+type MemberDueRecord = MemberDue & {
+  member_due_periods?: {
+    name: string;
+    due_date: string;
+    due_amount: number;
+    penalty_rate?: number;
+    status?: string;
+  } | null;
+  total_due_amount?: number;
+  outstanding_amount?: number;
+};
+
+const dateFormatter = new Intl.DateTimeFormat('tr-TR', {
+  timeZone: 'UTC'
+});
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return dateFormatter.format(date);
+};
+
 export default function EditMemberPage() {
   const router = useRouter();
   const params = useParams();
@@ -75,6 +110,27 @@ export default function EditMemberPage() {
   const [passwordError, setPasswordError] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [duesLoading, setDuesLoading] = useState(false);
+  const [duesError, setDuesError] = useState('');
+  const [memberDuesSummary, setMemberDuesSummary] = useState(emptyMemberDueSummary);
+  const [memberDueRecords, setMemberDueRecords] = useState<MemberDueRecord[]>([]);
+
+  const formatCurrency = (value: number) =>
+    value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
+
+  const memberDueStatusBadges: Record<string, { label: string; className: string }> = {
+    paid: { label: 'Ödendi', className: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },
+    partial: { label: 'Kısmi', className: 'bg-amber-100 text-amber-700 ring-amber-200' },
+    overdue: { label: 'Gecikmiş', className: 'bg-red-100 text-red-700 ring-red-200' },
+    pending: { label: 'Beklemede', className: 'bg-slate-100 text-slate-700 ring-slate-200' },
+    cancelled: { label: 'İptal', className: 'bg-gray-200 text-gray-600 ring-gray-300' }
+  };
+
+  const getStatusBadge = (status: string) =>
+    memberDueStatusBadges[status] ?? {
+      label: status,
+      className: 'bg-slate-100 text-slate-700 ring-slate-200'
+    };
 
   useEffect(() => {
     // Kullanıcı bilgilerini al
@@ -83,6 +139,7 @@ export default function EditMemberPage() {
     
     // Üye bilgilerini yükle
     loadMember();
+    loadMemberDues();
   }, [memberId]);
 
   const loadMember = async () => {
@@ -129,6 +186,55 @@ export default function EditMemberPage() {
       router.push('/admin/members');
     } finally {
       setPageLoading(false);
+    }
+  };
+
+  const loadMemberDues = async () => {
+    if (!memberId) return;
+    try {
+      setDuesLoading(true);
+      setDuesError('');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('Oturumunuz geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın.');
+      }
+
+      const response = await fetch(`/api/dues/members/${memberId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.message || 'Aidat bilgileri alınamadı.');
+      }
+
+      const payload = await response.json();
+      const summaryData = payload?.data?.summary ?? emptyMemberDueSummary;
+      const duesList: MemberDueRecord[] = Array.isArray(payload?.data?.dues)
+        ? payload.data.dues
+        : [];
+
+      duesList.sort((a, b) => {
+        const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
+        const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      setMemberDuesSummary(summaryData);
+      setMemberDueRecords(duesList);
+    } catch (error) {
+      console.error('Üye aidat bilgileri alınırken hata:', error);
+      setDuesError(
+        error instanceof Error ? error.message : 'Aidat bilgileri alınamadı.'
+      );
+    } finally {
+      setDuesLoading(false);
     }
   };
 
@@ -849,6 +955,144 @@ export default function EditMemberPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Üye Aidat Durumu */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Aidat Durumu</h3>
+              <p className="text-sm text-slate-600">
+                Üyenin geçmiş aidat dönemleri, ödenen ve bekleyen tutarlar.
+              </p>
+            </div>
+          </div>
+
+          {duesLoading ? (
+            <div className="flex items-center gap-3 text-slate-500">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Aidat bilgileri yükleniyor...</span>
+            </div>
+          ) : duesError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {duesError}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Toplam Beklenen</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {formatCurrency(memberDuesSummary.total_expected)}
+                      </p>
+                    </div>
+                    <CircleDollarSign className="w-6 h-6 text-slate-500" />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Üyenin dahil olduğu tüm dönemlerdeki toplam tutar.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-emerald-600 uppercase">Tahsil Edilen</p>
+                      <p className="mt-1 text-lg font-semibold text-emerald-700">
+                        {formatCurrency(memberDuesSummary.total_paid)}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <p className="mt-2 text-xs text-emerald-700">
+                    {memberDuesSummary.paid_count} dönem tamamen ödendi.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-orange-600 uppercase">Bekleyen</p>
+                      <p className="mt-1 text-lg font-semibold text-orange-700">
+                        {formatCurrency(memberDuesSummary.total_outstanding)}
+                      </p>
+                    </div>
+                    <TrendingDown className="w-6 h-6 text-orange-500" />
+                  </div>
+                  <p className="mt-2 text-xs text-orange-700">
+                    {memberDuesSummary.overdue_count} dönem gecikmiş durumda.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-slate-800">
+                    Son Aidat Dönemleri
+                  </h4>
+                  <Link
+                    href="/admin/dues"
+                    className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Aidat merkezine git
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+                {memberDueRecords.length === 0 ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Üye için henüz aidat kaydı bulunmuyor.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {memberDueRecords.slice(0, 5).map((due) => {
+                      const badge = getStatusBadge(due.status);
+                      const totalDue = Math.max(
+                        (due.amount_due ?? 0) -
+                          (due.discount_amount ?? 0) +
+                          (due.penalty_amount ?? 0),
+                        0
+                      );
+                      return (
+                        <div
+                          key={due.id}
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-slate-200 px-4 py-3 bg-white"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {due.member_due_periods?.name ?? 'Aidat Dönemi'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Son ödeme:{' '}
+                              {due.due_date ? formatDate(due.due_date) : '-'}{' '}
+                              • Beklenen:{' '}
+                              {formatCurrency(totalDue)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${badge.className}`}
+                            >
+                              {badge.label}
+                            </span>
+                            <Link
+                              href={`/admin/dues/${due.period_id}`}
+                              className="text-sm text-blue-600 hover:text-blue-700"
+                            >
+                              Detay
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Üye Giriş Bilgileri */}

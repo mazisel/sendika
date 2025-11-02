@@ -98,9 +98,9 @@ export default function HomePage() {
                         <p className="text-gray-600 mb-3 text-sm leading-relaxed">
                           {newsItem.excerpt || newsItem.content.substring(0, 150) + '...'}
                         </p>
-                        <a href="#" className="text-primary-600 font-medium hover:text-primary-700 text-sm">
+                        <Link href={`/haberler/${newsItem.id}`} className="text-primary-600 font-medium hover:text-primary-700 text-sm">
                           Devamını Oku →
-                        </a>
+                        </Link>
                       </div>
                     </article>
                   ))
@@ -149,26 +149,26 @@ export default function HomePage() {
                       switch (type) {
                         case 'urgent':
                           return (
-                            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                              <span className="text-white text-sm font-bold">!</span>
+                            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-lg text-white mr-4">
+                              ❗
                             </div>
                           )
                         case 'general':
                           return (
-                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-3 mt-1">
-                              <span className="text-white text-xs">📢</span>
+                            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-base mr-4">
+                              📢
                             </div>
                           )
                         case 'info':
                           return (
-                            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-1">
-                              <span className="text-white text-xs">✓</span>
+                            <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center text-base mr-4">
+                              ✅
                             </div>
                           )
                         default:
                           return (
-                            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center mr-3 mt-1">
-                              <span className="text-white text-xs">⚠</span>
+                            <div className="w-9 h-9 bg-yellow-500 rounded-full flex items-center justify-center text-base mr-4">
+                              ⚠️
                             </div>
                           )
                       }
@@ -203,34 +203,35 @@ export default function HomePage() {
                     const isUrgent = announcement.type === 'urgent'
 
                     return (
-                      <div key={announcement.id} className={`${getTypeColor(announcement.type)} ${isUrgent ? 'p-6' : 'p-4'} rounded-lg`}>
+                      <Link
+                        key={announcement.id}
+                        href={`/duyurular/${announcement.id}`}
+                        className={`${getTypeColor(announcement.type)} ${isUrgent ? 'p-6' : 'p-4'} rounded-lg block hover:shadow-md transition-shadow`}
+                      >
                         <div className="flex items-start">
-                          {isUrgent ? (
-                            <div className="flex-shrink-0">
-                              {getTypeIcon(announcement.type)}
-                            </div>
-                          ) : (
-                            getTypeIcon(announcement.type)
-                          )}
-                          <div className={isUrgent ? 'ml-4' : ''}>
-                            <h4 className={`font-semibold ${colors.title} mb-1 ${isUrgent ? 'text-lg mb-2' : ''}`}>
+                          {getTypeIcon(announcement.type)}
+                          <div className="flex-1">
+                            <h4 className={`font-semibold ${colors.title} mb-2 ${isUrgent ? 'text-lg' : ''}`}>
                               {announcement.title}
                             </h4>
-                            <p className={`${colors.content} text-sm ${isUrgent ? 'mb-3' : ''}`}>
+                            <p className={`${colors.content} text-sm md:text-base whitespace-pre-wrap break-words ${isUrgent ? 'mb-3' : ''}`}>
                               {announcement.content}
                             </p>
-                            {isUrgent && (
-                              <span className="text-sm text-red-600 font-medium">
-                                📅 {new Date(announcement.created_at).toLocaleDateString('tr-TR', {
+                            <div className="flex items-center justify-between mt-3 text-xs md:text-sm text-gray-500">
+                              <span>
+                                {new Date(announcement.created_at).toLocaleDateString('tr-TR', {
                                   year: 'numeric',
                                   month: 'long',
                                   day: 'numeric'
                                 })}
                               </span>
-                            )}
+                              <span className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700">
+                                Devamını Gör <ChevronRight className="w-4 h-4 ml-1" />
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     )
                   })
                 ) : (

@@ -211,10 +211,13 @@ export default function NewsPage() {
                       )}
 
                       {/* Read More */}
-                      <button className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700 transition-colors">
+                      <Link
+                        href={`/haberler/${newsItem.id}`}
+                        className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700 transition-colors"
+                      >
                         Devamını Oku
                         <ChevronRight className="w-4 h-4 ml-1" />
-                      </button>
+                      </Link>
                     </div>
                   </article>
                 ))}
