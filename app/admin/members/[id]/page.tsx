@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { AdminAuth } from '@/lib/auth';
+import { PermissionManager } from '@/lib/permissions';
 import { ArrowLeft, Upload, FileText, Download, Trash2, Eye, X, Check, UserCheck, UserX, Clock } from 'lucide-react';
 
 interface Member {
@@ -15,11 +17,12 @@ interface Member {
   gender: string;
   city: string;
   district: string;
-  phone: string;
-  email: string;
+  phone: string | null;
+  email: string | null;
   address: string;
   workplace: string;
   position: string;
+  region: number | null;
   membership_status: 'pending' | 'active' | 'inactive' | 'suspended';
   emergency_contact_name: string;
   emergency_contact_phone: string;
@@ -69,6 +72,14 @@ export default function MemberDetailPage() {
         .single();
 
       if (memberError) throw memberError;
+
+      const viewer = AdminAuth.getCurrentUser();
+      if (viewer && !PermissionManager.canAccessCityMembers(viewer, memberData?.city, memberData?.region)) {
+        alert('Bu üyeyi görüntüleme yetkiniz bulunmuyor.');
+        router.push('/admin/members');
+        return;
+      }
+
       setMember(memberData);
 
       // Üye belgelerini yükle
@@ -247,6 +258,9 @@ export default function MemberDetailPage() {
               {member.first_name} {member.last_name}
             </h1>
             <p className="text-gray-600 mt-1">Üye No: {member.membership_number || '-'}</p>
+            {member.region && (
+              <p className="text-sm text-gray-500 mt-1">{member.region}. Bölge</p>
+            )}
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -296,16 +310,22 @@ export default function MemberDetailPage() {
             <div className="space-y-4">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Telefon</dt>
-                <dd className="text-sm text-gray-900 mt-1">{member.phone}</dd>
+                <dd className="text-sm text-gray-900 mt-1">{member.phone || '-'}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">E-posta</dt>
-                <dd className="text-sm text-gray-900 mt-1">{member.email}</dd>
+                <dd className="text-sm text-gray-900 mt-1">{member.email || '-'}</dd>
               </div>
-              <div>
-                <dt className="text-sm font-medium text-gray-500">İl / İlçe</dt>
-                <dd className="text-sm text-gray-900 mt-1">{member.city} / {member.district}</dd>
-              </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">İl / İlçe</dt>
+                    <dd className="text-sm text-gray-900 mt-1">{member.city} / {member.district}</dd>
+                  </div>
+                  {member.region && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Bölge</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{member.region}. Bölge</dd>
+                    </div>
+                  )}
               <div>
                 <dt className="text-sm font-medium text-gray-500">Adres</dt>
                 <dd className="text-sm text-gray-900 mt-1">{member.address || '-'}</dd>

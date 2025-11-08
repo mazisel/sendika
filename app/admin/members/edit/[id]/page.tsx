@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
-import { AdminUser } from '@/lib/types';
+import { PermissionManager } from '@/lib/permissions';
+import { cityOptions } from '@/lib/cities';
+import { AdminUser, DefinitionType, GeneralDefinition } from '@/lib/types';
 import type { MemberDue } from '@/types/dues';
 import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, AlertTriangle, Key, Wallet, CircleDollarSign, CheckCircle2, TrendingDown, Loader2, ArrowRight } from 'lucide-react';
 
@@ -114,6 +116,34 @@ export default function EditMemberPage() {
   const [duesError, setDuesError] = useState('');
   const [memberDuesSummary, setMemberDuesSummary] = useState(emptyMemberDueSummary);
   const [memberDueRecords, setMemberDueRecords] = useState<MemberDueRecord[]>([]);
+  const [branchRegions, setBranchRegions] = useState<Record<string, number>>({});
+  const [cityRegion, setCityRegion] = useState<number | null>(null);
+  const [branchesLoading, setBranchesLoading] = useState(true);
+  const canEditMembershipNumber = currentUser ? PermissionManager.canEditRestrictedFields(currentUser) : false;
+  const [definitionOptions, setDefinitionOptions] = useState<Record<DefinitionType, GeneralDefinition[]>>({
+    workplace: [],
+    position: []
+  });
+  const [definitionsLoading, setDefinitionsLoading] = useState(true);
+  const [isCustomWorkplace, setIsCustomWorkplace] = useState(false);
+  const [isCustomPosition, setIsCustomPosition] = useState(false);
+  const canManageDefinitions = currentUser ? PermissionManager.canManageDefinitions(currentUser) : false;
+
+  const allowedCities = useMemo(() => {
+    if (currentUser?.role_type === 'branch_manager' && currentUser.city) {
+      return [currentUser.city];
+    }
+
+    if (currentUser?.role_type === 'regional_manager' && currentUser.region) {
+      const cities = Object.entries(branchRegions)
+        .filter(([, region]) => region === currentUser.region)
+        .map(([city]) => city)
+        .sort((a, b) => a.localeCompare(b, 'tr'));
+      return cities;
+    }
+
+    return cityOptions.map(option => option.name);
+  }, [branchRegions, currentUser]);
 
   const formatCurrency = (value: number) =>
     value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' });
@@ -142,6 +172,112 @@ export default function EditMemberPage() {
     loadMemberDues();
   }, [memberId]);
 
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        setBranchesLoading(true)
+        const { data, error } = await supabase
+          .from('branches')
+          .select('city, region, is_active');
+
+        if (error) throw error;
+
+        const mapping: Record<string, number> = {};
+        (data || []).forEach(branch => {
+          if (branch.city && typeof branch.region === 'number') {
+            mapping[branch.city] = branch.region;
+          }
+        });
+
+        setBranchRegions(mapping);
+      } catch (error) {
+        console.error('Şube bilgileri alınamadı:', error);
+      } finally {
+        setBranchesLoading(false)
+      }
+    };
+
+    fetchBranches();
+  }, []);
+
+  useEffect(() => {
+    if (formData.city) {
+      setCityRegion(branchRegions[formData.city] ?? null);
+    } else {
+      setCityRegion(null);
+    }
+  }, [formData.city, branchRegions]);
+
+  useEffect(() => {
+    const fetchDefinitions = async () => {
+      try {
+        setDefinitionsLoading(true);
+        const { data, error } = await supabase
+          .from('general_definitions')
+          .select('*')
+          .in('type', ['workplace', 'position'])
+          .eq('is_active', true)
+          .order('type')
+          .order('sort_order', { ascending: true })
+          .order('label', { ascending: true });
+
+        if (error) throw error;
+
+        const grouped: Record<DefinitionType, GeneralDefinition[]> = {
+          workplace: [],
+          position: []
+        };
+
+        (data || []).forEach((item) => {
+          const type = item.type as DefinitionType;
+          if (grouped[type]) {
+            grouped[type].push(item as GeneralDefinition);
+          }
+        });
+
+        setDefinitionOptions(grouped);
+      } catch (error) {
+        console.error('Tanımlamalar alınamadı:', error);
+      } finally {
+        setDefinitionsLoading(false);
+      }
+    };
+
+    fetchDefinitions();
+  }, []);
+
+  useEffect(() => {
+    if (
+      formData.workplace &&
+      !definitionOptions.workplace.some((option) => option.label === formData.workplace) &&
+      !isCustomWorkplace
+    ) {
+      setIsCustomWorkplace(true);
+    }
+  }, [formData.workplace, definitionOptions.workplace, isCustomWorkplace]);
+
+  useEffect(() => {
+    if (
+      formData.position &&
+      !definitionOptions.position.some((option) => option.label === formData.position) &&
+      !isCustomPosition
+    ) {
+      setIsCustomPosition(true);
+    }
+  }, [formData.position, definitionOptions.position, isCustomPosition]);
+
+  useEffect(() => {
+    if (!definitionsLoading && definitionOptions.workplace.length === 0) {
+      setIsCustomWorkplace(true);
+    }
+  }, [definitionsLoading, definitionOptions.workplace.length]);
+
+  useEffect(() => {
+    if (!definitionsLoading && definitionOptions.position.length === 0) {
+      setIsCustomPosition(true);
+    }
+  }, [definitionsLoading, definitionOptions.position.length]);
+
   const loadMember = async () => {
     try {
       const { data, error } = await supabase
@@ -153,6 +289,13 @@ export default function EditMemberPage() {
       if (error) throw error;
 
       if (data) {
+        const viewer = AdminAuth.getCurrentUser();
+        if (viewer && !PermissionManager.canAccessCityMembers(viewer, data.city, data.region)) {
+          alert('Bu üyeyi görüntüleme yetkiniz bulunmuyor.');
+          router.push('/admin/members');
+          return;
+        }
+
         setFormData({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
@@ -179,6 +322,7 @@ export default function EditMemberPage() {
           membership_date: data.membership_date || ''
         });
         setMembershipNumber(data.membership_number || '');
+        setCityRegion(data.region ?? null);
       }
     } catch (error) {
       console.error('Üye bilgileri yüklenirken hata:', error);
@@ -313,6 +457,26 @@ export default function EditMemberPage() {
     }
   };
 
+  const toggleWorkplaceInput = () => {
+    if (isCustomWorkplace) {
+      const exists = definitionOptions.workplace.some(option => option.label === formData.workplace);
+      if (!exists) {
+        setFormData(prev => ({ ...prev, workplace: '' }));
+      }
+    }
+    setIsCustomWorkplace(prev => !prev);
+  };
+
+  const togglePositionInput = () => {
+    if (isCustomPosition) {
+      const exists = definitionOptions.position.some(option => option.label === formData.position);
+      if (!exists) {
+        setFormData(prev => ({ ...prev, position: '' }));
+      }
+    }
+    setIsCustomPosition(prev => !prev);
+  };
+
   const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
   const validateForm = (): boolean => {
@@ -326,8 +490,9 @@ export default function EditMemberPage() {
     if (!formData.gender) newErrors.gender = 'Cinsiyet zorunludur';
     if (!formData.city.trim()) newErrors.city = 'İl zorunludur';
     if (!formData.district.trim()) newErrors.district = 'İlçe zorunludur';
-    if (!formData.phone.trim()) newErrors.phone = 'Telefon zorunludur';
-    if (!formData.email.trim()) newErrors.email = 'E-posta zorunludur';
+    if (canEditMembershipNumber && !membershipNumber.trim()) {
+      newErrors.membership_number = 'Üye numarası zorunludur';
+    }
 
     // TC Kimlik No kontrolü
     if (formData.tc_identity && formData.tc_identity.length !== 11) {
@@ -362,6 +527,14 @@ export default function EditMemberPage() {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
     }
 
+    if (currentUser?.role_type === 'regional_manager' && currentUser.region) {
+      if (!cityRegion) {
+        newErrors.city = 'Seçilen il için bölge bilgisi bulunamadı.';
+      } else if (cityRegion !== currentUser.region) {
+        newErrors.city = `Sadece ${currentUser.region}. bölgedeki üyeleri düzenleyebilirsiniz`;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -376,7 +549,7 @@ export default function EditMemberPage() {
     setLoading(true);
 
     try {
-      const updatedData = {
+      const updatedData: Record<string, any> = {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         tc_identity: formData.tc_identity.trim(),
@@ -384,8 +557,8 @@ export default function EditMemberPage() {
         gender: formData.gender,
         city: formData.city.trim(),
         district: formData.district.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
+        phone: formData.phone.trim() || null,
+        email: formData.email.trim() || null,
         address: formData.address.trim(),
         workplace: formData.workplace.trim(),
         position: formData.position.trim(),
@@ -400,8 +573,13 @@ export default function EditMemberPage() {
         membership_date: formData.membership_date ? formData.membership_date : null,
         membership_status: formData.membership_status,
         is_active: formData.is_active,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        region: cityRegion
       };
+
+      if (canEditMembershipNumber) {
+        updatedData.membership_number = membershipNumber.trim();
+      }
 
       const { error } = await supabase
         .from('members')
@@ -432,19 +610,6 @@ export default function EditMemberPage() {
       setLoading(false);
     }
   };
-
-  const turkishCities = [
-    'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Amasya', 'Ankara', 'Antalya', 'Artvin',
-    'Aydın', 'Balıkesir', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur', 'Bursa',
-    'Çanakkale', 'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Edirne', 'Elazığ', 'Erzincan',
-    'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Isparta',
-    'Mersin', 'İstanbul', 'İzmir', 'Kars', 'Kastamonu', 'Kayseri', 'Kırklareli', 'Kırşehir',
-    'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Kahramanmaraş', 'Mardin', 'Muğla',
-    'Muş', 'Nevşehir', 'Niğde', 'Ordu', 'Rize', 'Sakarya', 'Samsun', 'Siirt',
-    'Sinop', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Şanlıurfa', 'Uşak',
-    'Van', 'Yozgat', 'Zonguldak', 'Aksaray', 'Bayburt', 'Karaman', 'Kırıkkale', 'Batman',
-    'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük', 'Kilis', 'Osmaniye', 'Düzce'
-  ];
 
   if (pageLoading) {
     return (
@@ -501,18 +666,31 @@ export default function EditMemberPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Üye Numarası
+                Üye Numarası {canEditMembershipNumber && <span className="text-red-500">*</span>}
               </label>
-              <input
-                type="text"
-                value={membershipNumber}
-                disabled
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 cursor-not-allowed"
-                placeholder="Otomatik oluşturuldu"
-              />
-              <p className="mt-1 text-sm text-slate-500">
-                Üye numarası değiştirilemez
-              </p>
+              {canEditMembershipNumber ? (
+                <>
+                  <input
+                    type="text"
+                    value={membershipNumber}
+                    onChange={(e) => setMembershipNumber(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      errors.membership_number ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                    placeholder="Örn: UYE-000123"
+                  />
+                  {errors.membership_number && (
+                    <p className="mt-1 text-sm text-red-600">{errors.membership_number}</p>
+                  )}
+                  <p className="mt-1 text-sm text-slate-500">
+                    Bu alan yalnızca süper adminler tarafından güncellenebilir.
+                  </p>
+                </>
+              ) : (
+                <div className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600">
+                  {membershipNumber || 'Otomatik oluşturuldu'}
+                </div>
+              )}
             </div>
 
             <div>
@@ -677,7 +855,7 @@ export default function EditMemberPage() {
                 } ${currentUser?.role_type === 'branch_manager' ? 'bg-slate-100 cursor-not-allowed' : ''}`}
               >
                 <option value="">İl seçiniz</option>
-                {turkishCities.map(city => (
+                {allowedCities.map(city => (
                   <option key={city} value={city}>{city}</option>
                 ))}
               </select>
@@ -687,6 +865,21 @@ export default function EditMemberPage() {
               {currentUser?.role_type === 'branch_manager' && (
                 <p className="mt-1 text-sm text-blue-600">
                   Şube yöneticisi olarak sadece {currentUser.city} iline üye ekleyebilirsiniz.
+                </p>
+              )}
+              {currentUser?.role_type === 'regional_manager' && currentUser.region && (
+                <p className="mt-1 text-sm text-blue-600">
+                  Sadece {currentUser.region}. bölgedeki illere üye ekleyebilirsiniz.
+                </p>
+              )}
+              {!branchesLoading && currentUser?.role_type === 'regional_manager' && currentUser.region && allowedCities.length === 0 && (
+                <p className="mt-1 text-sm text-red-600">
+                  Bu bölgeye bağlı aktif şube bulunamadı. Lütfen önce şube tanımlayın.
+                </p>
+              )}
+              {cityRegion && (
+                <p className="mt-1 text-sm text-slate-500">
+                  Seçilen şehir {cityRegion}. bölgeye bağlı.
                 </p>
               )}
             </div>
@@ -782,7 +975,7 @@ export default function EditMemberPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Telefon <span className="text-red-500">*</span>
+                Telefon <span className="text-xs text-slate-500 ml-1">(opsiyonel)</span>
               </label>
               <input
                 type="tel"
@@ -801,7 +994,7 @@ export default function EditMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                E-posta <span className="text-red-500">*</span>
+                E-posta <span className="text-xs text-slate-500 ml-1">(opsiyonel)</span>
               </label>
               <input
                 type="email"
@@ -851,28 +1044,112 @@ export default function EditMemberPage() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 İşyeri
               </label>
-              <input
-                type="text"
-                name="workplace"
-                value={formData.workplace}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Çalıştığı işyeri"
-              />
+              {!isCustomWorkplace ? (
+                <select
+                  name="workplace"
+                  value={formData.workplace}
+                  onChange={handleInputChange}
+                  disabled={definitionsLoading || definitionOptions.workplace.length === 0}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {definitionsLoading ? 'Tanımlar yükleniyor...' : 'İşyeri seçiniz'}
+                  </option>
+                  {definitionOptions.workplace.map((option) => (
+                    <option key={option.id} value={option.label}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="workplace"
+                  value={formData.workplace}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="İşyeri adı girin"
+                />
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+                <button
+                  type="button"
+                  onClick={toggleWorkplaceInput}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  {isCustomWorkplace ? 'Listeden Seç' : 'Özel Değer Gir'}
+                </button>
+                <span className="text-slate-400">
+                  {definitionsLoading
+                    ? 'Tanımlar yükleniyor'
+                    : `${definitionOptions.workplace.length} kayıt`}
+                </span>
+              </div>
+              {canManageDefinitions && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/admin/definitions')}
+                  className="mt-1 text-xs text-blue-600 hover:text-blue-700"
+                >
+                  Tanımları yönet
+                </button>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Pozisyon
               </label>
-              <input
-                type="text"
-                name="position"
-                value={formData.position}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="İş pozisyonu"
-              />
+              {!isCustomPosition ? (
+                <select
+                  name="position"
+                  value={formData.position}
+                  onChange={handleInputChange}
+                  disabled={definitionsLoading || definitionOptions.position.length === 0}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {definitionsLoading ? 'Tanımlar yükleniyor...' : 'Pozisyon seçiniz'}
+                  </option>
+                  {definitionOptions.position.map((option) => (
+                    <option key={option.id} value={option.label}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="position"
+                  value={formData.position}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="İş pozisyonu girin"
+                />
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+                <button
+                  type="button"
+                  onClick={togglePositionInput}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  {isCustomPosition ? 'Listeden Seç' : 'Özel Değer Gir'}
+                </button>
+                <span className="text-slate-400">
+                  {definitionsLoading
+                    ? 'Tanımlar yükleniyor'
+                    : `${definitionOptions.position.length} kayıt`}
+                </span>
+              </div>
+              {canManageDefinitions && (
+                <button
+                  type="button"
+                  onClick={() => router.push('/admin/definitions')}
+                  className="mt-1 text-xs text-blue-600 hover:text-blue-700"
+                >
+                  Tanımları yönet
+                </button>
+              )}
             </div>
 
             <div>

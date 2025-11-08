@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
 import { AdminUser } from '@/lib/types';
-import { Search, Eye, Check, X, Filter, Download, UserCheck, UserX, Clock, FileText, MapPin, Plus, Edit } from 'lucide-react';
+import { Search, Eye, Check, X, Filter, Download, UserCheck, UserX, Clock, FileText, MapPin, Plus, Edit, AlertTriangle } from 'lucide-react';
 
 interface Member {
   id: string;
@@ -18,8 +18,9 @@ interface Member {
   gender: string;
   city: string;
   district: string;
-  phone: string;
-  email: string;
+  phone: string | null;
+  email: string | null;
+  region: number | null;
   address: string;
   workplace: string;
   position: string;
@@ -69,9 +70,10 @@ export default function AdminMembersPage() {
         .from('members')
         .select('*');
 
-      // Şube yöneticisi ise sadece kendi ilindeki üyeleri getir
       if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
         query = query.eq('city', currentUser.city);
+      } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
+        query = query.eq('region', currentUser.region);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -96,17 +98,25 @@ export default function AdminMembersPage() {
 
     // Arama filtresi
     if (searchTerm) {
+      const lowered = searchTerm.toLowerCase();
       filtered = filtered.filter(member => 
-        member.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.first_name.toLowerCase().includes(lowered) ||
+        member.last_name.toLowerCase().includes(lowered) ||
         member.tc_identity.includes(searchTerm) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.phone.includes(searchTerm) ||
-        (member.membership_number && member.membership_number.toLowerCase().includes(searchTerm.toLowerCase()))
+        (member.email?.toLowerCase().includes(lowered) ?? false) ||
+        (member.phone?.includes(searchTerm) ?? false) ||
+        (member.membership_number?.toLowerCase().includes(lowered) ?? false)
       );
     }
 
     setFilteredMembers(filtered);
+  };
+
+  const getMissingContactFields = (member: Member) => {
+    const missing: string[] = [];
+    if (!member.phone) missing.push('Telefon');
+    if (!member.email) missing.push('E-posta');
+    return missing;
   };
 
   const updateMemberStatus = async (memberId: string, newStatus: string) => {
@@ -139,8 +149,8 @@ export default function AdminMembersPage() {
         member.first_name,
         member.last_name,
         member.tc_identity,
-        member.phone,
-        member.email,
+        member.phone ?? '',
+        member.email ?? '',
         member.city,
         member.district,
         member.membership_status,
@@ -299,7 +309,9 @@ export default function AdminMembersPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-slate-800">
-              {filteredMembers.map((member) => (
+              {filteredMembers.map((member) => {
+                const missingFields = getMissingContactFields(member);
+                return (
                 <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-slate-100">
                     {member.membership_number || '-'}
@@ -318,8 +330,17 @@ export default function AdminMembersPage() {
                     {member.tc_identity}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.phone}</div>
-                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.email}</div>
+                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.phone || '-'}</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.email || '-'}</div>
+                    {missingFields.length > 0 && (
+                      <div
+                        className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-xs dark:bg-amber-500/20 dark:text-amber-200"
+                        title={`Eksik alanlar: ${missingFields.join(', ')}`}
+                      >
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        Eksik bilgi
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-slate-100">{member.city}</div>
@@ -374,7 +395,8 @@ export default function AdminMembersPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -442,16 +464,22 @@ export default function AdminMembersPage() {
                 <dl className="space-y-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Telefon</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.phone}</dd>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.phone || '-'}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">E-posta</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.email}</dd>
+                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.email || '-'}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">İl / İlçe</dt>
                     <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.city} / {selectedMember.district}</dd>
                   </div>
+                  {selectedMember.region && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Bölge</dt>
+                      <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.region}. Bölge</dd>
+                    </div>
+                  )}
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Adres</dt>
                     <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.address || '-'}</dd>

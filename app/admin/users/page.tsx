@@ -5,26 +5,96 @@ import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { cityOptions, regionOptions } from '@/lib/cities';
 import Link from 'next/link';
 import { 
   Users, 
   UserPlus, 
-  Edit, 
   Trash2, 
   Shield, 
   ShieldCheck, 
   AlertCircle, 
-  CheckCircle,
   Eye,
   EyeOff,
   User
 } from 'lucide-react';
+
+type AccessLevel = 'super_admin' | 'general_manager' | 'regional_manager' | 'branch_manager';
+
+const accessLevelOptions: { value: AccessLevel; label: string }[] = [
+  { value: 'super_admin', label: 'Süper Admin' },
+  { value: 'general_manager', label: 'Genel Merkez Yöneticisi' },
+  { value: 'regional_manager', label: 'Bölge Sorumlusu' },
+  { value: 'branch_manager', label: 'Şube Yöneticisi' }
+];
+
+const getAccessLevelForUser = (user: AdminUser): AccessLevel => {
+  if (user.role === 'super_admin') {
+    return 'super_admin';
+  }
+  if (user.role === 'branch_manager' || user.role_type === 'branch_manager') {
+    return 'branch_manager';
+  }
+  if (user.role_type === 'regional_manager') {
+    return 'regional_manager';
+  }
+  return 'general_manager';
+};
+
+interface AccessPayload {
+  role: 'admin' | 'super_admin' | 'branch_manager';
+  role_type: 'general_manager' | 'regional_manager' | 'branch_manager';
+  city: string | null;
+  region: number | null;
+}
+
+const buildAccessPayload = (
+  level: AccessLevel,
+  cityValue?: string,
+  regionValue?: number | null
+): AccessPayload => {
+  switch (level) {
+    case 'super_admin':
+      return {
+        role: 'super_admin',
+        role_type: 'general_manager',
+        city: null,
+        region: null
+      };
+    case 'regional_manager':
+      return {
+        role: 'admin',
+        role_type: 'regional_manager',
+        city: null,
+        region: regionValue ?? null
+      };
+    case 'branch_manager':
+      return {
+        role: 'branch_manager',
+        role_type: 'branch_manager',
+        city: cityValue || null,
+        region: null
+      };
+    case 'general_manager':
+    default:
+      return {
+        role: 'admin',
+        role_type: 'general_manager',
+        city: null,
+        region: null
+      };
+  }
+};
 
 export default function UserManagement() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [accessLevels, setAccessLevels] = useState<Record<string, AccessLevel>>({});
+  const [citySelections, setCitySelections] = useState<Record<string, string>>({});
+  const [regionSelections, setRegionSelections] = useState<Record<string, string>>({});
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,6 +117,26 @@ export default function UserManagement() {
     
     checkAuthAndLoad();
   }, [router]);
+
+  useEffect(() => {
+    const levelMap: Record<string, AccessLevel> = {};
+    const cityMap: Record<string, string> = {};
+    const regionMap: Record<string, string> = {};
+
+    users.forEach((user) => {
+      levelMap[user.id] = getAccessLevelForUser(user);
+      if (user.city) {
+        cityMap[user.id] = user.city;
+      }
+      if (user.region) {
+        regionMap[user.id] = user.region.toString();
+      }
+    });
+
+    setAccessLevels(levelMap);
+    setCitySelections(cityMap);
+    setRegionSelections(regionMap);
+  }, [users]);
 
   const loadUsers = async () => {
     try {
@@ -124,40 +214,106 @@ export default function UserManagement() {
     }
   };
 
-  const changeRole = async (id: string, newRole: 'admin' | 'super_admin' | 'branch_manager') => {
-    // Kendi rolünü değiştirmeye izin verme
-    if (currentUser?.id === id) {
-      setError('Kendi rolünüzü değiştiremezsiniz');
+  const handleAccessLevelSelect = (userId: string, value: AccessLevel) => {
+    setAccessLevels((prev) => ({ ...prev, [userId]: value }));
+
+    setCitySelections((prev) => {
+      if (value !== 'branch_manager') {
+        const { [userId]: _removed, ...rest } = prev;
+        return rest;
+      }
+
+      if (prev[userId]) {
+        return prev;
+      }
+
+      const user = users.find((u) => u.id === userId);
+      return {
+        ...prev,
+        [userId]: user?.city || ''
+      };
+    });
+
+    setRegionSelections((prev) => {
+      if (value !== 'regional_manager') {
+        const { [userId]: _removed, ...rest } = prev;
+        return rest;
+      }
+
+      if (prev[userId]) {
+        return prev;
+      }
+
+      const user = users.find((u) => u.id === userId);
+      return {
+        ...prev,
+        [userId]: user?.region ? user.region.toString() : ''
+      };
+    });
+  };
+
+  const updateUserAccess = async (user: AdminUser) => {
+    if (currentUser?.id === user.id) {
+      setError('Kendi yetki seviyenizi değiştiremezsiniz');
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('admin_users')
-        .update({ role: newRole })
-        .eq('id', id);
+    setError('');
 
-      if (error) {
-        setError('Kullanıcı rolü güncellenirken hata oluştu');
+    const selectedLevel = accessLevels[user.id] ?? getAccessLevelForUser(user);
+    const selectedCity = citySelections[user.id] ?? user.city ?? '';
+    const selectedRegion = regionSelections[user.id] ?? (user.region ? user.region.toString() : '');
+
+    if (selectedLevel === 'branch_manager' && !selectedCity) {
+      setError('Şube yöneticisi için il seçimi zorunlu');
+      return;
+    }
+
+    if (selectedLevel === 'regional_manager' && !selectedRegion) {
+      setError('Bölge sorumlusu için bölge seçimi zorunlu');
+      return;
+    }
+
+    const normalizedRegion =
+      selectedLevel === 'regional_manager' ? Number(selectedRegion) : null;
+
+    const payload = buildAccessPayload(
+      selectedLevel,
+      selectedLevel === 'branch_manager' ? selectedCity : undefined,
+      normalizedRegion
+    );
+
+    setUpdatingUserId(user.id);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('admin_users')
+        .update(payload)
+        .eq('id', user.id);
+
+      if (updateError) {
+        setError('Yetki seviyesi güncellenirken hata oluştu');
         return;
       }
 
-      setUsers(users.map(user => 
-        user.id === id 
-          ? { ...user, role: newRole }
-          : user
-      ));
+      setUsers(users.map((item) => (item.id === user.id ? { ...item, ...payload } : item)));
+      setError('');
     } catch (error) {
-      setError('Kullanıcı rolü güncellenirken hata oluştu');
+      setError('Yetki seviyesi güncellenirken hata oluştu');
+    } finally {
+      setUpdatingUserId(null);
     }
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
+  const getRoleColor = (user: AdminUser) => {
+    const level = getAccessLevelForUser(user);
+    switch (level) {
       case 'super_admin':
         return 'bg-red-100 text-red-800';
-      case 'admin':
+      case 'general_manager':
         return 'bg-blue-100 text-blue-800';
+      case 'regional_manager':
+        return 'bg-amber-100 text-amber-800';
       case 'branch_manager':
         return 'bg-green-100 text-green-800';
       default:
@@ -165,16 +321,18 @@ export default function UserManagement() {
     }
   };
 
-  const getRoleText = (role: string) => {
-    switch (role) {
+  const getRoleText = (user: AdminUser) => {
+    const level = getAccessLevelForUser(user);
+    switch (level) {
       case 'super_admin':
         return 'Süper Admin';
-      case 'admin':
-        return 'Admin';
+      case 'regional_manager':
+        return 'Bölge Sorumlusu';
       case 'branch_manager':
         return 'Şube Yöneticisi';
+      case 'general_manager':
       default:
-        return 'Bilinmeyen';
+        return 'Genel Merkez Yöneticisi';
     }
   };
 
@@ -238,9 +396,10 @@ export default function UserManagement() {
             Rol Açıklamaları
           </h3>
           <div className="space-y-2 text-sm text-blue-800">
-            <div><strong>Süper Admin:</strong> Tüm yetkilere sahip, kullanıcı yönetimi yapabilir</div>
-            <div><strong>Admin:</strong> Haber ve duyuru yönetimi yapabilir, kullanıcı yönetimi yapamaz</div>
-            <div><strong>Şube Yöneticisi:</strong> Kendi şubesindeki üye başvurularını yönetebilir</div>
+            <div><strong>Süper Admin:</strong> Sistem genelinde sınırsız yetki ve korumalı alanlara erişim.</div>
+            <div><strong>Genel Merkez Yöneticisi:</strong> Tüm modülleri yönetir ancak kritik alanlarda sınırlıdır.</div>
+            <div><strong>Bölge Sorumlusu:</strong> Atandığı bölgedeki şube ve üyeleri yönetebilir.</div>
+            <div><strong>Şube Yöneticisi:</strong> Sadece bağlı olduğu ildeki üyeleri yönetebilir.</div>
           </div>
         </div>
 
@@ -274,12 +433,17 @@ export default function UserManagement() {
                             </h3>
                             <p className="text-sm text-slate-500">{user.email}</p>
                           </div>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                            {getRoleText(user.role)}
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user)}`}>
+                            {getRoleText(user)}
                           </span>
                           {user.role === 'branch_manager' && user.city && (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                               {user.city} Şubesi
+                            </span>
+                          )}
+                          {user.role_type === 'regional_manager' && user.region && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              {user.region}. Bölge
                             </span>
                           )}
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -301,43 +465,100 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-col items-end space-y-2 min-w-[240px]">
                         {/* Role Change */}
-                        {currentUser.id !== user.id && (
-                          <select
-                            value={user.role}
-                            onChange={(e) => changeRole(user.id, e.target.value as 'admin' | 'super_admin' | 'branch_manager')}
-                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                          >
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Süper Admin</option>
-                            <option value="branch_manager">Şube Yöneticisi</option>
-                          </select>
+                        {currentUser.id !== user.id ? (
+                          <div className="flex flex-col space-y-2 w-full">
+                            <select
+                              value={accessLevels[user.id] ?? getAccessLevelForUser(user)}
+                              onChange={(e) => handleAccessLevelSelect(user.id, e.target.value as AccessLevel)}
+                              className="text-sm border border-gray-300 rounded px-2 py-1"
+                            >
+                              {accessLevelOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+
+                            {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'regional_manager' && (
+                              <select
+                                value={regionSelections[user.id] ?? (user.region ? user.region.toString() : '')}
+                                onChange={(e) =>
+                                  setRegionSelections((prev) => ({
+                                    ...prev,
+                                    [user.id]: e.target.value
+                                  }))
+                                }
+                                className="text-sm border border-gray-300 rounded px-2 py-1"
+                              >
+                                <option value="">Bölge seçiniz</option>
+                                {regionOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+
+                            {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'branch_manager' && (
+                              <select
+                                value={citySelections[user.id] ?? user.city ?? ''}
+                                onChange={(e) =>
+                                  setCitySelections((prev) => ({
+                                    ...prev,
+                                    [user.id]: e.target.value
+                                  }))
+                                }
+                                className="text-sm border border-gray-300 rounded px-2 py-1"
+                              >
+                                <option value="">İl seçiniz</option>
+                                {cityOptions.map((option) => (
+                                  <option key={option.code} value={option.name}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+
+                            <button
+                              onClick={() => updateUserAccess(user)}
+                              disabled={updatingUserId === user.id}
+                              className="flex items-center justify-center space-x-1 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                              <span>{updatingUserId === user.id ? 'Güncelleniyor...' : 'Yetkiyi Güncelle'}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-500">Kendi yetkinizi değiştiremezsiniz</span>
                         )}
-                        
-                        {/* Toggle Active */}
-                        <button
-                          onClick={() => toggleActive(user.id, user.is_active)}
-                          disabled={currentUser.id === user.id && user.is_active}
-                          className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                            user.is_active
-                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                              : 'bg-green-100 text-green-800 hover:bg-green-200'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          {user.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          <span>{user.is_active ? 'Pasif Yap' : 'Aktif Yap'}</span>
-                        </button>
-                        
-                        {/* Delete */}
-                        <button
-                          onClick={() => handleDelete(user.id)}
-                          disabled={currentUser.id === user.id}
-                          className="flex items-center space-x-1 bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Sil</span>
-                        </button>
+
+                        <div className="flex items-center space-x-2">
+                          {/* Toggle Active */}
+                          <button
+                            onClick={() => toggleActive(user.id, user.is_active)}
+                            disabled={currentUser.id === user.id && user.is_active}
+                            className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                              user.is_active
+                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                                : 'bg-green-100 text-green-800 hover:bg-green-200'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {user.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <span>{user.is_active ? 'Pasif Yap' : 'Aktif Yap'}</span>
+                          </button>
+                          
+                          {/* Delete */}
+                          <button
+                            onClick={() => handleDelete(user.id)}
+                            disabled={currentUser.id === user.id}
+                            className="flex items-center space-x-1 bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Sil</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </li>

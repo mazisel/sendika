@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, MapPin, Phone, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { AdminAuth } from '@/lib/auth'
+import { AdminUser } from '@/lib/types'
 
 interface Branch {
   id: string
   city: string
   city_code: string
+  region: number
   branch_name: string
   president_name: string
   president_phone?: string
@@ -24,18 +27,30 @@ export default function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null)
 
   useEffect(() => {
-    loadBranches()
+    const user = AdminAuth.getCurrentUser()
+    setCurrentUser(user)
+    loadBranches(user)
   }, [])
 
-  const loadBranches = async () => {
+  const loadBranches = async (user?: AdminUser | null) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      let query = supabase
         .from('branches')
         .select('*')
         .order('city', { ascending: true })
+
+      const viewer = user ?? currentUser
+      if (viewer?.role_type === 'regional_manager' && viewer.region) {
+        query = query.eq('region', viewer.region)
+      } else if (viewer?.role_type === 'branch_manager' && viewer.city) {
+        query = query.eq('city', viewer.city)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setBranches(data || [])
@@ -128,6 +143,9 @@ export default function BranchesPage() {
                     Şehir
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Bölge
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Şube Adı
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -163,6 +181,11 @@ export default function BranchesPage() {
                           </div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                        {branch.region ? `${branch.region}. Bölge` : '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">

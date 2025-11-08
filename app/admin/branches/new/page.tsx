@@ -3,9 +3,24 @@
 import { useState } from 'react'
 import { ArrowLeft, Save, MapPin } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { cityOptions, regionOptions, findCityByName } from '@/lib/cities'
+
+interface BranchFormData {
+  city: string
+  city_code: string
+  branch_name: string
+  president_name: string
+  president_phone: string
+  president_email: string
+  address: string
+  coordinates_lat: string
+  coordinates_lng: string
+  is_active: boolean
+  region: string
+}
 
 export default function NewBranchPage() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BranchFormData>({
     city: '',
     city_code: '',
     branch_name: '',
@@ -15,7 +30,8 @@ export default function NewBranchPage() {
     address: '',
     coordinates_lat: '',
     coordinates_lng: '',
-    is_active: true
+    is_active: true,
+    region: ''
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -30,13 +46,31 @@ export default function NewBranchPage() {
       const coordinates_lat = formData.coordinates_lat ? parseFloat(formData.coordinates_lat) : null
       const coordinates_lng = formData.coordinates_lng ? parseFloat(formData.coordinates_lng) : null
 
+      const regionValue = formData.region ? parseInt(formData.region, 10) : null
+
+      if (!regionValue || regionValue < 1 || regionValue > 8) {
+        throw new Error('Lütfen geçerli bir bölge seçiniz.')
+      }
+
+      const payload = {
+        ...formData,
+        coordinates_lat,
+        coordinates_lng,
+        city_code: formData.city_code || findCityByName(formData.city)?.code || '',
+        region: regionValue
+      }
+
+      if (!payload.city) {
+        throw new Error('Lütfen bir şehir seçiniz.')
+      }
+
+      if (!payload.city_code) {
+        throw new Error('Seçilen şehir için plaka kodu bulunamadı.')
+      }
+
       const { error } = await supabase
         .from('branches')
-        .insert([{
-          ...formData,
-          coordinates_lat,
-          coordinates_lng
-        }])
+        .insert([payload])
 
       if (error) throw error
 
@@ -54,6 +88,30 @@ export default function NewBranchPage() {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+    }))
+  }
+
+  const handleCitySelect = (value: string) => {
+    if (!value) {
+      setFormData(prev => ({
+        ...prev,
+        city: '',
+        city_code: ''
+      }))
+      return
+    }
+    const selectedCity = findCityByName(value)
+    setFormData(prev => ({
+      ...prev,
+      city: value,
+      city_code: selectedCity?.code ?? ''
+    }))
+  }
+
+  const handleRegionSelect = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      region: value
     }))
   }
 
@@ -95,16 +153,21 @@ export default function NewBranchPage() {
                   <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                     Şehir *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="city"
                     name="city"
                     value={formData.city}
-                    onChange={handleChange}
+                    onChange={(e) => handleCitySelect(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="İstanbul"
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">Şehir seçiniz</option>
+                    {cityOptions.map((city) => (
+                      <option key={city.code} value={city.name}>
+                        {city.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -116,11 +179,33 @@ export default function NewBranchPage() {
                     id="city_code"
                     name="city_code"
                     value={formData.city_code}
-                    onChange={handleChange}
+                    readOnly
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
                     placeholder="34"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Şehir seçildiğinde plaka kodu otomatik doldurulur.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="region" className="block text-sm font-medium text-gray-700 mb-1">
+                    Bölge *
+                  </label>
+                  <select
+                    id="region"
+                    name="region"
+                    value={formData.region}
+                    onChange={(e) => handleRegionSelect(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">Bölge seçiniz</option>
+                    {regionOptions.map((region) => (
+                      <option key={region.value} value={region.value}>
+                        {region.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

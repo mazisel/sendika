@@ -207,6 +207,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       });
     }
 
+    if (PermissionManager.canManageDefinitions(currentUser)) {
+      baseItems.push({
+        title: 'Tanımlamalar',
+        href: '/admin/definitions',
+        icon: Settings,
+        description: 'İşyeri, pozisyon gibi genel listeleri yönet'
+      });
+    }
+
     if (PermissionManager.canManageUsers(currentUser)) {
       baseItems.push({
         title: 'Kullanıcılar',
@@ -356,11 +365,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
                       {currentUser?.role_type === 'branch_manager' && currentUser?.city
-                        ? `${currentUser.city} Şube Yöneticisi` 
+                        ? `${currentUser.city} Şube Yöneticisi`
+                        : currentUser?.role_type === 'regional_manager' && currentUser?.region
+                        ? `${currentUser.region}. Bölge Sorumlusu`
                         : currentUser?.role_type === 'general_manager'
                         ? 'Genel Merkez Yöneticisi'
-                        : 'Yönetici'
-                      }
+                        : currentUser?.role === 'super_admin'
+                        ? 'Süper Admin'
+                        : 'Yönetici'}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500" />

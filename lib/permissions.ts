@@ -1,16 +1,44 @@
 import { AdminUser } from './types';
 
 export class PermissionManager {
-  static canAccessAllMembers(user: AdminUser): boolean {
-    return user.role_type === 'general_manager' || user.role === 'super_admin';
+  private static isSuperAdmin(user: AdminUser) {
+    return user.role === 'super_admin';
   }
 
-  static canAccessCityMembers(user: AdminUser, city?: string): boolean {
+  private static isGeneralManager(user: AdminUser) {
+    return user.role_type === 'general_manager';
+  }
+
+  private static isRegionalManager(user: AdminUser) {
+    return user.role_type === 'regional_manager' && !!user.region;
+  }
+
+  private static isBranchManager(user: AdminUser) {
+    return user.role_type === 'branch_manager' && !!user.city;
+  }
+
+  static canAccessAllMembers(user: AdminUser): boolean {
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  }
+
+  static canAccessRegionMembers(user: AdminUser, region?: number | null): boolean {
+    if (!this.isRegionalManager(user)) {
+      return false;
+    }
+    if (!user.region) return false;
+    return region ? user.region === region : true;
+  }
+
+  static canAccessCityMembers(user: AdminUser, city?: string, region?: number | null): boolean {
     if (this.canAccessAllMembers(user)) {
       return true;
     }
+
+    if (this.canAccessRegionMembers(user, region)) {
+      return true;
+    }
     
-    if (user.role_type === 'branch_manager' && user.city) {
+    if (this.isBranchManager(user)) {
       return city ? user.city === city : true;
     }
     
@@ -18,35 +46,39 @@ export class PermissionManager {
   }
 
   static canManageUsers(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageNews(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageAnnouncements(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageSliders(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageManagement(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageBranches(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user) || this.isRegionalManager(user);
   }
 
   static canManageCategories(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  }
+
+  static canManageDefinitions(user: AdminUser): boolean {
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canManageDues(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user) || this.isRegionalManager(user);
   }
 
   static canViewDues(user: AdminUser): boolean {
@@ -54,11 +86,15 @@ export class PermissionManager {
   }
 
   static canManageFinance(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
   static canViewFinance(user: AdminUser): boolean {
-    return user.role === 'super_admin' || user.role_type === 'general_manager' || user.role === 'admin';
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  }
+
+  static canEditRestrictedFields(user: AdminUser): boolean {
+    return this.isSuperAdmin(user);
   }
 
   static getUserAccessibleCities(user: AdminUser): string[] {
@@ -66,7 +102,7 @@ export class PermissionManager {
       return []; // Boş array tüm şehirlere erişim anlamına gelir
     }
     
-    if (user.role_type === 'branch_manager' && user.city) {
+    if (this.isBranchManager(user) && user.city) {
       return [user.city];
     }
     
@@ -113,6 +149,10 @@ export class PermissionManager {
 
     if (this.canManageCategories(user)) {
       baseItems.push({ name: 'Kategoriler', href: '/admin/categories', icon: 'categories' });
+    }
+
+    if (this.canManageDefinitions(user)) {
+      baseItems.push({ name: 'Tanımlamalar', href: '/admin/definitions', icon: 'definitions' });
     }
 
     if (this.canManageUsers(user)) {

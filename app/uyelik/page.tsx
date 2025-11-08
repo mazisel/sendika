@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -27,12 +27,124 @@ export default function UyelikPage() {
     marital_status: '',
     children_count: 0,
   });
+  const [workplaceOptions, setWorkplaceOptions] = useState<string[]>([]);
+  const [positionOptions, setPositionOptions] = useState<string[]>([]);
+  const [useCustomWorkplace, setUseCustomWorkplace] = useState(false);
+  const [useCustomPosition, setUseCustomPosition] = useState(false);
+  const CUSTOM_OPTION_VALUE = '__custom__';
+
+  useEffect(() => {
+    const fetchDefinitions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('general_definitions')
+          .select('type, label, sort_order')
+          .in('type', ['workplace', 'position'])
+          .eq('is_active', true)
+          .order('type')
+          .order('sort_order', { ascending: true })
+          .order('label', { ascending: true });
+
+        if (error) throw error;
+
+        const grouped = {
+          workplace: [] as string[],
+          position: [] as string[]
+        };
+
+        const definitions = (data || []) as { type: string; label: string }[];
+
+        definitions.forEach((item) => {
+          if (item.type === 'workplace') {
+            grouped.workplace.push(item.label);
+          } else if (item.type === 'position') {
+            grouped.position.push(item.label);
+          }
+        });
+
+        setWorkplaceOptions(grouped.workplace);
+        setPositionOptions(grouped.position);
+      } catch (error) {
+        console.error('Tanımlamalar alınamadı:', error);
+      }
+    };
+
+    fetchDefinitions();
+  }, []);
+
+  useEffect(() => {
+    if (workplaceOptions.length === 0) {
+      setUseCustomWorkplace(true);
+    }
+  }, [workplaceOptions.length]);
+
+  useEffect(() => {
+    if (
+      formData.workplace &&
+      workplaceOptions.length > 0 &&
+      !workplaceOptions.includes(formData.workplace)
+    ) {
+      setUseCustomWorkplace(true);
+    }
+  }, [formData.workplace, workplaceOptions]);
+
+  useEffect(() => {
+    if (positionOptions.length === 0) {
+      setUseCustomPosition(true);
+    }
+  }, [positionOptions.length]);
+
+  useEffect(() => {
+    if (
+      formData.position &&
+      positionOptions.length > 0 &&
+      !positionOptions.includes(formData.position)
+    ) {
+      setUseCustomPosition(true);
+    }
+  }, [formData.position, positionOptions]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const handleWorkplaceSelect = (value: string) => {
+    if (value === CUSTOM_OPTION_VALUE) {
+      setUseCustomWorkplace(true);
+      setFormData(prev => ({ ...prev, workplace: '' }));
+    } else {
+      setUseCustomWorkplace(false);
+      setFormData(prev => ({ ...prev, workplace: value }));
+    }
+  };
+
+  const handlePositionSelect = (value: string) => {
+    if (value === CUSTOM_OPTION_VALUE) {
+      setUseCustomPosition(true);
+      setFormData(prev => ({ ...prev, position: '' }));
+    } else {
+      setUseCustomPosition(false);
+      setFormData(prev => ({ ...prev, position: value }));
+    }
+  };
+
+  const resetWorkplaceToSelect = () => {
+    setUseCustomWorkplace(false);
+    setFormData(prev => ({
+      ...prev,
+      workplace: workplaceOptions.includes(prev.workplace) ? prev.workplace : ''
+    }));
+  };
+
+  const resetPositionToSelect = () => {
+    setUseCustomPosition(false);
+    setFormData(prev => ({
+      ...prev,
+      position: positionOptions.includes(prev.position) ? prev.position : ''
     }));
   };
 
@@ -48,17 +160,20 @@ export default function UyelikPage() {
         return;
       }
 
-      // Email formatı kontrolü
+      // Email formatı kontrolü (opsiyonel alan)
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
+      const trimmedEmail = formData.email.trim();
+      if (trimmedEmail && !emailRegex.test(trimmedEmail)) {
         alert('Geçerli bir email adresi giriniz.');
         setLoading(false);
         return;
       }
 
-      // Telefon formatı kontrolü
+      // Telefon formatı kontrolü (opsiyonel alan)
       const phoneRegex = /^[0-9]{10,11}$/;
-      if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+      const trimmedPhone = formData.phone.trim();
+      const digitsOnlyPhone = trimmedPhone.replace(/\s/g, '');
+      if (digitsOnlyPhone && !phoneRegex.test(digitsOnlyPhone)) {
         alert('Geçerli bir telefon numarası giriniz.');
         setLoading(false);
         return;
@@ -68,6 +183,8 @@ export default function UyelikPage() {
         .from('members')
         .insert([{
           ...formData,
+          phone: trimmedPhone || null,
+          email: trimmedEmail || null,
           membership_status: 'pending',
           is_active: true
         }]);
@@ -368,7 +485,7 @@ export default function UyelikPage() {
 
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefon *
+                    Telefon <span className="text-sm text-gray-500">(opsiyonel)</span>
                   </label>
                   <input
                     type="tel"
@@ -376,7 +493,6 @@ export default function UyelikPage() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    required
                     placeholder="5XX XXX XX XX"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -384,7 +500,7 @@ export default function UyelikPage() {
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    E-posta *
+                    E-posta <span className="text-sm text-gray-500">(opsiyonel)</span>
                   </label>
                   <input
                     type="email"
@@ -392,7 +508,6 @@ export default function UyelikPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -422,28 +537,86 @@ export default function UyelikPage() {
                   <label htmlFor="workplace" className="block text-sm font-medium text-gray-700 mb-1">
                     İşyeri
                   </label>
-                  <input
-                    type="text"
-                    id="workplace"
-                    name="workplace"
-                    value={formData.workplace}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  {!useCustomWorkplace && workplaceOptions.length > 0 ? (
+                    <select
+                      id="workplace"
+                      value={formData.workplace || ''}
+                      onChange={(e) => handleWorkplaceSelect(e.target.value || '')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">İşyeri seçiniz</option>
+                      {workplaceOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_OPTION_VALUE}>Diğer (elle gir)</option>
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        id="workplace"
+                        name="workplace"
+                        value={formData.workplace}
+                        onChange={handleChange}
+                        placeholder="Çalıştığınız kurum"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {workplaceOptions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={resetWorkplaceToSelect}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-700"
+                        >
+                          Listeden seç
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
                     Pozisyon/Görev
                   </label>
-                  <input
-                    type="text"
-                    id="position"
-                    name="position"
-                    value={formData.position}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  {!useCustomPosition && positionOptions.length > 0 ? (
+                    <select
+                      id="position"
+                      value={formData.position || ''}
+                      onChange={(e) => handlePositionSelect(e.target.value || '')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Pozisyon seçiniz</option>
+                      {positionOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_OPTION_VALUE}>Diğer (elle gir)</option>
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        id="position"
+                        name="position"
+                        value={formData.position}
+                        onChange={handleChange}
+                        placeholder="Göreviniz"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {positionOptions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={resetPositionToSelect}
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-700"
+                        >
+                          Listeden seç
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>

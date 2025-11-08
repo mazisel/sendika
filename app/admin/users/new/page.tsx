@@ -4,14 +4,21 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import Link from 'next/link';
+import { cityOptions, regionOptions } from '@/lib/cities';
+
+type Role = 'admin' | 'super_admin' | 'branch_manager';
+type RoleType = 'general_manager' | 'regional_manager' | 'branch_manager';
+type AccessLevel = 'super_admin' | 'general_manager' | 'regional_manager' | 'branch_manager';
 
 export default function NewUser() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'admin' | 'super_admin' | 'branch_manager'>('super_admin');
-  const [roleType, setRoleType] = useState<'general_manager' | 'branch_manager'>('general_manager');
+  const [role, setRole] = useState<Role>('admin');
+  const [roleType, setRoleType] = useState<RoleType>('general_manager');
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>('general_manager');
   const [city, setCity] = useState('');
+  const [region, setRegion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -35,20 +42,41 @@ export default function NewUser() {
     }
 
     // Form validasyonu
-    if (roleType === 'branch_manager' && !city) {
+    if (accessLevel === 'branch_manager' && !city) {
       setError('Şube yöneticisi için il seçimi zorunludur');
       setLoading(false);
       return;
     }
 
+    if (accessLevel === 'regional_manager' && !region) {
+      setError('Bölge sorumlusu için bölge seçimi zorunludur');
+      setLoading(false);
+      return;
+    }
+
     try {
+      const resolvedRole: Role =
+        accessLevel === 'super_admin'
+          ? 'super_admin'
+          : accessLevel === 'branch_manager'
+            ? 'branch_manager'
+            : 'admin';
+
+      const resolvedRoleType: RoleType =
+        accessLevel === 'branch_manager'
+          ? 'branch_manager'
+          : accessLevel === 'regional_manager'
+            ? 'regional_manager'
+            : 'general_manager';
+
       const result = await AdminAuth.createUser({
         email,
         password,
         full_name: fullName,
-        role,
-        role_type: roleType,
-        city: roleType === 'branch_manager' ? city : undefined
+        role: resolvedRole,
+        role_type: resolvedRoleType,
+        city: accessLevel === 'branch_manager' ? city : undefined,
+        region: accessLevel === 'regional_manager' ? Number(region) : undefined
       });
 
       if (result.success) {
@@ -145,29 +173,66 @@ export default function NewUser() {
                 </label>
                 <select
                   id="roleType"
-                  value={roleType}
+                  value={accessLevel}
                   onChange={(e) => {
-                    const newRoleType = e.target.value as 'general_manager' | 'branch_manager';
-                    setRoleType(newRoleType);
-                    if (newRoleType === 'general_manager') {
+                    const value = e.target.value as AccessLevel;
+                    setAccessLevel(value);
+                    setError('');
+                    setCity('');
+                    setRegion('');
+
+                    if (value === 'super_admin') {
                       setRole('super_admin');
-                      setCity('');
-                    } else {
+                      setRoleType('general_manager');
+                    } else if (value === 'branch_manager') {
                       setRole('branch_manager');
+                      setRoleType('branch_manager');
+                    } else if (value === 'regional_manager') {
+                      setRole('admin');
+                      setRoleType('regional_manager');
+                    } else {
+                      setRole('admin');
+                      setRoleType('general_manager');
                     }
                   }}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                 >
+                  <option value="super_admin">Süper Admin</option>
                   <option value="general_manager">Genel Merkez Yöneticisi</option>
+                  <option value="regional_manager">Bölge Sorumlusu</option>
                   <option value="branch_manager">Şube Yöneticisi</option>
                 </select>
-                <div className="mt-2 text-sm text-gray-600">
-                  <div><strong>Genel Merkez Yöneticisi:</strong> Tüm modüllere erişim, sistem genelinde tam yetki</div>
-                  <div><strong>Şube Yöneticisi:</strong> Sadece kendi ilindeki üye yönetimi</div>
+                <div className="mt-2 text-sm text-gray-600 space-y-1">
+                  <div><strong>Süper Admin:</strong> Sistem genelinde sınırsız yetki.</div>
+                  <div><strong>Genel Merkez Yöneticisi:</strong> Tüm modüllere erişir, kritik alanlarda sınırlı değişiklik.</div>
+                  <div><strong>Bölge Sorumlusu:</strong> Yalnızca bağlı olduğu bölgedeki şube ve üyeleri yönetir.</div>
+                  <div><strong>Şube Yöneticisi:</strong> Sadece kendi ilindeki üyeleri yönetir.</div>
                 </div>
               </div>
 
-              {roleType === 'branch_manager' && (
+              {accessLevel === 'regional_manager' && (
+                <div>
+                  <label htmlFor="region" className="block text-sm font-medium text-gray-700">
+                    Bölge *
+                  </label>
+                  <select
+                    id="region"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    required={accessLevel === 'regional_manager'}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  >
+                    <option value="">Bölge seçiniz</option>
+                    {regionOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {accessLevel === 'branch_manager' && (
                 <div>
                   <label htmlFor="city" className="block text-sm font-medium text-gray-700">
                     İl *
@@ -176,95 +241,16 @@ export default function NewUser() {
                     id="city"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    required={roleType === 'branch_manager'}
+                    required={accessLevel === 'branch_manager'}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   >
                     <option value="">İl seçiniz</option>
-                    <option value="Adana">Adana</option>
-                    <option value="Adıyaman">Adıyaman</option>
-                    <option value="Afyonkarahisar">Afyonkarahisar</option>
-                    <option value="Ağrı">Ağrı</option>
-                    <option value="Amasya">Amasya</option>
-                    <option value="Ankara">Ankara</option>
-                    <option value="Antalya">Antalya</option>
-                    <option value="Artvin">Artvin</option>
-                    <option value="Aydın">Aydın</option>
-                    <option value="Balıkesir">Balıkesir</option>
-                    <option value="Bilecik">Bilecik</option>
-                    <option value="Bingöl">Bingöl</option>
-                    <option value="Bitlis">Bitlis</option>
-                    <option value="Bolu">Bolu</option>
-                    <option value="Burdur">Burdur</option>
-                    <option value="Bursa">Bursa</option>
-                    <option value="Çanakkale">Çanakkale</option>
-                    <option value="Çankırı">Çankırı</option>
-                    <option value="Çorum">Çorum</option>
-                    <option value="Denizli">Denizli</option>
-                    <option value="Diyarbakır">Diyarbakır</option>
-                    <option value="Edirne">Edirne</option>
-                    <option value="Elazığ">Elazığ</option>
-                    <option value="Erzincan">Erzincan</option>
-                    <option value="Erzurum">Erzurum</option>
-                    <option value="Eskişehir">Eskişehir</option>
-                    <option value="Gaziantep">Gaziantep</option>
-                    <option value="Giresun">Giresun</option>
-                    <option value="Gümüşhane">Gümüşhane</option>
-                    <option value="Hakkâri">Hakkâri</option>
-                    <option value="Hatay">Hatay</option>
-                    <option value="Isparta">Isparta</option>
-                    <option value="Mersin">Mersin</option>
-                    <option value="İstanbul">İstanbul</option>
-                    <option value="İzmir">İzmir</option>
-                    <option value="Kars">Kars</option>
-                    <option value="Kastamonu">Kastamonu</option>
-                    <option value="Kayseri">Kayseri</option>
-                    <option value="Kırklareli">Kırklareli</option>
-                    <option value="Kırşehir">Kırşehir</option>
-                    <option value="Kocaeli">Kocaeli</option>
-                    <option value="Konya">Konya</option>
-                    <option value="Kütahya">Kütahya</option>
-                    <option value="Malatya">Malatya</option>
-                    <option value="Manisa">Manisa</option>
-                    <option value="Kahramanmaraş">Kahramanmaraş</option>
-                    <option value="Mardin">Mardin</option>
-                    <option value="Muğla">Muğla</option>
-                    <option value="Muş">Muş</option>
-                    <option value="Nevşehir">Nevşehir</option>
-                    <option value="Niğde">Niğde</option>
-                    <option value="Ordu">Ordu</option>
-                    <option value="Rize">Rize</option>
-                    <option value="Sakarya">Sakarya</option>
-                    <option value="Samsun">Samsun</option>
-                    <option value="Siirt">Siirt</option>
-                    <option value="Sinop">Sinop</option>
-                    <option value="Sivas">Sivas</option>
-                    <option value="Tekirdağ">Tekirdağ</option>
-                    <option value="Tokat">Tokat</option>
-                    <option value="Trabzon">Trabzon</option>
-                    <option value="Tunceli">Tunceli</option>
-                    <option value="Şanlıurfa">Şanlıurfa</option>
-                    <option value="Uşak">Uşak</option>
-                    <option value="Van">Van</option>
-                    <option value="Yozgat">Yozgat</option>
-                    <option value="Zonguldak">Zonguldak</option>
-                    <option value="Aksaray">Aksaray</option>
-                    <option value="Bayburt">Bayburt</option>
-                    <option value="Karaman">Karaman</option>
-                    <option value="Kırıkkale">Kırıkkale</option>
-                    <option value="Batman">Batman</option>
-                    <option value="Şırnak">Şırnak</option>
-                    <option value="Bartın">Bartın</option>
-                    <option value="Ardahan">Ardahan</option>
-                    <option value="Iğdır">Iğdır</option>
-                    <option value="Yalova">Yalova</option>
-                    <option value="Karabük">Karabük</option>
-                    <option value="Kilis">Kilis</option>
-                    <option value="Osmaniye">Osmaniye</option>
-                    <option value="Düzce">Düzce</option>
+                    {cityOptions.map(option => (
+                      <option key={option.code} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
                   </select>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Şube yöneticisi sadece seçilen ildeki üyeleri yönetebilir
-                  </p>
                 </div>
               )}
 

@@ -98,8 +98,9 @@ export class AdminAuth {
     password: string;
     full_name: string;
     role?: 'admin' | 'super_admin' | 'branch_manager';
-    role_type?: 'general_manager' | 'branch_manager';
+    role_type?: 'general_manager' | 'regional_manager' | 'branch_manager';
     city?: string;
+    region?: number;
   }): Promise<AuthResponse> {
     try {
       // Önce Supabase Auth'da kullanıcı oluştur
@@ -122,7 +123,8 @@ export class AdminAuth {
             full_name: userData.full_name,
             role: userData.role || 'admin',
             role_type: userData.role_type || 'general_manager',
-            city: userData.city
+            city: userData.city,
+            region: userData.region ?? null
           }
         ])
         .select()

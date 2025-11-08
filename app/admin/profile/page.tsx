@@ -155,11 +155,14 @@ export default function ProfilePage() {
                 <label className="text-sm font-medium text-slate-700">Rol</label>
                 <p className="text-slate-900 font-medium">
                   {currentUser.role_type === 'branch_manager' && currentUser.city
-                    ? `${currentUser.city} Şube Yöneticisi` 
+                    ? `${currentUser.city} Şube Yöneticisi`
+                    : currentUser.role_type === 'regional_manager' && currentUser.region
+                    ? `${currentUser.region}. Bölge Sorumlusu`
                     : currentUser.role_type === 'general_manager'
                     ? 'Genel Merkez Yöneticisi'
-                    : 'Yönetici'
-                  }
+                    : currentUser.role === 'super_admin'
+                    ? 'Süper Admin'
+                    : 'Yönetici'}
                 </p>
               </div>
               

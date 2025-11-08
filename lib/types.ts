@@ -1,10 +1,24 @@
+export type DefinitionType = 'workplace' | 'position';
+
+export interface GeneralDefinition {
+  id: string;
+  type: DefinitionType;
+  label: string;
+  description?: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AdminUser {
   id: string;
   email: string;
   full_name: string;
   role: 'admin' | 'super_admin' | 'branch_manager';
-  role_type: 'general_manager' | 'branch_manager' | null;
+  role_type: 'general_manager' | 'regional_manager' | 'branch_manager' | null;
   city?: string | null;
+  region?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

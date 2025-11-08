@@ -19,6 +19,7 @@ export type Database = {
           workplace: string
           membership_date: string
           status: 'active' | 'inactive'
+          region: number | null
         }
         Insert: {
           id?: string
@@ -29,6 +30,7 @@ export type Database = {
           workplace: string
           membership_date?: string
           status?: 'active' | 'inactive'
+          region?: number | null
         }
         Update: {
           id?: string
@@ -39,6 +41,7 @@ export type Database = {
           workplace?: string
           membership_date?: string
           status?: 'active' | 'inactive'
+          region?: number | null
         }
       }
       news: {
@@ -79,7 +82,7 @@ export type Database = {
           link_url: string | null
           button_text: string | null
           is_active: boolean
-          sort_order: number
+          sort_order: number | null
           created_at: string
           updated_at: string
         }
@@ -91,7 +94,7 @@ export type Database = {
           link_url?: string | null
           button_text?: string | null
           is_active?: boolean
-          sort_order?: number
+          sort_order?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -103,7 +106,7 @@ export type Database = {
           link_url?: string | null
           button_text?: string | null
           is_active?: boolean
-          sort_order?: number
+          sort_order?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -116,6 +119,7 @@ export type Database = {
           role: string
           role_type: string | null
           city: string | null
+          region: number | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -128,6 +132,7 @@ export type Database = {
           role?: string
           role_type?: string | null
           city?: string | null
+          region?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -140,6 +145,7 @@ export type Database = {
           role?: string
           role_type?: string | null
           city?: string | null
+          region?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -193,6 +199,38 @@ export type Database = {
           id?: string
           title?: string
           content?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      general_definitions: {
+        Row: {
+          id: string
+          type: string
+          label: string
+          description: string | null
+          sort_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          type: string
+          label: string
+          description?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          type?: string
+          label?: string
+          description?: string | null
+          sort_order?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string

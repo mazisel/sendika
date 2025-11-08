@@ -9,6 +9,7 @@ interface Branch {
   id: string
   city: string
   city_code: string
+  region?: number
   branch_name: string
   president_name: string
   president_phone?: string
@@ -30,6 +31,11 @@ export default function BranchesPage() {
   useEffect(() => {
     loadBranches()
   }, [])
+
+  const getRegionLabel = (region?: number | null) => {
+    if (!region) return null
+    return `${region}. Bölge`
+  }
 
   const loadBranches = async () => {
     try {
@@ -190,7 +196,14 @@ export default function BranchesPage() {
                           <h3 className="text-lg font-semibold text-gray-900">
                             {branch.branch_name}
                           </h3>
-                          <p className="text-gray-600">{branch.city}</p>
+                          <div className="flex items-center space-x-2 text-gray-600">
+                            <span>{branch.city}</span>
+                            {branch.region && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+                                {getRegionLabel(branch.region)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
