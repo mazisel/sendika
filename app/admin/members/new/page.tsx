@@ -337,6 +337,8 @@ export default function NewMemberPage() {
       return;
     }
 
+    const file = documentForm.file;
+
     const uniqueId =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
@@ -348,7 +350,7 @@ export default function NewMemberPage() {
         id: uniqueId,
         name: documentForm.name.trim(),
         type: documentForm.type,
-        file: documentForm.file
+        file
       }
     ]);
 

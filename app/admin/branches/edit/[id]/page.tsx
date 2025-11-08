@@ -145,19 +145,20 @@ export default function EditBranchPage({ params }: { params: { id: string } }) {
 
   const handleCitySelect = (value: string) => {
     if (!value) {
+      setFormData(prev => ({
+        ...prev,
+        city: '',
+        city_code: ''
+      }))
+      return
+    }
+
+    const selectedCity = findCityByName(value)
     setFormData(prev => ({
       ...prev,
-      city: '',
-      city_code: ''
+      city: value,
+      city_code: selectedCity?.code ?? ''
     }))
-    return
-  }
-  const selectedCity = findCityByName(value)
-  setFormData(prev => ({
-    ...prev,
-    city: value,
-    city_code: selectedCity?.code ?? ''
-  }))
   }
 
   const handleRegionSelect = (value: string) => {
@@ -269,7 +270,6 @@ export default function EditBranchPage({ params }: { params: { id: string } }) {
                       </option>
                     ))}
                   </select>
-                </div>
                 </div>
 
                 <div>
