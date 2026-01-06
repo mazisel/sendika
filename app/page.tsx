@@ -55,6 +55,96 @@ export default function HomePage() {
       {/* Hero Slider */}
       <HeroSlider />
 
+      {/* Nasıl Yardımcı Olabiliriz Section */}
+      <section className="py-16 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
+        {/* Decorative wave pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <svg className="w-full h-full" viewBox="0 0 1440 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 200C240 280 480 120 720 200C960 280 1200 120 1440 200V400H0V200Z" fill="currentColor" className="text-primary-600"/>
+          </svg>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Section Header */}
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-primary-600 mb-4">
+              NASIL YARDIMCI OLABİLİRİZ?
+            </h2>
+            {/* Decorative line with icon */}
+            <div className="flex items-center justify-center gap-2">
+              <div className="h-0.5 w-32 bg-gradient-to-r from-transparent via-primary-500 to-primary-500"></div>
+              <div className="text-primary-500 text-lg">✦</div>
+              <div className="h-0.5 w-32 bg-gradient-to-l from-transparent via-primary-500 to-primary-500"></div>
+            </div>
+          </div>
+
+          {/* Service Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+            {/* Card 1 - Temsilciliklerimiz */}
+            <Link href="/subelerimiz" className="group">
+              <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 flex flex-col items-center text-center h-full border border-gray-100 hover:border-primary-200 group-hover:-translate-y-1">
+                <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-primary-600">Temsilciliklerimiz</h3>
+              </div>
+            </Link>
+
+            {/* Card 2 - Üyelik Başvuru Formu */}
+            <Link href="/uyelik" className="group">
+              <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 flex flex-col items-center text-center h-full border border-gray-100 hover:border-primary-200 group-hover:-translate-y-1">
+                <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-primary-600">Üyelik Başvuru Formu</h3>
+              </div>
+            </Link>
+
+            {/* Card 3 - Nasıl Üye Olurum */}
+            <Link href="/uyelik#nasil-uye-olurum" className="group">
+              <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 flex flex-col items-center text-center h-full border border-gray-100 hover:border-primary-200 group-hover:-translate-y-1">
+                <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-primary-600">Nasıl Üye Olurum</h3>
+              </div>
+            </Link>
+
+            {/* Card 4 - EK-1 Üyelik Formu */}
+            <a href="/ek1-uyelik-formu.pdf" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 flex flex-col items-center text-center h-full border border-gray-100 hover:border-primary-200 group-hover:-translate-y-1">
+                <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17h6" />
+                  </svg>
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-primary-600">EK-1 Üyelik Formu</h3>
+              </div>
+            </a>
+
+            {/* Card 5 - Kazanımlarımız */}
+            <Link href="/hakkimizda#kazanimlarimiz" className="group">
+              <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 flex flex-col items-center text-center h-full border border-gray-100 hover:border-primary-200 group-hover:-translate-y-1">
+                <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm md:text-base font-semibold text-primary-600">Kazanımlarımız</h3>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* News and Announcements Section */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

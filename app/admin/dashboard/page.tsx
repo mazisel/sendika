@@ -5,14 +5,15 @@ import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { 
-  Users, 
-  FileText, 
-  Megaphone, 
-  Building2, 
-  MapPin, 
-  Tags, 
-  Image, 
+import TurkeyStatsMap from '@/components/TurkeyStatsMap';
+import {
+  Users,
+  FileText,
+  Megaphone,
+  Building2,
+  MapPin,
+  Tags,
+  Image,
   UserPlus,
   Bell,
   TrendingUp,
@@ -43,6 +44,20 @@ interface DashboardStats {
   recentMembers: number;
   activeHeaderAnnouncements: number;
   pendingMembers: number;
+  // Üye istatistikleri
+  activeMembers: number;
+  newMembersThisMonth: number;
+  resignedMembersThisMonth: number;
+  suspendedMembers: number;
+}
+
+interface CityStats {
+  city: string;
+  city_code: string;
+  activeMembers: number;
+  resignedMembers: number;
+  registeredMembers: number;
+  onlineApplications: number;
 }
 
 export default function AdminDashboard() {
@@ -50,6 +65,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [cityStats, setCityStats] = useState<CityStats[]>([]);
+  const [cityStatsLoading, setCityStatsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,12 +78,144 @@ export default function AdminDashboard() {
     setUser(currentUser);
     setLoading(false);
     loadDashboardStats();
+    loadCityStats();
   }, [router]);
+
+  const loadCityStats = async () => {
+    try {
+      setCityStatsLoading(true);
+
+      // Tüm illerin listesi (81 il)
+      const turkishCities = [
+        { city: 'Adana', city_code: '01' },
+        { city: 'Adıyaman', city_code: '02' },
+        { city: 'Afyonkarahisar', city_code: '03' },
+        { city: 'Ağrı', city_code: '04' },
+        { city: 'Amasya', city_code: '05' },
+        { city: 'Ankara', city_code: '06' },
+        { city: 'Antalya', city_code: '07' },
+        { city: 'Artvin', city_code: '08' },
+        { city: 'Aydın', city_code: '09' },
+        { city: 'Balıkesir', city_code: '10' },
+        { city: 'Bilecik', city_code: '11' },
+        { city: 'Bingöl', city_code: '12' },
+        { city: 'Bitlis', city_code: '13' },
+        { city: 'Bolu', city_code: '14' },
+        { city: 'Burdur', city_code: '15' },
+        { city: 'Bursa', city_code: '16' },
+        { city: 'Çanakkale', city_code: '17' },
+        { city: 'Çankırı', city_code: '18' },
+        { city: 'Çorum', city_code: '19' },
+        { city: 'Denizli', city_code: '20' },
+        { city: 'Diyarbakır', city_code: '21' },
+        { city: 'Edirne', city_code: '22' },
+        { city: 'Elazığ', city_code: '23' },
+        { city: 'Erzincan', city_code: '24' },
+        { city: 'Erzurum', city_code: '25' },
+        { city: 'Eskişehir', city_code: '26' },
+        { city: 'Gaziantep', city_code: '27' },
+        { city: 'Giresun', city_code: '28' },
+        { city: 'Gümüşhane', city_code: '29' },
+        { city: 'Hakkari', city_code: '30' },
+        { city: 'Hatay', city_code: '31' },
+        { city: 'Isparta', city_code: '32' },
+        { city: 'Mersin', city_code: '33' },
+        { city: 'İstanbul', city_code: '34' },
+        { city: 'İzmir', city_code: '35' },
+        { city: 'Kars', city_code: '36' },
+        { city: 'Kastamonu', city_code: '37' },
+        { city: 'Kayseri', city_code: '38' },
+        { city: 'Kırklareli', city_code: '39' },
+        { city: 'Kırşehir', city_code: '40' },
+        { city: 'Kocaeli', city_code: '41' },
+        { city: 'Konya', city_code: '42' },
+        { city: 'Kütahya', city_code: '43' },
+        { city: 'Malatya', city_code: '44' },
+        { city: 'Manisa', city_code: '45' },
+        { city: 'Kahramanmaraş', city_code: '46' },
+        { city: 'Mardin', city_code: '47' },
+        { city: 'Muğla', city_code: '48' },
+        { city: 'Muş', city_code: '49' },
+        { city: 'Nevşehir', city_code: '50' },
+        { city: 'Niğde', city_code: '51' },
+        { city: 'Ordu', city_code: '52' },
+        { city: 'Rize', city_code: '53' },
+        { city: 'Sakarya', city_code: '54' },
+        { city: 'Samsun', city_code: '55' },
+        { city: 'Siirt', city_code: '56' },
+        { city: 'Sinop', city_code: '57' },
+        { city: 'Sivas', city_code: '58' },
+        { city: 'Tekirdağ', city_code: '59' },
+        { city: 'Tokat', city_code: '60' },
+        { city: 'Trabzon', city_code: '61' },
+        { city: 'Tunceli', city_code: '62' },
+        { city: 'Şanlıurfa', city_code: '63' },
+        { city: 'Uşak', city_code: '64' },
+        { city: 'Van', city_code: '65' },
+        { city: 'Yozgat', city_code: '66' },
+        { city: 'Zonguldak', city_code: '67' },
+        { city: 'Aksaray', city_code: '68' },
+        { city: 'Bayburt', city_code: '69' },
+        { city: 'Karaman', city_code: '70' },
+        { city: 'Kırıkkale', city_code: '71' },
+        { city: 'Batman', city_code: '72' },
+        { city: 'Şırnak', city_code: '73' },
+        { city: 'Bartın', city_code: '74' },
+        { city: 'Ardahan', city_code: '75' },
+        { city: 'Iğdır', city_code: '76' },
+        { city: 'Yalova', city_code: '77' },
+        { city: 'Karabük', city_code: '78' },
+        { city: 'Kilis', city_code: '79' },
+        { city: 'Osmaniye', city_code: '80' },
+        { city: 'Düzce', city_code: '81' }
+      ];
+
+      // Üyeleri şehre göre say
+      const { data: members } = await supabase
+        .from('members')
+        .select('city, membership_status');
+
+      const cityStatsMap: { [key: string]: CityStats } = {};
+
+      turkishCities.forEach(c => {
+        cityStatsMap[c.city.toLowerCase()] = {
+          city: c.city,
+          city_code: c.city_code,
+          activeMembers: 0,
+          resignedMembers: 0,
+          registeredMembers: 0,
+          onlineApplications: 0
+        };
+      });
+
+      if (members) {
+        members.forEach(member => {
+          const cityKey = member.city?.toLowerCase();
+          if (cityKey && cityStatsMap[cityKey]) {
+            cityStatsMap[cityKey].registeredMembers++;
+            if (member.membership_status === 'active') {
+              cityStatsMap[cityKey].activeMembers++;
+            } else if (member.membership_status === 'inactive' || member.membership_status === 'suspended') {
+              cityStatsMap[cityKey].resignedMembers++;
+            } else if (member.membership_status === 'pending') {
+              cityStatsMap[cityKey].onlineApplications++;
+            }
+          }
+        });
+      }
+
+      setCityStats(Object.values(cityStatsMap));
+    } catch (error) {
+      console.error('İl istatistikleri yüklenirken hata:', error);
+    } finally {
+      setCityStatsLoading(false);
+    }
+  };
 
   const loadDashboardStats = async () => {
     try {
       setStatsLoading(true);
-      
+
       // Basit istatistikler - sadece sayıları al
       const statsData: DashboardStats = {
         totalNews: 0,
@@ -80,7 +229,11 @@ export default function AdminDashboard() {
         recentNews: 0,
         recentMembers: 0,
         activeHeaderAnnouncements: 0,
-        pendingMembers: 0
+        pendingMembers: 0,
+        activeMembers: 0,
+        newMembersThisMonth: 0,
+        resignedMembersThisMonth: 0,
+        suspendedMembers: 0
       };
 
       // Her tabloyu ayrı ayrı kontrol et
@@ -101,6 +254,45 @@ export default function AdminDashboard() {
       try {
         const membersResult = await supabase.from('members').select('*', { count: 'exact', head: true });
         statsData.totalMembers = membersResult.count || 0;
+
+        // Aktif üye sayısı
+        const activeMembersResult = await supabase
+          .from('members')
+          .select('*', { count: 'exact', head: true })
+          .eq('membership_status', 'active');
+        statsData.activeMembers = activeMembersResult.count || 0;
+
+        // Bekleyen üye sayısı
+        const pendingMembersResult = await supabase
+          .from('members')
+          .select('*', { count: 'exact', head: true })
+          .eq('membership_status', 'pending');
+        statsData.pendingMembers = pendingMembersResult.count || 0;
+
+        // Askıya alınmış (istifa/pasif) üye sayısı
+        const suspendedMembersResult = await supabase
+          .from('members')
+          .select('*', { count: 'exact', head: true })
+          .in('membership_status', ['inactive', 'suspended']);
+        statsData.suspendedMembers = suspendedMembersResult.count || 0;
+
+        // Bu ayki yeni üyeler
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const newMembersResult = await supabase
+          .from('members')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', firstDayOfMonth);
+        statsData.newMembersThisMonth = newMembersResult.count || 0;
+
+        // Bu ay istifa edenler (inactive veya suspended olmuşlar)
+        const resignedResult = await supabase
+          .from('members')
+          .select('*', { count: 'exact', head: true })
+          .in('membership_status', ['inactive', 'suspended'])
+          .gte('updated_at', firstDayOfMonth);
+        statsData.resignedMembersThisMonth = resignedResult.count || 0;
+
       } catch (e) {
         console.warn('Members tablosu bulunamadı:', e);
       }
@@ -156,7 +348,11 @@ export default function AdminDashboard() {
         recentNews: 0,
         recentMembers: 0,
         activeHeaderAnnouncements: 0,
-        pendingMembers: 0
+        pendingMembers: 0,
+        activeMembers: 0,
+        newMembersThisMonth: 0,
+        resignedMembersThisMonth: 0,
+        suspendedMembers: 0
       });
     } finally {
       setStatsLoading(false);
@@ -243,13 +439,6 @@ export default function AdminDashboard() {
       description: 'Yeni haber içeriği'
     },
     {
-      title: 'Son 30 Günde Yeni Üyeler',
-      value: statsLoading ? '-' : stats?.recentMembers || 0,
-      icon: UserPlus,
-      color: 'green',
-      description: 'Sendikaya katılan üyeler'
-    },
-    {
       title: 'Aktif Başlık Duyuruları',
       value: statsLoading ? '-' : stats?.activeHeaderAnnouncements || 0,
       icon: Bell,
@@ -257,11 +446,18 @@ export default function AdminDashboard() {
       description: 'Şu anda yayında'
     },
     {
-      title: 'Onay Bekleyen Üyeler',
-      value: statsLoading ? '-' : stats?.pendingMembers || 0,
-      icon: Clock,
-      color: 'yellow',
-      description: 'İnceleme gerekiyor'
+      title: 'Toplam Şube',
+      value: statsLoading ? '-' : stats?.totalBranches || 0,
+      icon: Building2,
+      color: 'purple',
+      description: 'Aktif şubeler'
+    },
+    {
+      title: 'Yönetim Kadrosu',
+      value: statsLoading ? '-' : stats?.totalManagement || 0,
+      icon: Users,
+      color: 'teal',
+      description: 'Yönetim üyeleri'
     }
   ];
 
@@ -280,11 +476,106 @@ export default function AdminDashboard() {
             </div>
             <div className="text-right">
               <div className="text-sm text-blue-100">Bugün</div>
-              <div className="text-lg font-semibold">{new Date().toLocaleDateString('tr-TR', { 
-                day: 'numeric', 
-                month: 'long', 
-                year: 'numeric' 
+              <div className="text-lg font-semibold">{new Date().toLocaleDateString('tr-TR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
               })}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Üye İstatistikleri - Hero Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Aktif Üye Sayısı */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-emerald-100 text-sm font-medium">Aktif Üye Sayısı</p>
+              <p className="text-4xl font-bold mt-2">
+                {statsLoading ? (
+                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                ) : (
+                  stats?.activeMembers || 0
+                )}
+              </p>
+              <p className="text-emerald-100 text-xs mt-2 flex items-center">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Onaylanmış üyeler
+              </p>
+            </div>
+            <div className="bg-white/20 rounded-full p-3">
+              <Users className="w-8 h-8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bu Ay Yeni Üyeler */}
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm font-medium">Bu Ay Yeni Üyeler</p>
+              <p className="text-4xl font-bold mt-2">
+                {statsLoading ? (
+                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                ) : (
+                  stats?.newMembersThisMonth || 0
+                )}
+              </p>
+              <p className="text-blue-100 text-xs mt-2 flex items-center">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                {new Date().toLocaleDateString('tr-TR', { month: 'long' })} ayı
+              </p>
+            </div>
+            <div className="bg-white/20 rounded-full p-3">
+              <UserPlus className="w-8 h-8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bu Ay İstifalar */}
+        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-red-100 text-sm font-medium">Bu Ay İstifalar</p>
+              <p className="text-4xl font-bold mt-2">
+                {statsLoading ? (
+                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                ) : (
+                  stats?.resignedMembersThisMonth || 0
+                )}
+              </p>
+              <p className="text-red-100 text-xs mt-2 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Ayrılan/Askıya alınan
+              </p>
+            </div>
+            <div className="bg-white/20 rounded-full p-3">
+              <Activity className="w-8 h-8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bekleyen Üyeler */}
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-amber-100 text-sm font-medium">Bekleyen Başvurular</p>
+              <p className="text-4xl font-bold mt-2">
+                {statsLoading ? (
+                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                ) : (
+                  stats?.pendingMembers || 0
+                )}
+              </p>
+              <p className="text-amber-100 text-xs mt-2 flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                Onay bekliyor
+              </p>
+            </div>
+            <div className="bg-white/20 rounded-full p-3">
+              <Clock className="w-8 h-8" />
             </div>
           </div>
         </div>
@@ -301,20 +592,18 @@ export default function AdminDashboard() {
                   <p className="text-sm font-medium text-slate-600">{stat.title}</p>
                   <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
                   <div className="flex items-center mt-2">
-                    <div className={`w-4 h-4 mr-1 ${
-                      stat.changeType === 'positive' ? 'text-green-500' : 
-                      stat.changeType === 'negative' ? 'text-red-500' : 
-                      stat.changeType === 'warning' ? 'text-orange-500' : 'text-slate-400'
-                    }`}>
+                    <div className={`w-4 h-4 mr-1 ${stat.changeType === 'positive' ? 'text-green-500' :
+                      stat.changeType === 'negative' ? 'text-red-500' :
+                        stat.changeType === 'warning' ? 'text-orange-500' : 'text-slate-400'
+                      }`}>
                       {stat.changeType === 'positive' && <TrendingUp className="w-4 h-4" />}
                       {stat.changeType === 'warning' && <AlertCircle className="w-4 h-4" />}
                       {stat.changeType === 'neutral' && <CheckCircle className="w-4 h-4" />}
                     </div>
-                    <span className={`text-sm font-medium ${
-                      stat.changeType === 'positive' ? 'text-green-600' : 
-                      stat.changeType === 'negative' ? 'text-red-600' : 
-                      stat.changeType === 'warning' ? 'text-orange-600' : 'text-slate-500'
-                    }`}>
+                    <span className={`text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' :
+                      stat.changeType === 'negative' ? 'text-red-600' :
+                        stat.changeType === 'warning' ? 'text-orange-600' : 'text-slate-500'
+                      }`}>
                       {stat.change}
                     </span>
                   </div>
@@ -336,7 +625,7 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-semibold text-slate-900">{section.title}</h3>
               <PieChart className="w-5 h-5 text-slate-400" />
             </div>
-            
+
             <div className="space-y-4">
               {section.items.map((item, itemIndex) => {
                 const Icon = item.icon;
@@ -357,13 +646,23 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Turkey Statistics Map */}
+      <TurkeyStatsMap
+        cityStats={cityStats}
+        totalActiveMembers={stats?.activeMembers || 0}
+        totalResigned={stats?.suspendedMembers || 0}
+        totalRegistered={stats?.totalMembers || 0}
+        totalOnlineApplications={stats?.pendingMembers || 0}
+        isLoading={cityStatsLoading}
+      />
+
       {/* Recent Activity */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-slate-900">Son Aktiviteler</h3>
           <Activity className="w-5 h-5 text-slate-400" />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {recentActivity.map((activity, index) => {
             const Icon = activity.icon;

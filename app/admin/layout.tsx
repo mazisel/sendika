@@ -3,18 +3,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Home, 
-  Users, 
-  FileText, 
-  Megaphone, 
-  Settings, 
-  Building2, 
-  MapPin, 
-  Tags, 
-  Image, 
-  Menu, 
-  X, 
+import {
+  Home,
+  Users,
+  FileText,
+  Megaphone,
+  Settings,
+  Building2,
+  MapPin,
+  Tags,
+  Image,
+  Menu,
+  X,
   LogOut,
   UserPlus,
   Bell,
@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         setCurrentUser(user);
       }
     };
-    
+
     checkAuth();
   }, [pathname, router]);
 
@@ -100,7 +100,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   // Yetki bazlı menü öğelerini al
   const getMenuItems = () => {
     if (!currentUser) return [];
-    
+
     const baseItems = [
       {
         title: 'Dashboard',
@@ -118,8 +118,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         title: 'Üyeler',
         href: '/admin/members',
         icon: Users,
-        description: currentUser.role_type === 'branch_manager' 
-          ? `${currentUser.city} üyelerini yönet` 
+        description: currentUser.role_type === 'branch_manager'
+          ? `${currentUser.city} üyelerini yönet`
           : 'Sendika üyelerini yönet'
       }
     ];
@@ -236,10 +236,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="admin-theme min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="admin-theme h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-hidden">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -247,12 +247,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl dark:shadow-slate-900/40 border-r border-slate-200/60 dark:border-slate-800/60 transform transition-all duration-300 ease-out
+        fixed inset-y-0 left-0 z-50 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl dark:shadow-slate-900/40 border-r border-slate-200/60 dark:border-slate-800/60 transform transition-all duration-300 ease-out flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:relative lg:flex lg:flex-col lg:w-72
+        lg:translate-x-0 lg:static lg:w-72 shrink-0
       `}>
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-20 px-6 border-b border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-slate-800 dark:to-slate-900">
+        <div className="flex items-center justify-between h-20 px-6 border-b border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-slate-800 dark:to-slate-900 shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-white/20 dark:bg-slate-800/60 rounded-xl flex items-center justify-center">
               <Building2 className="w-6 h-6 text-white" />
@@ -276,15 +276,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-              
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`
                     group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 relative
-                    ${isActive 
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40' 
+                    ${isActive
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-900/40'
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white'
                     }
                   `}
@@ -325,9 +325,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 shadow-sm dark:shadow-slate-900/40">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 shadow-sm dark:shadow-slate-900/40 shrink-0">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6">
             {/* Mobile menu button */}
             <button
@@ -367,12 +367,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       {currentUser?.role_type === 'branch_manager' && currentUser?.city
                         ? `${currentUser.city} Şube Yöneticisi`
                         : currentUser?.role_type === 'regional_manager' && currentUser?.region
-                        ? `${currentUser.region}. Bölge Sorumlusu`
-                        : currentUser?.role_type === 'general_manager'
-                        ? 'Genel Merkez Yöneticisi'
-                        : currentUser?.role === 'super_admin'
-                        ? 'Süper Admin'
-                        : 'Yönetici'}
+                          ? `${currentUser.region}. Bölge Sorumlusu`
+                          : currentUser?.role_type === 'general_manager'
+                            ? 'Genel Merkez Yöneticisi'
+                            : currentUser?.role === 'super_admin'
+                              ? 'Süper Admin'
+                              : 'Yönetici'}
                     </div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -405,7 +405,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-6 overflow-y-auto">
           <div className="w-full">
             {children}
           </div>
@@ -426,8 +426,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Click outside to close user menu */}
       {userMenuOpen && (
-        <div 
-          className="fixed inset-0 z-20" 
+        <div
+          className="fixed inset-0 z-20"
           onClick={() => setUserMenuOpen(false)}
         />
       )}

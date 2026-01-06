@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  
+
   // Admin sayfalarında header gösterme
   const isAdminPage = pathname?.startsWith('/admin')
 
