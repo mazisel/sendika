@@ -216,6 +216,30 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       });
     }
 
+    if (PermissionManager.canManageDefinitions(currentUser)) {
+      baseItems.push({
+        title: 'İndirimler',
+        href: '/admin/discounts',
+        icon: Tags,
+        description: 'Anlaşmalı kurum indirimlerini yönet'
+      });
+    }
+
+    if (PermissionManager.canManageSiteSettings(currentUser)) {
+      baseItems.push({
+        title: 'Site Ayarları',
+        href: '/admin/settings',
+        icon: Settings,
+        description: 'Site logosu ve renklerini yönet'
+      });
+      baseItems.push({
+        title: 'SMS',
+        href: '/admin/sms',
+        icon: Megaphone,
+        description: 'Üyelere SMS gönder'
+      });
+    }
+
     if (PermissionManager.canManageUsers(currentUser)) {
       baseItems.push({
         title: 'Kullanıcılar',

@@ -6,7 +6,10 @@ import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
 import { AdminUser } from '@/lib/types';
-import { Search, Eye, Check, X, Filter, Download, UserCheck, UserX, Clock, FileText, MapPin, Plus, Edit, AlertTriangle } from 'lucide-react';
+import { Search, Eye, Check, X, Filter, Download, UserCheck, UserX, Clock, FileText, MapPin, Plus, Edit, AlertTriangle, FileUp, LogOut } from 'lucide-react';
+import EditMemberModal from '@/components/members/EditMemberModal';
+import MemberFilesModal from '@/components/members/MemberFilesModal';
+import ResignationModal from '@/components/members/ResignationModal';
 
 interface Member {
   id: string;
@@ -24,7 +27,7 @@ interface Member {
   address: string;
   workplace: string;
   position: string;
-  membership_status: 'pending' | 'active' | 'inactive' | 'suspended';
+  membership_status: 'pending' | 'active' | 'inactive' | 'suspended' | 'resigned';
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relation: string;
@@ -45,6 +48,9 @@ export default function AdminMembersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showFilesModal, setShowFilesModal] = useState(false);
+  const [showResignationModal, setShowResignationModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
@@ -99,7 +105,7 @@ export default function AdminMembersPage() {
     // Arama filtresi
     if (searchTerm) {
       const lowered = searchTerm.toLowerCase();
-      filtered = filtered.filter(member => 
+      filtered = filtered.filter(member =>
         member.first_name.toLowerCase().includes(lowered) ||
         member.last_name.toLowerCase().includes(lowered) ||
         member.tc_identity.includes(searchTerm) ||
@@ -123,7 +129,7 @@ export default function AdminMembersPage() {
     try {
       const { error } = await supabase
         .from('members')
-        .update({ 
+        .update({
           membership_status: newStatus,
           is_active: newStatus === 'active'
         })
@@ -156,8 +162,7 @@ export default function AdminMembersPage() {
         member.membership_status,
         new Date(member.created_at).toLocaleDateString('tr-TR')
       ].join(','))
-    ].join('\
-');
+    ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -171,7 +176,8 @@ export default function AdminMembersPage() {
       pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300', icon: Clock, text: 'Beklemede' },
       active: { color: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300', icon: UserCheck, text: 'Aktif' },
       inactive: { color: 'bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200', icon: UserX, text: 'Pasif' },
-      suspended: { color: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300', icon: X, text: 'Askıda' }
+      suspended: { color: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300', icon: X, text: 'Askıda' },
+      resigned: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300', icon: LogOut, text: 'İstifa' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -240,6 +246,7 @@ export default function AdminMembersPage() {
               <option value="active">Aktif</option>
               <option value="inactive">Pasif</option>
               <option value="suspended">Askıda</option>
+              <option value="resigned">İstifa</option>
             </select>
           </div>
 
@@ -272,6 +279,10 @@ export default function AdminMembersPage() {
               <span className="w-3 h-3 bg-green-100 dark:bg-green-500/40 rounded-full mr-1"></span>
               Aktif: {members.filter(m => m.membership_status === 'active').length}
             </span>
+            <span className="flex items-center">
+              <span className="w-3 h-3 bg-orange-100 dark:bg-orange-500/40 rounded-full mr-1"></span>
+              İstifa: {members.filter(m => m.membership_status === 'resigned').length}
+            </span>
           </div>
         </div>
       </div>
@@ -282,28 +293,28 @@ export default function AdminMembersPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
             <thead className="bg-gray-50 dark:bg-slate-900/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Üye No
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Ad Soyad
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   TC Kimlik
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   İletişim
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Konum
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Durum
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   Kayıt Tarihi
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                   İşlemler
                 </th>
               </tr>
@@ -312,89 +323,97 @@ export default function AdminMembersPage() {
               {filteredMembers.map((member) => {
                 const missingFields = getMissingContactFields(member);
                 return (
-                <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-slate-100">
-                    {member.membership_number || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                        {member.first_name} {member.last_name}
+                  <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
+                    <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-slate-100">
+                      {member.membership_number || '-'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-slate-100">
+                          {member.first_name} {member.last_name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400">
+                          {member.gender} • {member.birth_date ? new Date(member.birth_date).toLocaleDateString('tr-TR') : '-'}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-slate-400">
-                        {member.gender} • {member.birth_date ? new Date(member.birth_date).toLocaleDateString('tr-TR') : '-'}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-slate-100">
-                    {member.tc_identity}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.phone || '-'}</div>
-                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.email || '-'}</div>
-                    {missingFields.length > 0 && (
-                      <div
-                        className="mt-2 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-xs dark:bg-amber-500/20 dark:text-amber-200"
-                        title={`Eksik alanlar: ${missingFields.join(', ')}`}
-                      >
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Eksik bilgi
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-slate-100">{member.city}</div>
-                    <div className="text-sm text-gray-500 dark:text-slate-400">{member.district}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(member.membership_status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
-                    {new Date(member.created_at).toLocaleDateString('tr-TR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        setSelectedMember(member);
-                        setShowDetails(true);
-                      }}
-                      className="text-primary-600 hover:text-primary-900 mr-3"
-                      title="Detayları Görüntüle"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => router.push(`/admin/members/edit/${member.id}`)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                      title="Düzenle"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => router.push(`/admin/members/${member.id}`)}
-                      className="text-purple-600 hover:text-purple-900 mr-3"
-                      title="Özlük Dosyaları"
-                    >
-                      <FileText className="w-5 h-5" />
-                    </button>
-                    {member.membership_status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => updateMemberStatus(member.id, 'active')}
-                          className="text-green-600 hover:text-green-900 mr-3"
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-slate-100">
+                      {member.tc_identity}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-slate-100">{member.phone || '-'}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400">{member.email || '-'}</div>
+                      {missingFields.length > 0 && (
+                        <div
+                          className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] dark:bg-amber-500/20 dark:text-amber-200"
+                          title={`Eksik alanlar: ${missingFields.join(', ')}`}
                         >
-                          <Check className="w-5 h-5" />
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          Eksik bilgi
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-slate-100">{member.city}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400">{member.district}</div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {getStatusBadge(member.membership_status)}
+                      {member.membership_status === 'resigned' && (
+                        <div className="text-[10px] text-orange-600 dark:text-orange-400 mt-1">İstifa etti</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
+                      {new Date(member.created_at).toLocaleDateString('tr-TR')}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedMember(member);
+                            setShowDetails(true);
+                          }}
+                          className="text-primary-600 hover:text-primary-900"
+                          title="Detayları Görüntüle"
+                        >
+                          <Eye className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => updateMemberStatus(member.id, 'inactive')}
-                          className="text-red-600 hover:text-red-900"
+                          onClick={() => {
+                            setSelectedMember(member)
+                            setShowEditModal(true)
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Düzenle"
                         >
-                          <X className="w-5 h-5" />
+                          <Edit className="w-5 h-5" />
                         </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
+                        <button
+                          onClick={() => {
+                            setSelectedMember(member)
+                            setShowFilesModal(true)
+                          }}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Özlük Dosyaları"
+                        >
+                          <FileText className="w-5 h-5" />
+                        </button>
+
+                        {member.membership_status === 'active' && (
+                          <button
+                            onClick={() => {
+                              setSelectedMember(member)
+                              setShowResignationModal(true)
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                            title="İstifa İşlemi"
+                          >
+                            <LogOut className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -402,10 +421,41 @@ export default function AdminMembersPage() {
         </div>
       </div>
 
+      {/* Modals */}
+      {showEditModal && selectedMember && (
+        <EditMemberModal
+          member={selectedMember}
+          isOpen={true}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            loadMembers()
+            setShowEditModal(false)
+          }}
+        />
+      )}
+
+      {showFilesModal && selectedMember && (
+        <MemberFilesModal
+          member={selectedMember}
+          onClose={() => setShowFilesModal(false)}
+        />
+      )}
+
+      {showResignationModal && selectedMember && (
+        <ResignationModal
+          member={selectedMember}
+          onClose={() => setShowResignationModal(false)}
+          onSuccess={() => {
+            loadMembers()
+            setShowResignationModal(false)
+          }}
+        />
+      )}
+
       {/* Üye Detay Modal */}
       {showDetails && selectedMember && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-slate-700 w-full max-w-4xl shadow-lg dark:shadow-slate-900/40 rounded-md bg-white dark:bg-slate-900">
+          <div className="relative top-20 mx-auto p-4 border border-gray-200 dark:border-slate-700 w-full max-w-4xl shadow-lg dark:shadow-slate-900/40 rounded-md bg-white dark:bg-slate-900">
             <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-slate-800 pb-3">
               <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Üye Detayları</h3>
               <button
@@ -416,10 +466,10 @@ export default function AdminMembersPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-900 dark:text-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-900 dark:text-slate-100">
               {/* Kişisel Bilgiler */}
-              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
-                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">Kişisel Bilgiler</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">Kişisel Bilgiler</h4>
                 <dl className="space-y-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Üye No</dt>
@@ -459,8 +509,8 @@ export default function AdminMembersPage() {
               </div>
 
               {/* İletişim Bilgileri */}
-              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
-                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">İletişim Bilgileri</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">İletişim Bilgileri</h4>
                 <dl className="space-y-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Telefon</dt>
@@ -488,8 +538,8 @@ export default function AdminMembersPage() {
               </div>
 
               {/* İş Bilgileri */}
-              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
-                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">İş Bilgileri</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">İş Bilgileri</h4>
                 <dl className="space-y-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">İşyeri</dt>
@@ -503,8 +553,8 @@ export default function AdminMembersPage() {
               </div>
 
               {/* Acil Durum */}
-              <div className="bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
-                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-3">Acil Durum İletişim</h4>
+              <div className="bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">Acil Durum İletişim</h4>
                 <dl className="space-y-2">
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Kişi</dt>
@@ -523,13 +573,33 @@ export default function AdminMembersPage() {
             </div>
 
             {/* Durum ve İşlemler */}
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-sm font-medium text-gray-500 dark:text-slate-400 mr-2">Mevcut Durum:</span>
                   {getStatusBadge(selectedMember.membership_status)}
                 </div>
                 <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Düzenle
+                  </button>
+                  <button
+                    onClick={() => setShowFilesModal(true)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                  >
+                    Özlük Dosyaları
+                  </button>
+                  {selectedMember.membership_status === 'active' && (
+                    <button
+                      onClick={() => setShowResignationModal(true)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                    >
+                      İstifa İşlemi
+                    </button>
+                  )}
                   {selectedMember.membership_status === 'pending' && (
                     <>
                       <button

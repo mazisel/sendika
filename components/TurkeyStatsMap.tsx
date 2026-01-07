@@ -128,32 +128,39 @@ export default function TurkeyStatsMap({
     // Mouse event handlers
     const containerRect = useRef<DOMRect | null>(null)
 
+    // viewMode değiştiğinde hoveredCity sıfırla
+    useEffect(() => {
+        setHoveredCity(null)
+    }, [viewMode])
+
     useEffect(() => {
         const updateRect = () => {
             if (mapRef.current) containerRect.current = mapRef.current.getBoundingClientRect()
         }
         window.addEventListener('resize', updateRect)
         window.addEventListener('scroll', updateRect)
+        // Her render'da güncelle
         updateRect()
+
+        // Bir süre sonra tekrar güncelle (layout stabilize olduktan sonra)
+        const timeout = setTimeout(updateRect, 100)
         return () => {
             window.removeEventListener('resize', updateRect)
             window.removeEventListener('scroll', updateRect)
+            clearTimeout(timeout)
         }
     }, [])
 
     useEffect(() => {
-        if (!mapRef.current) return
+        if (!mapContainerRef.current || cityStats.length === 0) return
 
-        const handleMouseMove = (event: MouseEvent) => {
-            if (!containerRect.current) return
-            setMousePosition({
-                x: event.clientX - containerRect.current.left,
-                y: event.clientY - containerRect.current.top
-            })
-        }
+        const container = mapContainerRef.current
 
-        const handleCityHover = (event: Event) => {
+        // Event delegation ile hover yönetimi
+        const handleMouseOver = (event: MouseEvent) => {
             const target = event.target as SVGElement
+            if (target.tagName !== 'path') return
+
             const parent = target.parentNode as SVGElement
             const cityCode = parent?.getAttribute('data-plate') ||
                 parent?.getAttribute('id') ||
@@ -161,46 +168,49 @@ export default function TurkeyStatsMap({
                 target.getAttribute('id')
 
             if (cityCode) {
-                const city = cityStats.find(c => c.city_code === cityCode)
+                const numericCode = cityCode.replace(/\D/g, '')
+                const city = cityStats.find(c =>
+                    c.city_code === cityCode ||
+                    c.city_code === numericCode ||
+                    c.city_code === String(parseInt(numericCode))
+                )
                 if (city) {
                     setHoveredCity(city)
                 }
             }
         }
 
-        const handleMouseLeave = () => {
-            setHoveredCity(null)
+        const handleMouseOut = (event: MouseEvent) => {
+            const target = event.target as SVGElement
+            if (target.tagName === 'path') {
+                setHoveredCity(null)
+            }
         }
 
-        const timeout = setTimeout(() => {
-            const pathElements = mapRef.current?.querySelectorAll('path')
-
-            pathElements?.forEach((element) => {
-                element.addEventListener('mouseenter', handleCityHover as EventListener)
-                element.addEventListener('mouseleave', handleMouseLeave as EventListener)
-                element.style.cursor = 'pointer'
-                element.style.transition = 'opacity 0.2s'
+        // Path'lere style ekle
+        const setupStyles = () => {
+            const pathElements = container.querySelectorAll('path')
+            if (pathElements.length === 0) {
+                requestAnimationFrame(setupStyles)
+                return
+            }
+            pathElements.forEach((element) => {
+                const existingStyle = element.getAttribute('style') || ''
+                if (!existingStyle.includes('cursor')) {
+                    element.setAttribute('style', existingStyle + '; cursor: pointer; transition: opacity 0.2s')
+                }
             })
+        }
 
-            mapRef.current?.addEventListener('mousemove', handleMouseMove)
-            mapRef.current?.addEventListener('mouseleave', handleMouseLeave)
+        container.addEventListener('mouseover', handleMouseOver as EventListener)
+        container.addEventListener('mouseout', handleMouseOut as EventListener)
 
-            // Initial rect update
-            if (mapRef.current) containerRect.current = mapRef.current.getBoundingClientRect()
-        }, 500)
+        const rafId = requestAnimationFrame(setupStyles)
 
         return () => {
-            clearTimeout(timeout)
-            const pathElements = mapRef.current?.querySelectorAll('path')
-            pathElements?.forEach(element => {
-                element.removeEventListener('mouseenter', handleCityHover as EventListener)
-                element.removeEventListener('mouseleave', handleMouseLeave as EventListener)
-            })
-
-            if (mapRef.current) {
-                mapRef.current.removeEventListener('mousemove', handleMouseMove)
-                mapRef.current.removeEventListener('mouseleave', handleMouseLeave)
-            }
+            cancelAnimationFrame(rafId)
+            container.removeEventListener('mouseover', handleMouseOver as EventListener)
+            container.removeEventListener('mouseout', handleMouseOut as EventListener)
         }
     }, [cityStats, viewMode])
 
@@ -332,12 +342,15 @@ export default function TurkeyStatsMap({
                         setPosition({ x: newX, y: newY })
                     }
 
-                    if (containerRect.current) {
-                        setMousePosition({
-                            x: e.clientX - containerRect.current.left,
-                            y: e.clientY - containerRect.current.top
-                        })
+                    // containerRect null ise güncelle
+                    if (!containerRect.current && mapRef.current) {
+                        containerRect.current = mapRef.current.getBoundingClientRect()
                     }
+
+                    setMousePosition({
+                        x: e.clientX,
+                        y: e.clientY
+                    })
                 }}
                 onMouseUp={() => setIsDragging(false)}
                 onMouseLeave={() => {
@@ -368,10 +381,12 @@ export default function TurkeyStatsMap({
                 {/* Hover Tooltip */}
                 {hoveredCity && (
                     <div
-                        className="absolute z-50 bg-white border border-slate-200 rounded-lg shadow-xl p-3 pointer-events-none"
+                        className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl p-3 pointer-events-none"
                         style={{
-                            left: Math.min(mousePosition.x + 10, (mapRef.current?.offsetWidth || 400) - 200),
-                            top: mousePosition.y - 80,
+                            left: Math.min(mousePosition.x + 20, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 220),
+                            top: (typeof window !== 'undefined' && mousePosition.y > window.innerHeight - 250)
+                                ? mousePosition.y - 180
+                                : mousePosition.y + 20,
                         }}
                     >
                         <div className="text-sm font-bold text-slate-900 mb-2 border-b pb-1">

@@ -153,8 +153,8 @@ export default function NewMemberPage() {
     position: []
   });
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
-  const [isCustomWorkplace, setIsCustomWorkplace] = useState(false);
-  const [isCustomPosition, setIsCustomPosition] = useState(false);
+  // const [isCustomWorkplace, setIsCustomWorkplace] = useState(false); // Removed
+  // const [isCustomPosition, setIsCustomPosition] = useState(false); // Removed
 
   useEffect(() => {
     // Kullanıcı bilgilerini al
@@ -244,37 +244,7 @@ export default function NewMemberPage() {
     fetchDefinitions();
   }, []);
 
-  useEffect(() => {
-    if (
-      formData.workplace &&
-      !definitionOptions.workplace.some((option) => option.label === formData.workplace) &&
-      !isCustomWorkplace
-    ) {
-      setIsCustomWorkplace(true);
-    }
-  }, [formData.workplace, definitionOptions.workplace, isCustomWorkplace]);
-
-  useEffect(() => {
-    if (
-      formData.position &&
-      !definitionOptions.position.some((option) => option.label === formData.position) &&
-      !isCustomPosition
-    ) {
-      setIsCustomPosition(true);
-    }
-  }, [formData.position, definitionOptions.position, isCustomPosition]);
-
-  useEffect(() => {
-    if (!definitionsLoading && definitionOptions.workplace.length === 0) {
-      setIsCustomWorkplace(true);
-    }
-  }, [definitionsLoading, definitionOptions.workplace.length]);
-
-  useEffect(() => {
-    if (!definitionsLoading && definitionOptions.position.length === 0) {
-      setIsCustomPosition(true);
-    }
-  }, [definitionsLoading, definitionOptions.position.length]);
+  // Custom input switching effects removed
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -361,25 +331,7 @@ export default function NewMemberPage() {
     setDocuments(prev => prev.filter(doc => doc.id !== id));
   };
 
-  const toggleWorkplaceInput = () => {
-    if (isCustomWorkplace) {
-      const exists = definitionOptions.workplace.some(option => option.label === formData.workplace);
-      if (!exists) {
-        setFormData(prev => ({ ...prev, workplace: '' }));
-      }
-    }
-    setIsCustomWorkplace(prev => !prev);
-  };
-
-  const togglePositionInput = () => {
-    if (isCustomPosition) {
-      const exists = definitionOptions.position.some(option => option.label === formData.position);
-      if (!exists) {
-        setFormData(prev => ({ ...prev, position: '' }));
-      }
-    }
-    setIsCustomPosition(prev => !prev);
-  };
+  // Toggle handlers removed
 
   const getDocumentTypeLabel = (value: string) =>
     documentTypeOptions.find(option => option.value === value)?.label || 'Diğer';
@@ -565,7 +517,7 @@ export default function NewMemberPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -675,7 +627,7 @@ export default function NewMemberPage() {
             <span>Geri Dön</span>
           </button>
         </div>
-        
+
         <h1 className="text-3xl font-bold text-slate-900">Yeni Üye Ekle</h1>
         <p className="text-slate-600 mt-2">
           {currentUser?.role_type === 'branch_manager' && currentUser.city
@@ -683,7 +635,7 @@ export default function NewMemberPage() {
             : 'Sendikaya yeni üye ekleyin'
           }
         </p>
-        
+
         {currentUser?.role_type === 'branch_manager' && currentUser.city && (
           <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
             <MapPin className="w-4 h-4 mr-1" />
@@ -718,9 +670,8 @@ export default function NewMemberPage() {
                     name="membership_number"
                     value={formData.membership_number}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.membership_number ? 'border-red-500' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.membership_number ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     placeholder="Örn: UYE-000123"
                   />
                   {errors.membership_number && (
@@ -746,9 +697,8 @@ export default function NewMemberPage() {
                 name="membership_date"
                 value={formData.membership_date}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.membership_date ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.membership_date ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.membership_date && (
                 <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
@@ -782,9 +732,8 @@ export default function NewMemberPage() {
                 name="first_name"
                 value={formData.first_name}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.first_name ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="Adını giriniz"
               />
               {errors.first_name && (
@@ -801,9 +750,8 @@ export default function NewMemberPage() {
                 name="last_name"
                 value={formData.last_name}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.last_name ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="Soyadını giriniz"
               />
               {errors.last_name && (
@@ -821,9 +769,8 @@ export default function NewMemberPage() {
                 value={formData.tc_identity}
                 onChange={handleInputChange}
                 maxLength={11}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.tc_identity ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.tc_identity ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="TC Kimlik Numarasını giriniz"
               />
               {errors.tc_identity && (
@@ -840,9 +787,8 @@ export default function NewMemberPage() {
                 name="birth_date"
                 value={formData.birth_date}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.birth_date ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.birth_date ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.birth_date && (
                 <p className="mt-1 text-sm text-red-600">{errors.birth_date}</p>
@@ -857,9 +803,8 @@ export default function NewMemberPage() {
                 name="gender"
                 value={formData.gender}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.gender ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.gender ? 'border-red-500' : 'border-slate-300'
+                  }`}
               >
                 <option value="">Cinsiyet seçiniz</option>
                 <option value="Erkek">Erkek</option>
@@ -880,9 +825,8 @@ export default function NewMemberPage() {
                 value={formData.city}
                 onChange={handleInputChange}
                 disabled={currentUser?.role_type === 'branch_manager'}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.city ? 'border-red-500' : 'border-slate-300'
-                } ${currentUser?.role_type === 'branch_manager' ? 'bg-slate-100 cursor-not-allowed' : ''}`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.city ? 'border-red-500' : 'border-slate-300'
+                  } ${currentUser?.role_type === 'branch_manager' ? 'bg-slate-100 cursor-not-allowed' : ''}`}
               >
                 <option value="">İl seçiniz</option>
                 {allowedCities.map(city => (
@@ -923,9 +867,8 @@ export default function NewMemberPage() {
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.district ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.district ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="İlçe giriniz"
               />
               {errors.district && (
@@ -1013,9 +956,8 @@ export default function NewMemberPage() {
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.phone ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="05XX XXX XX XX"
               />
               {errors.phone && (
@@ -1032,9 +974,8 @@ export default function NewMemberPage() {
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.email ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-slate-300'
+                  }`}
                 placeholder="ornek@email.com"
               />
               {errors.email && (
@@ -1075,41 +1016,23 @@ export default function NewMemberPage() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 İşyeri
               </label>
-              {!isCustomWorkplace ? (
-                <select
-                  name="workplace"
-                  value={formData.workplace}
-                  onChange={handleInputChange}
-                  disabled={definitionsLoading || definitionOptions.workplace.length === 0}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
-                >
-                  <option value="">
-                    {definitionsLoading ? 'Tanımlar yükleniyor...' : 'İşyeri seçiniz'}
+              <select
+                name="workplace"
+                value={formData.workplace}
+                onChange={handleInputChange}
+                disabled={definitionsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {definitionsLoading ? 'Tanımlar yükleniyor...' : 'İşyeri seçiniz'}
+                </option>
+                {definitionOptions.workplace.map((option) => (
+                  <option key={option.id} value={option.label}>
+                    {option.label}
                   </option>
-                  {definitionOptions.workplace.map((option) => (
-                    <option key={option.id} value={option.label}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  name="workplace"
-                  value={formData.workplace}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="İşyeri adı girin"
-                />
-              )}
+                ))}
+              </select>
               <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                <button
-                  type="button"
-                  onClick={toggleWorkplaceInput}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  {isCustomWorkplace ? 'Listeden Seç' : 'Özel Değer Gir'}
-                </button>
                 <span className="text-slate-400">
                   {definitionsLoading
                     ? 'Tanımlar yükleniyor'
@@ -1131,41 +1054,23 @@ export default function NewMemberPage() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Pozisyon
               </label>
-              {!isCustomPosition ? (
-                <select
-                  name="position"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  disabled={definitionsLoading || definitionOptions.position.length === 0}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
-                >
-                  <option value="">
-                    {definitionsLoading ? 'Tanımlar yükleniyor...' : 'Pozisyon seçiniz'}
+              <select
+                name="position"
+                value={formData.position}
+                onChange={handleInputChange}
+                disabled={definitionsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+              >
+                <option value="">
+                  {definitionsLoading ? 'Tanımlar yükleniyor...' : 'Pozisyon seçiniz'}
+                </option>
+                {definitionOptions.position.map((option) => (
+                  <option key={option.id} value={option.label}>
+                    {option.label}
                   </option>
-                  {definitionOptions.position.map((option) => (
-                    <option key={option.id} value={option.label}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  name="position"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="İş pozisyonu girin"
-                />
-              )}
+                ))}
+              </select>
               <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                <button
-                  type="button"
-                  onClick={togglePositionInput}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  {isCustomPosition ? 'Listeden Seç' : 'Özel Değer Gir'}
-                </button>
                 <span className="text-slate-400">
                   {definitionsLoading
                     ? 'Tanımlar yükleniyor'

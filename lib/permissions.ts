@@ -1,7 +1,7 @@
 import { AdminUser } from './types';
 
 export class PermissionManager {
-  private static isSuperAdmin(user: AdminUser) {
+  static isSuperAdmin(user: AdminUser) {
     return user.role === 'super_admin';
   }
 
@@ -37,11 +37,11 @@ export class PermissionManager {
     if (this.canAccessRegionMembers(user, region)) {
       return true;
     }
-    
+
     if (this.isBranchManager(user)) {
       return city ? user.city === city : true;
     }
-    
+
     return false;
   }
 
@@ -77,6 +77,10 @@ export class PermissionManager {
     return this.isSuperAdmin(user) || this.isGeneralManager(user);
   }
 
+  static canManageSiteSettings(user: AdminUser): boolean {
+    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  }
+
   static canManageDues(user: AdminUser): boolean {
     return this.isSuperAdmin(user) || this.isGeneralManager(user) || this.isRegionalManager(user);
   }
@@ -101,11 +105,11 @@ export class PermissionManager {
     if (this.canAccessAllMembers(user)) {
       return []; // Boş array tüm şehirlere erişim anlamına gelir
     }
-    
+
     if (this.isBranchManager(user) && user.city) {
       return [user.city];
     }
-    
+
     return [];
   }
 

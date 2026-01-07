@@ -6,9 +6,12 @@ import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
+
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [headerAnnouncements, setHeaderAnnouncements] = useState<any[]>([])
+  const { settings } = useSiteSettings()
   const pathname = usePathname()
 
   useEffect(() => {
@@ -49,8 +52,14 @@ export default function Header() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <Link href="/" className="flex items-center space-x-2">
-                  <img src="/logo.png" alt="Kamu Ulaşım Sen" className="h-24 w-auto" />
-                  <span className="text-2xl font-bold text-primary-600">Kamu Ulaşım Sen</span>
+                  <img
+                    src={settings?.logo_url || "/logo.png"}
+                    alt={settings?.site_title || "Kamu Ulaşım Sen"}
+                    className="h-24 w-auto object-contain"
+                  />
+                  <span className="text-2xl font-bold text-primary-600">
+                    {settings?.site_title || "Kamu Ulaşım Sen"}
+                  </span>
                 </Link>
               </div>
             </div>
@@ -58,77 +67,70 @@ export default function Header() {
             {/* Desktop Navigation */}
             <nav className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
-                <Link 
-                  href="/" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Ana Sayfa
                 </Link>
-                <Link 
-                  href="/hakkimizda" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/hakkimizda') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/hakkimizda"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/hakkimizda')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Hakkımızda
                 </Link>
-                <Link 
-                  href="/yonetim" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/yonetim') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/yonetim"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/yonetim')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Yönetim
                 </Link>
-                <Link 
-                  href="/subelerimiz" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/subelerimiz') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/subelerimiz"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/subelerimiz')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Şubelerimiz
                 </Link>
-                <Link 
-                  href="/haberler" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/haberler') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/haberler"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/haberler')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Haberler
                 </Link>
-                <Link 
-                  href="/duyurular" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/duyurular') 
-                      ? 'text-primary-600 bg-primary-50' 
-                      : 'text-gray-700 hover:text-primary-600'
-                  }`}
+                <Link
+                  href="/duyurular"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/duyurular')
+                    ? 'text-primary-600 bg-primary-50'
+                    : 'text-gray-700 hover:text-primary-600'
+                    }`}
                 >
                   Duyurular
                 </Link>
-                <Link 
-                  href="/#iletisim" 
+                <Link
+                  href="/#iletisim"
                   className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   İletişim
                 </Link>
-                <Link 
-                  href="/uyelik" 
-                  className={`btn-primary ${
-                    isActive('/uyelik') ? 'bg-primary-700' : ''
-                  }`}
+                <Link
+                  href="/uyelik"
+                  className={`btn-primary ${isActive('/uyelik') ? 'bg-primary-700' : ''
+                    }`}
                 >
                   Üye Ol
                 </Link>
@@ -155,85 +157,78 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
-              <Link 
-                href="/" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Ana Sayfa
               </Link>
-              <Link 
-                href="/hakkimizda" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/hakkimizda') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/hakkimizda"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/hakkimizda')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Hakkımızda
               </Link>
-              <Link 
-                href="/yonetim" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/yonetim') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/yonetim"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/yonetim')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Yönetim
               </Link>
-              <Link 
-                href="/subelerimiz" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/subelerimiz') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/subelerimiz"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/subelerimiz')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Şubelerimiz
               </Link>
-              <Link 
-                href="/haberler" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/haberler') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/haberler"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/haberler')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Haberler
               </Link>
-              <Link 
-                href="/duyurular" 
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/duyurular') 
-                    ? 'text-primary-600 bg-primary-50' 
-                    : 'text-gray-700 hover:text-primary-600'
-                }`}
+              <Link
+                href="/duyurular"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${isActive('/duyurular')
+                  ? 'text-primary-600 bg-primary-50'
+                  : 'text-gray-700 hover:text-primary-600'
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Duyurular
               </Link>
-              <Link 
-                href="/#iletisim" 
+              <Link
+                href="/#iletisim"
                 className="text-gray-700 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 İletişim
               </Link>
               <div className="px-3 py-2">
-                <Link 
-                  href="/uyelik" 
-                  className={`btn-primary w-full block text-center ${
-                    isActive('/uyelik') ? 'bg-primary-700' : ''
-                  }`}
+                <Link
+                  href="/uyelik"
+                  className={`btn-primary w-full block text-center ${isActive('/uyelik') ? 'bg-primary-700' : ''
+                    }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Üye Ol

@@ -9,30 +9,30 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Logo'dan çıkarılan ana renkler
+        // Logo'dan çıkarılan ana renkler - CSS değişkenleri ile dinamik hale getirildi
         primary: {
-          50: '#fef6f0',
-          100: '#fde8d7',
-          200: '#fbcfae',
-          300: '#f8ad7a',
-          400: '#f48344',
-          500: '#e3510f', // Ana turuncu renk
-          600: '#d4420c',
-          700: '#b0320c',
-          800: '#8d2a10',
-          900: '#732510',
+          50: 'var(--color-primary-50)',
+          100: 'var(--color-primary-100)',
+          200: 'var(--color-primary-200)',
+          300: 'var(--color-primary-300)',
+          400: 'var(--color-primary-400)',
+          500: 'var(--color-primary-500)', // Ana renk
+          600: 'var(--color-primary-600)',
+          700: 'var(--color-primary-700)',
+          800: 'var(--color-primary-800)',
+          900: 'var(--color-primary-900)',
         },
         secondary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#20a9e0', // Ana mavi renk
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          50: 'var(--color-secondary-50)',
+          100: 'var(--color-secondary-100)',
+          200: 'var(--color-secondary-200)',
+          300: 'var(--color-secondary-300)',
+          400: 'var(--color-secondary-400)',
+          500: 'var(--color-secondary-500)', // İkincil renk
+          600: 'var(--color-secondary-600)',
+          700: 'var(--color-secondary-700)',
+          800: 'var(--color-secondary-800)',
+          900: 'var(--color-secondary-900)',
         },
         accent: {
           50: '#f8fafc',
@@ -44,18 +44,18 @@ module.exports = {
           600: '#475569',
           700: '#334155',
           800: '#1e293b',
-          900: '#030405', // Logo'daki koyu renk
+          900: '#030405',
         },
-        // Ek yardımcı renkler
+        // Ek yardımcı renkler - uyumluluk için korundu
         orange: {
-          light: '#e65e1d', // Logo'daki ikincil turuncu
-          DEFAULT: '#e3510f',
-          dark: '#b0320c',
+          light: 'var(--color-primary-400)',
+          DEFAULT: 'var(--color-primary-500)',
+          dark: 'var(--color-primary-700)',
         },
         blue: {
-          light: '#79bee9', // Logo'daki açık mavi
-          DEFAULT: '#20a9e0',
-          dark: '#0369a1',
+          light: 'var(--color-secondary-400)',
+          DEFAULT: 'var(--color-secondary-500)',
+          dark: 'var(--color-secondary-700)',
         }
       },
       fontFamily: {

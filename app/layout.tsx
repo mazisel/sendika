@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Header from '@/components/Header'
 import { usePathname } from 'next/navigation'
+import { SiteSettingsProvider } from '@/components/providers/SiteSettingsProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,12 +20,14 @@ export default function RootLayout({
   const isAdminPage = pathname?.startsWith('/admin')
 
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50">
-          {!isAdminPage && <Header />}
-          {children}
-        </div>
+        <SiteSettingsProvider>
+          <div className="min-h-screen bg-gray-50">
+            {!isAdminPage && <Header />}
+            {children}
+          </div>
+        </SiteSettingsProvider>
       </body>
     </html>
   )

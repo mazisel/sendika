@@ -456,6 +456,15 @@ ALTER TABLE member_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE finance_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE member_dues ENABLE ROW LEVEL SECURITY;
 
+-- Member Documents Policies
+DROP POLICY IF EXISTS "Enable read access for authenticated users" ON member_documents;
+DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON member_documents;
+DROP POLICY IF EXISTS "Enable delete access for authenticated users" ON member_documents;
+
+CREATE POLICY "Enable read access for authenticated users" ON member_documents FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Enable insert access for authenticated users" ON member_documents FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Enable delete access for authenticated users" ON member_documents FOR DELETE TO authenticated USING (true);
+
 -- Note: Add specific RLS policies based on your authentication setup
 
 -- =====================================================
