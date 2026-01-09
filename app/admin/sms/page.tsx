@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Send, FileText, History, Loader2, Users, Search, Plus, Edit, Trash2, CheckCircle, XCircle, Clock, Filter, UsersRound, Zap, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Send, FileText, History, Loader2, Users, Search, Plus, Edit, Trash2, CheckCircle, XCircle, Clock, Filter, UsersRound, Zap, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { sendSms, logSms, SmsTemplateService, SmsLogService, SmsGroupService, MemberFilterService, SmsAutomationService } from '@/lib/netgsm'
 
@@ -10,13 +10,20 @@ type Tab = 'send' | 'templates' | 'groups' | 'automations' | 'logs'
 
 interface SmsAutomation {
     id: string
-    automation_type: string
+    name: string
+    trigger_column: 'birth_date' | 'membership_date' | 'created_at'
+    trigger_days_before: number
+    automation_type?: string // kept for legacy reference or icons
     is_enabled: boolean
     template_id: string | null
-    days_before: number
+    days_before: number // Deprecated, use trigger_days_before
     send_time: string
     custom_message: string | null
-    template?: { id: string; name: string; content: string } | null
+    template?: {
+        id: string
+        name: string
+        content: string
+    } | null
 }
 
 interface SmsGroup {
@@ -57,8 +64,9 @@ interface SmsLog {
     message: string
     status: string
     sent_at: string
-    member?: { full_name: string; phone: string }
+    member?: { first_name: string; last_name: string; phone: string }
     template?: { name: string }
+    sender?: { full_name: string }
 }
 
 export default function SmsPage() {
@@ -79,6 +87,12 @@ export default function SmsPage() {
     const [editingTemplate, setEditingTemplate] = useState<SmsTemplate | null>(null)
     const [newTemplate, setNewTemplate] = useState({ name: '', content: '', description: '' })
     const [showTemplateForm, setShowTemplateForm] = useState(false)
+
+    // AI Generation state
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [aiTone, setAiTone] = useState('formal')
+    const [isGeneratingAi, setIsGeneratingAi] = useState(false)
+    const [showAiModal, setShowAiModal] = useState(false)
 
     // Logs state
     const [logs, setLogs] = useState<SmsLog[]>([])
@@ -101,6 +115,15 @@ export default function SmsPage() {
 
     // Automations state
     const [automations, setAutomations] = useState<SmsAutomation[]>([])
+    const [showAutomationForm, setShowAutomationForm] = useState(false)
+    const [editingAutomation, setEditingAutomation] = useState<SmsAutomation | null>(null)
+    const [newAutomation, setNewAutomation] = useState({
+        name: '',
+        trigger_column: 'birth_date',
+        trigger_days_before: 0,
+        send_time: '09:00',
+        template_id: ''
+    })
 
     useEffect(() => {
         if (activeTab === 'templates') {
@@ -111,6 +134,7 @@ export default function SmsPage() {
             loadGroups()
         } else if (activeTab === 'automations') {
             loadAutomations()
+            loadTemplates() // Ensure templates are loaded for selection
         }
     }, [activeTab])
 
@@ -189,7 +213,7 @@ export default function SmsPage() {
     const loadAutomations = async () => {
         try {
             const data = await SmsAutomationService.getAll()
-            setAutomations(data || [])
+            setAutomations((data as unknown as SmsAutomation[]) || [])
         } catch (error) {
             console.error('Otomasyonlar yüklenirken hata:', error)
         }
@@ -204,6 +228,70 @@ export default function SmsPage() {
             console.error('Otomasyon güncelleme hatası:', error)
             toast.error('Ayarlar güncellenemedi')
         }
+    }
+
+    const handleSaveAutomation = async () => {
+        if (!newAutomation.name) {
+            toast.error('Lütfen otomasyon ismini girin')
+            return
+        }
+
+        try {
+            if (editingAutomation) {
+                await SmsAutomationService.update(editingAutomation.id, {
+                    name: newAutomation.name,
+                    trigger_column: newAutomation.trigger_column,
+                    trigger_days_before: newAutomation.trigger_days_before,
+                    send_time: newAutomation.send_time,
+                    template_id: newAutomation.template_id || null
+                })
+                toast.success('Otomasyon güncellendi')
+            } else {
+                await SmsAutomationService.create({
+                    name: newAutomation.name,
+                    trigger_column: newAutomation.trigger_column,
+                    trigger_days_before: newAutomation.trigger_days_before,
+                    send_time: newAutomation.send_time,
+                    template_id: newAutomation.template_id || null
+                })
+                toast.success('Otomasyon oluşturuldu')
+            }
+            setShowAutomationForm(false)
+            setEditingAutomation(null)
+            loadAutomations()
+        } catch (error) {
+            console.error('Otomasyon kaydedilirken hata:', error)
+            toast.error('Otomasyon kaydedilemedi')
+        }
+    }
+
+    const handleDeleteAutomation = async (id: string) => {
+        if (!confirm('Bu otomasyonu silmek istediğinize emin misiniz?')) return
+
+        try {
+            await SmsAutomationService.delete(id)
+            toast.success('Otomasyon silindi')
+            loadAutomations()
+        } catch (error) {
+            console.error('Otomasyon silinirken hata:', error)
+            toast.error('Otomasyon silinemedi')
+        }
+    }
+
+    const getTriggerLabel = (column: string) => {
+        switch (column) {
+            case 'birth_date': return 'Doğum Günü'
+            case 'membership_date': return 'Üyelik Tarihi'
+            case 'created_at': return 'Kayıt Tarihi'
+
+            default: return column
+        }
+    }
+
+    const getTriggerTimeLabel = (daysBefore: number) => {
+        if (daysBefore === 0) return 'Gününde'
+        if (daysBefore === 1) return '1 gün önce'
+        return `${daysBefore} gün önce`
     }
 
     const getAutomationLabel = (type: string): { title: string; description: string } => {
@@ -398,6 +486,9 @@ export default function SmsPage() {
             const personalizedMessage = replacePlaceholders(message, member)
             const result = await sendSms(member.phone, personalizedMessage, scheduledDate || undefined)
 
+            // Get current user for logging
+            const { data: { user } } = await supabase.auth.getUser()
+
             await logSms({
                 templateId: selectedTemplateId || undefined,
                 memberId: member.id,
@@ -405,7 +496,8 @@ export default function SmsPage() {
                 message: personalizedMessage,
                 status: result.success ? 'sent' : 'failed',
                 jobId: result.jobId,
-                errorMessage: result.error
+                errorMessage: result.error,
+                sentBy: user?.id
             })
 
             if (result.success) {
@@ -462,6 +554,45 @@ export default function SmsPage() {
         } catch (error) {
             console.error('Şablon silme hatası:', error)
             toast.error('Şablon silinemedi')
+        }
+    }
+
+    const handleGenerateAiSms = async () => {
+        if (!aiPrompt.trim()) {
+            toast.error('Lütfen bir konu veya açıklama girin')
+            return
+        }
+
+        setIsGeneratingAi(true)
+        try {
+            const response = await fetch('/api/ai/generate-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: aiPrompt,
+                    tone: aiTone
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Bir hata oluştu')
+            }
+
+            setNewTemplate(prev => ({
+                ...prev,
+                content: data.content
+            }))
+
+            setShowAiModal(false)
+            setAiPrompt('')
+            toast.success('SMS metni oluşturuldu')
+        } catch (error: any) {
+            console.error('AI Generation Error:', error)
+            toast.error(error.message || 'SMS oluşturulamadı')
+        } finally {
+            setIsGeneratingAi(false)
         }
     }
 
@@ -863,10 +994,20 @@ export default function SmsPage() {
                                     <textarea
                                         value={newTemplate.content}
                                         onChange={(e) => setNewTemplate({ ...newTemplate, content: e.target.value })}
-                                        rows={4}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 resize-none"
-                                        placeholder="Sayın {AD_SOYAD}, aidat ödemeniz hakkında..."
+                                        rows={5}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                                        placeholder="SMS içeriğini yazın..."
                                     />
+                                    <div className="mt-2 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAiModal(true)}
+                                            className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium px-3 py-1.5 rounded-lg hover:bg-purple-50 transition-colors border border-dashed border-purple-200"
+                                        >
+                                            <Sparkles className="w-4 h-4" />
+                                            Yapay Zeka ile Oluştur
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <button
@@ -875,6 +1016,87 @@ export default function SmsPage() {
                                     >
                                         Kaydet
                                     </button>
+
+                                    {/* AI Generator Modal */}
+                                    {showAiModal && (
+                                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                                            <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                                        <Sparkles className="w-5 h-5 text-purple-600" />
+                                                        Yapay Zeka Asistanı
+                                                    </h3>
+                                                    <button
+                                                        onClick={() => setShowAiModal(false)}
+                                                        className="text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <XCircle className="w-6 h-6" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Ne hakkında bir mesaj yazmak istiyorsunuz?
+                                                        </label>
+                                                        <textarea
+                                                            value={aiPrompt}
+                                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                                            rows={3}
+                                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                                            placeholder="Örn: Kurban bayramı kutlaması, aidat ödeme hatırlatması..."
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Mesajın tonu nasıl olsun?
+                                                        </label>
+                                                        <select
+                                                            value={aiTone}
+                                                            onChange={(e) => setAiTone(e.target.value)}
+                                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                                        >
+                                                            <option value="formal">Resmi ve Saygılı</option>
+                                                            <option value="enthusiastic">Coşkulu ve Heyecanlı</option>
+                                                            <option value="informative">Bilgilendirici ve Net</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-purple-50 p-3 rounded-lg text-xs text-purple-700 border border-purple-100">
+                                                        <p className="font-medium mb-1">💡 İpucu:</p>
+                                                        Yapay zeka {`{AD_SOYAD}`} gibi etiketleri otomatik olarak kullanabilir.
+                                                    </div>
+
+                                                    <div className="flex justify-end gap-3 pt-2">
+                                                        <button
+                                                            onClick={() => setShowAiModal(false)}
+                                                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium"
+                                                        >
+                                                            İptal
+                                                        </button>
+                                                        <button
+                                                            onClick={handleGenerateAiSms}
+                                                            disabled={isGeneratingAi || !aiPrompt.trim()}
+                                                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {isGeneratingAi ? (
+                                                                <>
+                                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                                    Oluşturuluyor...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Sparkles className="w-4 h-4" />
+                                                                    Oluştur
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <button
                                         onClick={() => {
                                             setShowTemplateForm(false)
@@ -1126,76 +1348,208 @@ export default function SmsPage() {
                             <Zap className="w-5 h-5 text-yellow-500" />
                             SMS Otomasyonları
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Otomatik SMS gönderimlerini aktifleştirin ve yönetin
-                        </p>
+                        <div className="flex justify-between items-center mt-1">
+                            <p className="text-sm text-gray-500">
+                                Otomatik SMS veritabanı üzerinden günlük kontrol edilir ve tanımlı kurallara göre gönderim yapılır.
+                            </p>
+                            <button
+                                onClick={() => {
+                                    setNewAutomation({
+                                        name: '',
+                                        trigger_column: 'birth_date',
+                                        trigger_days_before: 0,
+                                        send_time: '09:00',
+                                        template_id: ''
+                                    })
+                                    setEditingAutomation(null)
+                                    setShowAutomationForm(true)
+                                }}
+                                className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Yeni Otomasyon
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="space-y-4">
-                        {automations.length === 0 ? (
-                            <p className="text-gray-500 text-center py-8">Henüz otomasyon ayarı yok</p>
-                        ) : (
-                            automations.map((automation) => {
-                                const label = getAutomationLabel(automation.automation_type)
-                                return (
-                                    <div
-                                        key={automation.id}
-                                        className={`border rounded-lg p-4 ${automation.is_enabled ? 'border-green-200 bg-green-50/50' : 'border-gray-200'}`}
-                                    >
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3">
-                                                    <button
-                                                        onClick={() => handleUpdateAutomation(automation.id, { is_enabled: !automation.is_enabled })}
-                                                        className={`transition-colors ${automation.is_enabled ? 'text-green-600' : 'text-gray-400'}`}
-                                                    >
-                                                        {automation.is_enabled ? (
-                                                            <ToggleRight className="w-8 h-8" />
-                                                        ) : (
-                                                            <ToggleLeft className="w-8 h-8" />
-                                                        )}
-                                                    </button>
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-900">{label.title}</h4>
-                                                        <p className="text-sm text-gray-500">{label.description}</p>
-                                                    </div>
-                                                </div>
+                    {/* Automation Form Modal */}
+                    {showAutomationForm && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+                                <h3 className="text-lg font-semibold mb-4">
+                                    {editingAutomation ? 'Otomasyonu Düzenle' : 'Yeni Otomasyon'}
+                                </h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Otomasyon İsmi
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newAutomation.name}
+                                            onChange={(e) => setNewAutomation({ ...newAutomation, name: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                            placeholder="Örn: Doğum Günü Kutlaması"
+                                        />
+                                    </div>
 
-                                                {automation.is_enabled && (
-                                                    <div className="mt-4 ml-11 space-y-3">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                                Kullanılacak Şablon
-                                                            </label>
-                                                            <select
-                                                                value={automation.template_id || ''}
-                                                                onChange={(e) => handleUpdateAutomation(automation.id, { template_id: e.target.value || null })}
-                                                                className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                                                            >
-                                                                <option value="">-- Şablon seçin --</option>
-                                                                {templates.filter(t => t.is_active).map((template) => (
-                                                                    <option key={template.id} value={template.id}>
-                                                                        {template.name}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Tetikleyici
+                                            </label>
+                                            <select
+                                                value={newAutomation.trigger_column}
+                                                onChange={(e) => setNewAutomation({ ...newAutomation, trigger_column: e.target.value as any })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                            >
+                                                <option value="birth_date">Doğum Günü</option>
+                                                <option value="membership_date">Üyelik Tarihi</option>
+                                                <option value="created_at">Kayıt Tarihi</option>
 
-                                                        {automation.template && (
-                                                            <div className="text-sm bg-gray-100 p-3 rounded-lg">
-                                                                <span className="text-gray-500">Şablon önizleme:</span>
-                                                                <p className="mt-1 text-gray-700">{automation.template.content}</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Zamanlama
+                                            </label>
+                                            <select
+                                                value={newAutomation.trigger_days_before}
+                                                onChange={(e) => setNewAutomation({ ...newAutomation, trigger_days_before: Number(e.target.value) })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                            >
+                                                <option value={0}>Gününde</option>
+                                                <option value={1}>1 gün önce</option>
+                                                <option value={2}>2 gün önce</option>
+                                                <option value={3}>3 gün önce</option>
+                                                <option value={7}>1 hafta önce</option>
+                                            </select>
                                         </div>
                                     </div>
-                                )
-                            })
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Gönderim Saati
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={newAutomation.send_time}
+                                            onChange={(e) => setNewAutomation({ ...newAutomation, send_time: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            SMS Şablonu
+                                        </label>
+                                        <select
+                                            value={newAutomation.template_id}
+                                            onChange={(e) => setNewAutomation({ ...newAutomation, template_id: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                        >
+                                            <option value="">Şablon Seçin</option>
+                                            {templates.filter(t => t.is_active).map(t => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => setShowAutomationForm(false)}
+                                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={handleSaveAutomation}
+                                        className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+                                    >
+                                        Kaydet
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        {automations.map((automation) => (
+                            <div key={automation.id} className="border border-gray-200 rounded-lg p-5 flex items-start justify-between bg-gray-50/50">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <h4 className="font-semibold text-gray-900">{automation.name}</h4>
+                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${automation.is_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                            {automation.is_enabled ? 'Aktif' : 'Pasif'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                                        <span className="font-medium text-gray-700">{getTriggerLabel(automation.trigger_column)}</span>
+                                        <span className="text-gray-400">•</span>
+                                        <span>{getTriggerTimeLabel(automation.trigger_days_before)}</span>
+                                        <span className="text-gray-400">•</span>
+                                        <span>Saat {automation.send_time}</span>
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                        {automation.template
+                                            ? `Seçili şablon: ${automation.template.name}`
+                                            : 'Şablon seçilmemiş (Gönderim yapılmaz)'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 ml-4">
+                                    <button
+                                        onClick={() => handleUpdateAutomation(automation.id, { is_enabled: !automation.is_enabled })}
+                                        className={`p-2 rounded-lg transition-colors ${automation.is_enabled
+                                            ? 'text-green-600 hover:bg-green-50'
+                                            : 'text-gray-400 hover:bg-gray-100'
+                                            }`}
+                                        title={automation.is_enabled ? 'Pasifleştir' : 'Aktifleştir'}
+                                    >
+                                        {automation.is_enabled ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setNewAutomation({
+                                                name: automation.name,
+                                                trigger_column: automation.trigger_column,
+                                                trigger_days_before: automation.trigger_days_before,
+                                                send_time: automation.send_time,
+                                                template_id: automation.template_id || ''
+                                            })
+                                            setEditingAutomation(automation)
+                                            setShowAutomationForm(true)
+                                        }}
+                                        className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                                        title="Düzenle"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteAutomation(automation.id)}
+                                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                                        title="Sil"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+
+                        {automations.length === 0 && (
+                            <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-xl">
+                                <Zap className="w-8 h-8 mx-auto text-gray-300 mb-3" />
+                                <p>Henüz tanımlanmış otomasyon yok</p>
+                                <button
+                                    onClick={() => setShowAutomationForm(true)}
+                                    className="mt-2 text-primary-600 hover:text-primary-700 font-medium"
+                                >
+                                    İlk otomasyonu oluştur
+                                </button>
+                            </div>
                         )}
                     </div>
+
 
                     <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                         <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Nasıl Çalışır?</h4>
@@ -1227,6 +1581,7 @@ export default function SmsPage() {
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alıcı</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mesaj</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Şablon</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gönderen</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
                                     </tr>
                                 </thead>
@@ -1238,7 +1593,7 @@ export default function SmsPage() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="text-sm font-medium text-gray-900">
-                                                    {log.member?.full_name || '-'}
+                                                    {log.member ? `${log.member.first_name} ${log.member.last_name}` : '-'}
                                                 </div>
                                                 <div className="text-sm text-gray-500">{log.phone}</div>
                                             </td>
@@ -1247,6 +1602,9 @@ export default function SmsPage() {
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-500">
                                                 {log.template?.name || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">
+                                                {log.sender?.full_name || 'Sistem'}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`

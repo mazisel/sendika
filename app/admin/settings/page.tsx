@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Save, Upload, Loader2, Image as ImageIcon, MessageSquare, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { Logger } from '@/lib/logger'
 
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true)
@@ -143,6 +144,15 @@ export default function SettingsPage() {
             if (error) throw error
 
             toast.success('Ayarlar kaydedildi')
+
+            await Logger.log({
+                action: 'UPDATE',
+                entityType: 'SETTINGS',
+                entityId: settings.id || 'new',
+                details: { updatedFields: Object.keys(settingData) },
+                userId: (await supabase.auth.getUser()).data.user?.id
+            });
+
             window.location.reload()
         } catch (error) {
             console.error('Kaydedilirken hata:', error)
@@ -341,8 +351,8 @@ export default function SettingsPage() {
 
                     {connectionStatus !== 'idle' && (
                         <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${connectionStatus === 'success'
-                                ? 'bg-green-50 text-green-700'
-                                : 'bg-red-50 text-red-700'
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-red-50 text-red-700'
                             }`}>
                             {connectionStatus === 'success' ? (
                                 <>

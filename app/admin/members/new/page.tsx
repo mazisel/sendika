@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { Logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
@@ -33,6 +34,7 @@ interface FormData {
   notes: string;
   membership_number: string;
   membership_date: string;
+
 }
 
 interface PendingDocument {
@@ -64,7 +66,8 @@ const initialFormData: FormData = {
   children_count: 0,
   notes: '',
   membership_number: '',
-  membership_date: ''
+  membership_date: '',
+
 };
 
 const fieldLabels: Record<string, string> = {
@@ -89,7 +92,8 @@ const fieldLabels: Record<string, string> = {
   children_count: 'Çocuk sayısı',
   notes: 'Notlar',
   membership_number: 'Üye numarası',
-  membership_date: 'Üye kayıt tarihi'
+  membership_date: 'Üye kayıt tarihi',
+
 };
 
 const documentTypeOptions = [
@@ -484,6 +488,9 @@ export default function NewMemberPage() {
       newErrors.membership_date = 'Geçerli bir tarih seçiniz';
     }
 
+
+
+
     // Şube yöneticisi şehir kontrolü
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
@@ -548,6 +555,9 @@ export default function NewMemberPage() {
         notes: formData.notes.trim(),
         membership_number: canEditMembershipNumber ? formData.membership_number.trim() : null,
         membership_date: formData.membership_date ? formData.membership_date : null,
+        custom_date_1: null,
+        custom_date_2: null,
+        custom_date_3: null,
         membership_status: 'active', // Admin tarafından eklenen üyeler direkt aktif
         is_active: true,
         region: cityRegion
@@ -564,6 +574,14 @@ export default function NewMemberPage() {
         alert(message);
         return;
       }
+
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'MEMBER',
+        entityId: data.id,
+        details: { memberName: `${memberData.first_name} ${memberData.last_name}`, createdBy: currentUser?.id },
+        userId: currentUser?.id
+      });
 
       if (documents.length > 0 && data?.id) {
         try {
@@ -617,31 +635,104 @@ export default function NewMemberPage() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Geri Dön</span>
-          </button>
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <div className="flex items-center space-x-4 mb-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Geri Dön</span>
+            </button>
+          </div>
+
+          <h1 className="text-3xl font-bold text-slate-900">Yeni Üye Ekle</h1>
+          <p className="text-slate-600 mt-2">
+            {currentUser?.role_type === 'branch_manager' && currentUser.city
+              ? `${currentUser.city} şubesine yeni üye ekleyin`
+              : 'Sendikaya yeni üye ekleyin'
+            }
+          </p>
+
+          {currentUser?.role_type === 'branch_manager' && currentUser.city && (
+            <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+              <MapPin className="w-4 h-4 mr-1" />
+              {currentUser.city} Şubesi
+            </div>
+          )}
         </div>
 
-        <h1 className="text-3xl font-bold text-slate-900">Yeni Üye Ekle</h1>
-        <p className="text-slate-600 mt-2">
-          {currentUser?.role_type === 'branch_manager' && currentUser.city
-            ? `${currentUser.city} şubesine yeni üye ekleyin`
-            : 'Sendikaya yeni üye ekleyin'
-          }
-        </p>
+        <div>
+          <input
+            type="file"
+            accept="image/*"
+            id="id-card-upload"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
 
-        {currentUser?.role_type === 'branch_manager' && currentUser.city && (
-          <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-            <MapPin className="w-4 h-4 mr-1" />
-            {currentUser.city} Şubesi
-          </div>
-        )}
+              if (file.size > 5 * 1024 * 1024) {
+                alert('Dosya boyutu 5MB\'dan küçük olmalıdır.');
+                return;
+              }
+
+              const formData = new FormData();
+              formData.append('file', file);
+
+              try {
+                setLoading(true);
+                const response = await fetch('/api/ai/scan-id', {
+                  method: 'POST',
+                  body: formData
+                });
+
+                if (!response.ok) {
+                  throw new Error('Kimlik tarama başarısız oldu.');
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+
+                setFormData(prev => ({
+                  ...prev,
+                  first_name: data.first_name || prev.first_name,
+                  last_name: data.last_name || prev.last_name,
+                  tc_identity: data.tc_identity || prev.tc_identity,
+                  birth_date: data.birth_date || prev.birth_date,
+                  gender: data.gender || prev.gender
+                }));
+
+                alert('Kimlik bilgileri başarıyla tarandı ve forma dolduruldu! Lütfen bilgileri kontrol ediniz.');
+
+              } catch (error) {
+                console.error('ID Scan error:', error);
+                alert('Kimlik taranırken bir hata oluştu. Lütfen tekrar deneyin veya elle giriş yapın.');
+              } finally {
+                setLoading(false);
+                // Reset input value to allow selecting same file again
+                e.target.value = '';
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => document.getElementById('id-card-upload')?.click()}
+            disabled={loading}
+            className="group relative inline-flex items-center justify-center p-0.5 mb-2 me-2 overflow-hidden text-sm font-medium text-gray-900 rounded-lg group bg-gradient-to-br from-purple-600 to-blue-500 group-hover:from-purple-600 group-hover:to-blue-500 hover:text-white dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
+          >
+            <span className="relative px-5 py-2.5 transition-all ease-in duration-75 bg-white dark:bg-gray-900 rounded-md group-hover:bg-opacity-0 flex items-center gap-2">
+              {loading ? <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" /> : <Upload className="w-4 h-4 text-purple-600 group-hover:text-white" />}
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-500 group-hover:text-white">
+                {loading ? 'Taranıyor...' : 'Akıllı Kimlik Tara (AI)'}
+              </span>
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Form */}
@@ -931,6 +1022,9 @@ export default function NewMemberPage() {
                 <option value="Doktora">Doktora</option>
               </select>
             </div>
+
+
+
           </div>
         </div>
 

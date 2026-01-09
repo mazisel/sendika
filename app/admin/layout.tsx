@@ -26,7 +26,8 @@ import {
   Wallet,
   PiggyBank,
   Sun,
-  Moon
+  Moon,
+  Shield
 } from 'lucide-react';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
@@ -43,6 +44,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isThemeInitialized, setIsThemeInitialized] = useState(false);
   const lastUpdated = useMemo(() => {
     return new Intl.DateTimeFormat('tr-TR', {
       day: '2-digit',
@@ -77,10 +79,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDarkMode(true);
     }
+    setIsThemeInitialized(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !isThemeInitialized) return;
+
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
       window.localStorage.setItem('admin-theme', 'dark');
@@ -88,7 +92,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       document.documentElement.classList.remove('dark');
       window.localStorage.setItem('admin-theme', 'light');
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, isThemeInitialized]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
@@ -124,16 +128,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       }
     ];
 
-    if (PermissionManager.canViewDues(currentUser)) {
-      baseItems.push({
-        title: 'Aidatlar',
-        href: '/admin/dues',
-        icon: Wallet,
-        description: PermissionManager.canManageDues(currentUser)
-          ? 'Aidat dönemlerini ve ödemeleri yönet'
-          : 'Aidat durumlarını görüntüle'
-      });
-    }
+
 
     if (PermissionManager.canViewFinance(currentUser)) {
       baseItems.push({
@@ -246,6 +241,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         href: '/admin/users',
         icon: UserPlus,
         description: 'Admin kullanıcılarını yönet'
+      });
+    }
+
+    // Denetim Kayıtları (Super Admin ve Admin)
+    if (currentUser.role === 'super_admin' || currentUser.role === 'admin') {
+      baseItems.push({
+        title: 'Denetim Kayıtları',
+        href: '/admin/audit-logs',
+        icon: Shield,
+        description: 'Sistem loglarını incele'
       });
     }
 

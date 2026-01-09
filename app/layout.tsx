@@ -6,6 +6,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import { usePathname } from 'next/navigation'
 import { SiteSettingsProvider } from '@/components/providers/SiteSettingsProvider'
+import { Toaster } from 'react-hot-toast'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,6 +27,7 @@ export default function RootLayout({
           <div className="min-h-screen bg-gray-50">
             {!isAdminPage && <Header />}
             {children}
+            <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
           </div>
         </SiteSettingsProvider>
       </body>

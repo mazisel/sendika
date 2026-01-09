@@ -318,8 +318,9 @@ export const SmsLogService = {
             .from('sms_logs')
             .select(`
         *,
-        member:members(full_name, phone),
-        template:sms_templates(name)
+        member:members(first_name, last_name, phone),
+        template:sms_templates(name),
+        sender:admin_users(full_name)
       `)
             .order('sent_at', { ascending: false })
             .limit(limit)
@@ -495,19 +496,43 @@ export const SmsAutomationService = {
         const { data, error } = await supabase
             .from('sms_automations')
             .select(`
-                *,
                 template:sms_templates(id, name, content)
             `)
-            .order('automation_type')
+            .order('name', { ascending: true })
+
+        if (error) throw error
+        return data
+    },
+
+    async create(settings: {
+        name: string
+        trigger_column: string
+        trigger_days_before?: number
+        is_enabled?: boolean
+        template_id?: string | null
+        send_time?: string
+        custom_message?: string | null
+    }) {
+        const { data, error } = await supabase
+            .from('sms_automations')
+            .insert({
+                ...settings,
+                is_enabled: settings.is_enabled ?? true, // Default to true on create
+                updated_at: new Date().toISOString()
+            })
+            .select()
+            .single()
 
         if (error) throw error
         return data
     },
 
     async update(id: string, settings: {
+        name?: string
+        trigger_column?: string
+        trigger_days_before?: number
         is_enabled?: boolean
         template_id?: string | null
-        days_before?: number
         send_time?: string
         custom_message?: string | null
     }) {
@@ -522,6 +547,17 @@ export const SmsAutomationService = {
         return data
     },
 
+    async delete(id: string) {
+        const { error } = await supabase
+            .from('sms_automations')
+            .delete()
+            .eq('id', id)
+
+        if (error) throw error
+    },
+
+    // Legacy method, kept for compatibility if needed, but updated to use ID logic ideally
+    // We should transition to using ID everywhere
     async updateByType(automationType: string, settings: {
         is_enabled?: boolean
         template_id?: string | null

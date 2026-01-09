@@ -34,6 +34,7 @@ interface Member {
   education_level: string;
   marital_status: string;
   children_count: number;
+
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -468,44 +469,50 @@ export default function AdminMembersPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-900 dark:text-slate-100">
               {/* Kişisel Bilgiler */}
-              <div className="bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-800">
-                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-2">Kişisel Bilgiler</h4>
-                <dl className="space-y-2">
+              <div className="col-span-1 md:col-span-2 bg-gray-50 dark:bg-slate-900/60 p-4 rounded-lg border border-gray-100 dark:border-slate-800">
+                <h4 className="font-semibold text-gray-900 dark:text-slate-100 mb-4 border-b border-gray-200 dark:border-slate-700 pb-2">Kişisel Bilgiler</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Üye No</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.membership_number || '-'}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Üye No</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100 font-medium">{selectedMember.membership_number || '-'}</p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Ad Soyad</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.first_name} {selectedMember.last_name}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Ad Soyad</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100 font-medium">{selectedMember.first_name} {selectedMember.last_name}</p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">TC Kimlik</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.tc_identity}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">TC Kimlik No</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">{selectedMember.tc_identity}</p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Doğum Tarihi</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Doğum Tarihi</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">
                       {selectedMember.birth_date ? new Date(selectedMember.birth_date).toLocaleDateString('tr-TR') : '-'}
-                    </dd>
+                    </p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Cinsiyet</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.gender}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Cinsiyet</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">{selectedMember.gender}</p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Medeni Durum</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.marital_status || '-'}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Medeni Durum / Çocuk</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">
+                      {selectedMember.marital_status || '-'} / {selectedMember.children_count}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Eğitim Durumu</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">{selectedMember.education_level || '-'}</p>
                   </div>
                   <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Çocuk Sayısı</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.children_count}</dd>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Acil Durum Kişisi</p>
+                    <p className="mt-1 text-slate-900 dark:text-slate-100">
+                      {selectedMember.emergency_contact_name} ({selectedMember.emergency_contact_relation})
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{selectedMember.emergency_contact_phone}</p>
                   </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Eğitim Durumu</dt>
-                    <dd className="text-sm text-gray-900 dark:text-slate-100">{selectedMember.education_level || '-'}</dd>
-                  </div>
-                </dl>
+                </div>
               </div>
 
               {/* İletişim Bilgileri */}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
+import { Logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
@@ -35,6 +36,7 @@ interface FormData {
   membership_status: string;
   is_active: boolean;
   membership_date: string;
+
 }
 
 const initialFormData: FormData = {
@@ -60,7 +62,8 @@ const initialFormData: FormData = {
   notes: '',
   membership_status: 'active',
   is_active: true,
-  membership_date: ''
+  membership_date: '',
+
 };
 
 const emptyMemberDueSummary = {
@@ -289,7 +292,8 @@ export default function EditMemberPage() {
           notes: data.notes || '',
           membership_status: data.membership_status || 'active',
           is_active: data.is_active || true,
-          membership_date: data.membership_date || ''
+          membership_date: data.membership_date || '',
+
         });
         setMembershipNumber(data.membership_number || '');
         setCityRegion(data.region ?? null);
@@ -474,6 +478,9 @@ export default function EditMemberPage() {
       newErrors.membership_date = 'Geçerli bir tarih seçiniz';
     }
 
+
+
+
     // Şube yöneticisi şehir kontrolü
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
@@ -523,6 +530,7 @@ export default function EditMemberPage() {
         children_count: formData.children_count,
         notes: formData.notes.trim(),
         membership_date: formData.membership_date ? formData.membership_date : null,
+
         membership_status: formData.membership_status,
         is_active: formData.is_active,
         updated_at: new Date().toISOString(),
@@ -554,6 +562,15 @@ export default function EditMemberPage() {
       }
 
       alert('Üye bilgileri başarıyla güncellendi!');
+
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'MEMBER',
+        entityId: memberId as string,
+        details: { memberName: `${updatedData.first_name} ${updatedData.last_name}`, updatedBy: currentUser?.id },
+        userId: currentUser?.id
+      });
+
       router.push('/admin/members');
     } catch (error) {
       console.error('Üye güncellenirken hata:', error);
@@ -900,6 +917,9 @@ export default function EditMemberPage() {
                 <option value="Doktora">Doktora</option>
               </select>
             </div>
+
+
+
           </div>
         </div>
 

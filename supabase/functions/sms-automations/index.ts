@@ -17,11 +17,17 @@ interface Member {
     phone: string
     birth_date?: string
     membership_date?: string
+
+    created_at?: string
+    [key: string]: any // Allow dynamic property access
 }
 
 interface Automation {
     id: string
-    automation_type: string
+    name: string
+    trigger_column: string
+    trigger_days_before: number
+    automation_type?: string // legacy
     is_enabled: boolean
     template_id: string | null
     template?: { id: string; name: string; content: string } | null
@@ -46,10 +52,10 @@ serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
         const results = {
-            birthday: { checked: 0, sent: 0, failed: 0 },
-            membership_anniversary: { checked: 0, sent: 0, failed: 0 },
+            total_checked: 0,
             total_sent: 0,
-            total_failed: 0
+            total_failed: 0,
+            details: [] as any[]
         }
 
         // Get NetGSM config
@@ -86,70 +92,123 @@ serve(async (req) => {
 
         const today = new Date()
         const todayStr = today.toISOString().split('T')[0]
-        const month = today.getMonth() + 1
-        const day = today.getDate()
 
+        // Process each automation
         for (const automation of automations as Automation[]) {
-            if (!automation.template?.content) continue
+            if (!automation.template?.content || !automation.trigger_column) continue
 
-            if (automation.automation_type === 'birthday') {
-                // Get members with birthday today
+            const triggerDate = new Date(today)
+            // If trigger is "X days before", we need to look for events happening "X days from now"
+            // Example: "Birthday 1 day before". Today is 10th. We look for birthdays on 11th.
+            // So we ADD days to today to find the target date to match against
+            triggerDate.setDate(today.getDate() + (automation.trigger_days_before || 0))
+
+            const targetMonth = triggerDate.getMonth() + 1
+            const targetDay = triggerDate.getDate()
+
+            let sentCount = 0
+            let failedCount = 0
+
+            // Query members based on trigger column type
+            let relevantMembers: Member[] = []
+
+            if (['birth_date', 'membership_date'].includes(automation.trigger_column)) {
+                // For recurring annual events (birthday, anniversary)
                 const { data: members } = await supabase
                     .from('members')
-                    .select('id, first_name, last_name, phone, birth_date')
-                    .not('birth_date', 'is', null)
+                    .select('*')
+                    .not(automation.trigger_column, 'is', null)
                     .not('phone', 'is', null)
 
                 if (members) {
-                    const birthdayMembers = members.filter((m: Member) => {
-                        if (!m.birth_date) return false
-                        const bd = new Date(m.birth_date)
-                        return bd.getMonth() + 1 === month && bd.getDate() === day
+                    relevantMembers = members.filter((m: Member) => {
+                        const dateVal = m[automation.trigger_column]
+                        if (!dateVal) return false
+                        const d = new Date(dateVal)
+                        const isSameMonthDay = d.getMonth() + 1 === targetMonth && d.getDate() === targetDay
+
+                        // For membership anniversary, ensure it's not the same year (creation year)
+                        if (automation.trigger_column === 'membership_date') {
+                            const isNotFirstYear = d.getFullYear() < triggerDate.getFullYear()
+                            return isSameMonthDay && isNotFirstYear
+                        }
+                        return isSameMonthDay
                     })
-
-                    results.birthday.checked = birthdayMembers.length
-
-                    for (const member of birthdayMembers) {
-                        const sendResult = await processAutomationSend(
-                            supabase, netgsmConfig, automation, member, todayStr
-                        )
-                        if (sendResult === 'sent') results.birthday.sent++
-                        else if (sendResult === 'failed') results.birthday.failed++
-                    }
                 }
-            }
+            } else if (automation.trigger_column === 'created_at') {
+                // For one-time events based on date (e.g. Welcome message 3 days after signup)
+                // We need to match exact date: created_at date part == triggerDate
+                // Wait, if "Welcome 0 days before" (Immediate) -> run on same day.
+                // But cron runs once a day. If user signed up at 14:00 and cron runs at 09:00, they missed it?
+                // For 'created_at' and 0 days, ideally this is handled by database trigger or API on signup.
+                // But for "3 days after signup", cron is perfect.
+                // Logic: Find members whose created_at is EXACTLY X days ago.
+                // Or rather: Today = created_at + X days.
+                // So created_at = Today - X days.
+                // My triggerDate logic above handles "X days before event".
+                // "Welcome message" is usually "X days AFTER event".
+                // Let's re-eval the UI perception.
+                // UI says: "Zamanlama: 1 gün önce".
+                // For birthday: "1 day before birthday". Correct.
+                // For welcome: "1 day before signup?" No. Usually "1 day AFTER signup".
+                // We probably need negative days for "after"? Or just assume "days before" is strictly for future events.
+                // BUT "created_at" is a past event.
+                // If I set "Welcome", "0 days before" -> Same day.
+                // If I set "Welcome", "1 day before" -> Impossible.
+                // So for created_at, the logic might need to be inverted or UI adjusted.
+                // Let's assume for now user only uses it for recurring events or "0 days" (same day).
 
-            if (automation.automation_type === 'membership_anniversary') {
+                // If user selects "created_at" and "0 days", we match today.
+                const targetDateStr = triggerDate.toISOString().split('T')[0] // This is today + days
+                // If days_before is positive (e.g. 1), we are looking for event in future.
+                // created_at is in past. So created_at can never match future date (unless time travel).
+                // So for created_at, "days_before" logic is flawed if we strictly interpret "before".
+                // However, usually welcome messages are "Send on registration".
+
+                // Let's stick to simple date match for now. match(month, day) for recurring, match(full date) for non-recurring.
+                // But created_at includes time.
+
+                // Actually, if I want to support "3 days after signup", I need "trigger_days_after".
+                // The current column is `trigger_days_before`.
+                // Let's assume for `created_at` we ignore `trigger_days_before` unless it's 0.
+                // Or user shouldn't use `created_at` with `days_before`.
+                // I will skip `created_at` logic complication for now or just treat it as "Same Day check".
+
+                // For now, let's implement strict date matching for created_at (ignoring year check implies recurring, which created_at isn't).
+                // created_at is unique point in time.
+                // So we match full date.
+                // Target date: Today.
+                // We want members creating account TODAY.
                 const { data: members } = await supabase
                     .from('members')
-                    .select('id, first_name, last_name, phone, membership_date')
-                    .not('membership_date', 'is', null)
+                    .select('*')
+                    .gte('created_at', formatStartOfDay(today))
+                    .lt('created_at', formatStartOfDay(new Date(today.getTime() + 86400000)))
                     .not('phone', 'is', null)
 
-                if (members) {
-                    const anniversaryMembers = members.filter((m: Member) => {
-                        if (!m.membership_date) return false
-                        const md = new Date(m.membership_date)
-                        const isSameMonthDay = md.getMonth() + 1 === month && md.getDate() === day
-                        const isNotFirstYear = md.getFullYear() < today.getFullYear()
-                        return isSameMonthDay && isNotFirstYear
-                    })
-
-                    results.membership_anniversary.checked = anniversaryMembers.length
-
-                    for (const member of anniversaryMembers) {
-                        const sendResult = await processAutomationSend(
-                            supabase, netgsmConfig, automation, member, todayStr
-                        )
-                        if (sendResult === 'sent') results.membership_anniversary.sent++
-                        else if (sendResult === 'failed') results.membership_anniversary.failed++
-                    }
-                }
+                if (members) relevantMembers = members
             }
+
+            // Process members
+            results.total_checked += relevantMembers.length
+
+            for (const member of relevantMembers) {
+                const sendResult = await processAutomationSend(
+                    supabase, netgsmConfig, automation, member, todayStr
+                )
+                if (sendResult === 'sent') sentCount++
+                else if (sendResult === 'failed') failedCount++
+            }
+
+            results.details.push({
+                automation: automation.name,
+                sent: sentCount,
+                failed: failedCount
+            })
         }
 
-        results.total_sent = results.birthday.sent + results.membership_anniversary.sent
-        results.total_failed = results.birthday.failed + results.membership_anniversary.failed
+        results.total_sent = results.details.reduce((acc, curr) => acc + curr.sent, 0)
+        results.total_failed = results.details.reduce((acc, curr) => acc + curr.failed, 0)
 
         return new Response(
             JSON.stringify({
@@ -168,6 +227,10 @@ serve(async (req) => {
         )
     }
 })
+
+function formatStartOfDay(date: Date): string {
+    return date.toISOString().split('T')[0] + 'T00:00:00.000Z'
+}
 
 async function processAutomationSend(
     supabase: any,
@@ -188,11 +251,16 @@ async function processAutomationSend(
     if (existing) return 'skipped'
 
     // Replace placeholders
-    const message = automation.template!.content
+    let message = automation.template!.content
         .replace(/{AD}/g, member.first_name || '')
         .replace(/{SOYAD}/g, member.last_name || '')
         .replace(/{AD_SOYAD}/g, `${member.first_name} ${member.last_name}`)
         .replace(/{TELEFON}/g, member.phone || '')
+
+    // Additional custom fields replacement check
+    if (member.membership_number) {
+        message = message.replace(/{UYE_NO}/g, member.membership_number)
+    }
 
     // Clean phone number
     let cleanPhone = member.phone.replace(/\s|-|\(|\)/g, '')
@@ -220,6 +288,8 @@ async function processAutomationSend(
 
         const result = await response.text()
         const [code, jobId] = result.trim().split(' ')
+        // NetGSM success codes: 00, 01, 02
+        // Sometimes it returns a jobID like "00 123456"
         const success = code === '00' || code === '01' || code === '02'
 
         // Log to automation logs

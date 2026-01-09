@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { AdminUser } from './types';
+import { Logger } from './logger';
 
 export interface LoginCredentials {
   email: string;
@@ -44,6 +45,7 @@ export class AdminAuth {
         localStorage.setItem('admin_user', JSON.stringify(adminUser));
       }
 
+      await Logger.logLogin(adminUser.id);
       return { success: true, user: adminUser };
     } catch (error) {
       console.error('Login error:', error);
@@ -53,11 +55,15 @@ export class AdminAuth {
 
   static async logout(): Promise<void> {
     try {
+      const user = this.getCurrentUser();
+      if (user) {
+        await Logger.logLogout(user.id);
+      }
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Logout error:', error);
     }
-    
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('admin_user');
     }
