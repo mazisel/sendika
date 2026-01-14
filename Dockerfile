@@ -25,6 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 ENV NODE_ENV=production \
     PORT=3000 \
+    HOSTNAME="0.0.0.0" \
     NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
