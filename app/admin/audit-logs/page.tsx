@@ -11,7 +11,7 @@ interface AuditLog {
     action: string;
     entity_type: string;
     entity_id: string;
-    details: any;
+
     ip_address: string;
     user_agent: string;
     created_at: string;
