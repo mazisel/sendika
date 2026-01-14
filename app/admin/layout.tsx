@@ -27,7 +27,8 @@ import {
   PiggyBank,
   Sun,
   Moon,
-  Shield
+  Shield,
+  Gavel
 } from 'lucide-react';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
@@ -186,10 +187,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     if (PermissionManager.canManageBranches(currentUser)) {
       baseItems.push({
-        title: 'Şubeler',
+        title: 'Bölge ve Şubeler',
         href: '/admin/branches',
         icon: MapPin,
-        description: 'Şube bilgilerini yönet'
+        description: 'Bölge ve şube bilgilerini yönet'
       });
     }
 
@@ -241,6 +242,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         href: '/admin/users',
         icon: UserPlus,
         description: 'Admin kullanıcılarını yönet'
+      });
+    }
+
+    // Hukuk Destek Modülü
+    if (
+      currentUser.role === 'super_admin' ||
+      currentUser.role === 'admin' ||
+      currentUser.role_type === 'legal_manager' ||
+      currentUser.role_type === 'general_manager'
+    ) {
+      baseItems.push({
+        title: 'Hukuk Destek',
+        href: '/admin/legal',
+        icon: Gavel,
+        description: 'Hukuki destek taleplerini yönet'
       });
     }
 

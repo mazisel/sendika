@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
-import { AdminUser } from '@/lib/types';
+import { AdminUser, Member } from '@/lib/types';
 import { Logger } from '@/lib/logger';
 import { Search, Eye, Check, X, Filter, Download, UserCheck, UserX, Clock, FileText, MapPin, Plus, Edit, AlertTriangle, FileUp, LogOut, Settings2 } from 'lucide-react';
 import EditMemberModal from '@/components/members/EditMemberModal';
@@ -14,37 +14,7 @@ import ResignationModal from '@/components/members/ResignationModal';
 import { cityOptions } from '@/lib/cities';
 import { getDistrictsByCity } from '@/lib/districts';
 
-interface Member {
-  id: string;
-  membership_number: string;
-  decision_number: string | null;
-  decision_date: string | null;
-  first_name: string;
-  last_name: string;
-  tc_identity: string;
-  birth_date: string;
-  gender: string;
-  city: string;
-  district: string;
-  phone: string | null;
-  email: string | null;
-  region: number | null;
-  address: string;
-  workplace: string;
-  position: string;
-  membership_status: 'pending' | 'active' | 'inactive' | 'suspended' | 'resigned';
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relation: string;
-  education_level: string;
-  marital_status: string;
-  children_count: number;
-  blood_group: string | null;
 
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
 export default function AdminMembersPage() {
   const router = useRouter();
