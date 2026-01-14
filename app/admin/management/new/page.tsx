@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { uploadFile } from '@/lib/storage'
+import { Logger } from '@/lib/logger'
 import { ArrowLeft, Upload, User } from 'lucide-react'
 import Link from 'next/link'
 
@@ -63,6 +64,15 @@ export default function NewManagementPage() {
       }
 
       router.push('/admin/management')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'SETTINGS',
+        entityId: 'new_manager',
+        details: { manager_name: formData.full_name, title: formData.title },
+        userId: currentUser?.id
+      });
     } catch (error) {
       console.error('Yönetici eklenirken hata:', error)
       alert('Yönetici eklenirken bir hata oluştu')

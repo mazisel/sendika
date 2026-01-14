@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Menu, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -14,9 +14,25 @@ export default function Header() {
   const { settings } = useSiteSettings()
   const pathname = usePathname()
 
+  const [shouldAnimate, setShouldAnimate] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     loadHeaderAnnouncements()
   }, [])
+
+  useEffect(() => {
+    const checkScroll = () => {
+      if (containerRef.current && contentRef.current) {
+        setShouldAnimate(contentRef.current.offsetWidth > containerRef.current.offsetWidth)
+      }
+    }
+
+    checkScroll()
+    window.addEventListener('resize', checkScroll)
+    return () => window.removeEventListener('resize', checkScroll)
+  }, [headerAnnouncements])
 
   const loadHeaderAnnouncements = async () => {
     try {
@@ -24,9 +40,8 @@ export default function Header() {
         .from('announcements')
         .select('*')
         .eq('is_active', true)
-        .eq('type', 'urgent')
         .order('created_at', { ascending: false })
-        .limit(3)
+        .limit(5)
 
       if (!error && data) {
         setHeaderAnnouncements(data)
@@ -40,6 +55,15 @@ export default function Header() {
     if (path === '/' && pathname === '/') return true
     if (path !== '/' && pathname.startsWith(path)) return true
     return false
+  }
+
+  const getAnnouncementIcon = (type: string) => {
+    switch (type) {
+      case 'urgent': return '🔴'
+      case 'warning': return '⚠️'
+      case 'info': return 'ℹ️'
+      default: return '📢'
+    }
   }
 
   return (
@@ -248,12 +272,18 @@ export default function Header() {
                 <span className="bg-white text-primary-700 px-3 py-1 rounded text-sm font-semibold flex-shrink-0">
                   DUYURULAR
                 </span>
-                <div className="overflow-hidden flex-1">
-                  <div className="animate-marquee whitespace-nowrap">
+                <div
+                  ref={containerRef}
+                  className="overflow-hidden flex-1"
+                >
+                  <div
+                    ref={contentRef}
+                    className={`${shouldAnimate ? 'animate-marquee' : ''} whitespace-nowrap`}
+                  >
                     <span className="text-sm">
                       {headerAnnouncements.map((announcement, index) => (
                         <span key={announcement.id} className="inline-block">
-                          🔴 {announcement.title}
+                          {getAnnouncementIcon(announcement.type)} {announcement.title}
                           {index < headerAnnouncements.length - 1 ? ' • ' : ''}
                         </span>
                       ))}

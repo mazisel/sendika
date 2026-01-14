@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
+import { Logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 import Link from 'next/link'
@@ -44,7 +45,7 @@ export default function NewSliderPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!AdminAuth.isAuthenticated()) {
       router.push('/admin/login')
       return
@@ -72,8 +73,8 @@ export default function NewSliderPage() {
         .order('sort_order', { ascending: false })
         .limit(1)
 
-      const nextSortOrder = existingSliders && existingSliders.length > 0 
-        ? existingSliders[0].sort_order + 1 
+      const nextSortOrder = existingSliders && existingSliders.length > 0
+        ? existingSliders[0].sort_order + 1
         : 1
 
       const { error: insertError } = await supabase
@@ -89,6 +90,15 @@ export default function NewSliderPage() {
       if (insertError) throw insertError
 
       router.push('/admin/sliders')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'System' as any,
+        entityId: 'new_slider',
+        details: { slider: formData },
+        userId: currentUser?.id
+      });
     } catch (error: any) {
       setError('Slider oluşturulurken hata oluştu: ' + error.message)
     } finally {
@@ -155,7 +165,7 @@ export default function NewSliderPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Slider Görseli
               </label>
-              
+
               {!imagePreview && !formData.image_url ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                   <div className="text-center">

@@ -6,6 +6,7 @@ import { AdminAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { StorageService } from '@/lib/storage';
 import { Category } from '@/lib/types';
+import { Logger } from '@/lib/logger';
 import Link from 'next/link';
 
 export default function NewNews() {
@@ -71,17 +72,17 @@ export default function NewNews() {
       if (uploadMethod === 'file' && imageFile) {
         setUploading(true);
         const uploadResult = await StorageService.uploadImage(imageFile);
-        
+
         if (!uploadResult.success) {
           setError(uploadResult.error || 'Resim yüklenirken hata oluştu');
           setUploading(false);
           return;
         }
-        
+
         finalImageUrl = uploadResult.url || '';
         setUploading(false);
       }
-      
+
       const { error } = await supabase
         .from('news')
         .insert([
@@ -104,6 +105,14 @@ export default function NewNews() {
       }
 
       router.push('/admin/news');
+
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'System' as any,
+        entityId: 'new_news',
+        details: { title, is_published: isPublished },
+        userId: user.id
+      });
     } catch (error) {
       setError('Haber kaydedilirken hata oluştu');
     } finally {
@@ -191,7 +200,7 @@ export default function NewNews() {
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Resim
                 </label>
-                
+
                 {/* Upload Method Selection */}
                 <div className="flex space-x-4 mb-4">
                   <label className="flex items-center">

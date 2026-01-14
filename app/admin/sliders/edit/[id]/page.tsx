@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
+import { Logger } from '@/lib/logger'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Upload, X } from 'lucide-react'
 import Link from 'next/link'
@@ -25,7 +26,7 @@ export default function EditSliderPage() {
   const router = useRouter()
   const params = useParams()
   const sliderId = params.id as string
-  
+
   const [loading, setLoading] = useState(false)
   const [loadingSlider, setLoadingSlider] = useState(true)
   const [error, setError] = useState('')
@@ -44,18 +45,18 @@ export default function EditSliderPage() {
   useEffect(() => {
     AdminAuth.requireAuth()
     loadSlider()
-    
+
     // Admin kullanıcısının Supabase auth durumunu kontrol et
     const checkAuthStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       console.log('Supabase auth kullanıcısı:', user)
-      
+
       if (!user) {
         console.log('Supabase auth kullanıcısı bulunamadı, yeniden giriş gerekiyor')
         setError('Lütfen çıkış yapıp tekrar giriş yapın')
       }
     }
-    
+
     checkAuthStatus()
   }, [sliderId])
 
@@ -69,7 +70,7 @@ export default function EditSliderPage() {
         .single()
 
       if (error) throw error
-      
+
       if (data) {
         setFormData({
           title: data.title || '',
@@ -116,7 +117,7 @@ export default function EditSliderPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!AdminAuth.isAuthenticated()) {
       router.push('/admin/login')
       return
@@ -179,6 +180,15 @@ export default function EditSliderPage() {
 
       console.log('Güncellenen slider:', data[0])
       router.push('/admin/sliders')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'System' as any,
+        entityId: sliderId,
+        details: { slider: updateData },
+        userId: currentUser?.id
+      });
     } catch (error: any) {
       console.error('Slider güncelleme hatası:', error)
       setError('Slider güncellenirken hata oluştu: ' + error.message)
@@ -257,7 +267,7 @@ export default function EditSliderPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Slider Görseli
               </label>
-              
+
               {!imagePreview && !formData.image_url ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                   <div className="text-center">

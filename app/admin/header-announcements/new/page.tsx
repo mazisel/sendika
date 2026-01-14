@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { ArrowLeft, Save } from 'lucide-react'
+import { logAuditAction } from '@/lib/audit-logger'
 
 export default function NewHeaderAnnouncementPage() {
   const [formData, setFormData] = useState({
@@ -21,7 +22,7 @@ export default function NewHeaderAnnouncementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!AdminAuth.isAuthenticated()) {
       router.push('/admin/login')
       return
@@ -37,7 +38,7 @@ export default function NewHeaderAnnouncementPage() {
       setError('')
 
       const currentUser = AdminAuth.getCurrentUser()
-      
+
       const announcementData = {
         title: formData.title.trim(),
         content: formData.content.trim(),
@@ -53,6 +54,19 @@ export default function NewHeaderAnnouncementPage() {
         .insert([announcementData])
 
       if (error) throw error
+
+      if (error) throw error
+
+      // Log action
+      await logAuditAction({
+        action: 'CREATE',
+        entityType: 'ANNOUNCEMENT',
+        entityId: 'new', //Ideally we would get the ID from the insert response if we selected it
+        details: {
+          title: announcementData.title,
+          type: announcementData.type
+        }
+      })
 
       router.push('/admin/header-announcements')
     } catch (error) {

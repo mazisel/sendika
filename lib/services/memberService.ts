@@ -1,5 +1,6 @@
 
 import { supabase } from '@/lib/supabase'
+import { Logger } from '@/lib/logger'
 
 export interface MemberDocument {
     id: string
@@ -14,6 +15,18 @@ export interface MemberDocument {
 }
 
 export const MemberService = {
+    // Üye bilgilerini getir
+    async getMember(memberId: string) {
+        const { data, error } = await supabase
+            .from('members')
+            .select('*')
+            .eq('id', memberId)
+            .single()
+
+        if (error) throw error
+        return data
+    },
+
     // Tanımları getir
     async getDefinitions(type: string) {
         const { data, error } = await supabase
@@ -93,8 +106,19 @@ export const MemberService = {
     },
 
     // İstifa işlemi
-    async resignMember(memberId: string, petitionFile: File, adminUserId: string) {
+    async resignMember(
+        memberId: string,
+        petitionFile: File,
+        adminUserId: string,
+        resignationReason: string,
+        resignationDate: string,
+        sendSms: boolean = false,
+        sendEmail: boolean = false
+    ) {
         try {
+            // Önce üye bilgilerini al (e-posta göndermek için)
+            const member = await this.getMember(memberId)
+
             // 1. Dilekçeyi yükle
             const fileExt = petitionFile.name.split('.').pop()
             const fileName = `resignation_${memberId}_${Date.now()}.${fileExt}`
@@ -115,11 +139,57 @@ export const MemberService = {
                 uploaded_by: adminUserId
             })
 
-            // 3. Üye statüsünü güncelle
+            // 3. Üye statüsünü ve istifa nedenini güncelle
             await this.updateMember(memberId, {
                 membership_status: 'resigned',
-                is_active: false
+                is_active: false,
+                resignation_reason: resignationReason,
+                resignation_date: resignationDate
             })
+
+            await Logger.log({
+                action: 'UPDATE',
+                entityType: 'MEMBER',
+                entityId: memberId,
+                details: {
+                    change: 'resignation',
+                    reason: resignationReason,
+                    date: resignationDate,
+                    admin_id: adminUserId
+                },
+                userId: adminUserId
+            })
+
+            // 4. Bildirimler
+            if (sendSms && member.phone) {
+                console.log(`TODO: Send SMS notification to ${member.phone}`)
+                // SMS servisi entegrasyonu eklenecek
+            }
+
+            if (sendEmail && member.email) {
+                try {
+                    const memberName = `${member.first_name} ${member.last_name}`
+                    const response = await fetch('/api/email/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'resignation',
+                            to: member.email,
+                            memberName,
+                            resignationReason,
+                            resignationDate
+                        })
+                    })
+                    if (response.ok) {
+                        console.log(`E-posta bildirimi gönderildi: ${member.email}`)
+                    } else {
+                        console.error('E-posta API hatası:', await response.text())
+                    }
+                } catch (emailError) {
+                    console.error('E-posta gönderme hatası:', emailError)
+                    // E-posta hatası işlemi durdurmaz, sadece log'a yazar
+                }
+            }
 
             return true
         } catch (error) {
@@ -128,3 +198,4 @@ export const MemberService = {
         }
     }
 }
+

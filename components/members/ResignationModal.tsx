@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import { X, AlertTriangle, FileUp } from 'lucide-react'
+import { X, AlertTriangle, FileUp, Mail, MessageSquare } from 'lucide-react'
 import { MemberService } from '@/lib/services/memberService'
 import { AdminAuth } from '@/lib/auth'
 
@@ -15,9 +15,25 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [confirmName, setConfirmName] = useState('')
+    const [resignationReason, setResignationReason] = useState('')
+    const [resignationDate, setResignationDate] = useState(new Date().toISOString().split('T')[0])
+    const [sendSms, setSendSms] = useState(false)
+    const [sendEmail, setSendEmail] = useState(false)
 
     const currentUser = AdminAuth.getCurrentUser()
     const fullName = `${member.first_name} ${member.last_name}`
+
+    const resignationReasons = [
+        { value: 'Disiplin Kurulu Kararı', label: 'Disiplin Kurulu Kararı' },
+        { value: 'İş Kolu Değişikliği', label: 'İş Kolu Değişikliği' },
+        { value: 'Kendi İsteğiyle İstifa', label: 'Kendi İsteğiyle İstifa' },
+        { value: 'Hatalı, Geçersiz Üyelik', label: 'Hatalı, Geçersiz Üyelik' },
+        { value: 'Başka Sendika Üyesi', label: 'Başka Sendika Üyesi' },
+        { value: 'Memurluktan İstifa Etti', label: 'Memurluktan İstifa Etti' },
+        { value: 'Emeklilik', label: 'Emeklilik' },
+        { value: 'Ölüm', label: 'Ölüm' },
+        { value: 'Ücretsiz İzin (Pasif Üye)', label: 'Ücretsiz İzin (Pasif Üye)' },
+    ]
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -32,11 +48,29 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
             return;
         }
 
+        if (!resignationReason) {
+            setError('Lütfen istifa nedenini seçin.');
+            return;
+        }
+
+        if (!resignationDate) {
+            setError('Lütfen istifa tarihini seçin.');
+            return;
+        }
+
         setLoading(true)
         setError(null)
 
         try {
-            await MemberService.resignMember(member.id, file, currentUser?.id || '')
+            await MemberService.resignMember(
+                member.id,
+                file,
+                currentUser?.id || '',
+                resignationReason,
+                resignationDate,
+                sendSms,
+                sendEmail
+            )
             onSuccess()
             onClose()
         } catch (err) {
@@ -49,7 +83,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div className="relative mx-auto p-4 border border-red-200 dark:border-red-900 w-full max-w-lg shadow-xl dark:shadow-slate-900/40 rounded-lg bg-white dark:bg-slate-900">
+            <div className="relative mx-auto p-4 border border-red-200 dark:border-red-900 w-full max-w-lg shadow-xl dark:shadow-slate-900/40 rounded-lg bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-slate-800 pb-3">
                     <h3 className="text-lg font-bold text-red-600 dark:text-red-500 flex items-center">
                         <AlertTriangle className="w-6 h-6 mr-2" />
@@ -64,18 +98,50 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                     Bu işlem <strong>{fullName}</strong> isimli üyeyi <strong>İstifa (Resigned)</strong> durumuna getirecek ve istifa dilekçesini sisteme kaydedecektir.
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Resignation Reason & Date Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                                İstifa Nedeni (Zorunlu)
+                            </label>
+                            <select
+                                value={resignationReason}
+                                onChange={(e) => setResignationReason(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-md focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 text-sm"
+                                required
+                            >
+                                <option value="">Seçiniz</option>
+                                {resignationReasons.map(reason => (
+                                    <option key={reason.value} value={reason.value}>{reason.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                                İstifa Tarihi (Zorunlu)
+                            </label>
+                            <input
+                                type="date"
+                                value={resignationDate}
+                                onChange={(e) => setResignationDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-md focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 text-sm"
+                                required
+                            />
+                        </div>
+                    </div>
+
                     {/* File Upload */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                             İstifa Dilekçesi (Zorunlu)
                         </label>
-                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-slate-700 border-dashed rounded-md hover:border-red-400 transition-colors">
+                        <div className="mt-1 flex justify-center px-4 pt-4 pb-4 border-2 border-gray-300 dark:border-slate-700 border-dashed rounded-md hover:border-red-400 transition-colors">
                             <div className="space-y-1 text-center">
                                 {file ? (
                                     <div className="flex flex-col items-center">
-                                        <FileUp className="mx-auto h-12 w-12 text-green-500" />
-                                        <div className="flex text-sm text-gray-600 dark:text-slate-400 mt-2">
+                                        <FileUp className="mx-auto h-8 w-8 text-green-500" />
+                                        <div className="flex text-sm text-gray-600 dark:text-slate-400 mt-1">
                                             <span className="font-medium text-green-600">{file.name}</span>
                                         </div>
                                         <button
@@ -88,7 +154,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                                     </div>
                                 ) : (
                                     <>
-                                        <FileUp className="mx-auto h-12 w-12 text-gray-400" />
+                                        <FileUp className="mx-auto h-8 w-8 text-gray-400" />
                                         <div className="flex text-sm text-gray-600 dark:text-slate-400">
                                             <label
                                                 htmlFor="petition-upload"
@@ -97,7 +163,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                                                 <span>Dosya Yükle</span>
                                                 <input id="petition-upload" name="petition-upload" type="file" className="sr-only" onChange={(e) => e.target.files && setFile(e.target.files[0])} accept=".pdf,.jpg,.jpeg,.png" />
                                             </label>
-                                            <p className="pl-1">veya sürükleyip bırakın</p>
+                                            <p className="pl-1">veya sürükle</p>
                                         </div>
                                         <p className="text-xs text-gray-500 dark:text-slate-500">
                                             PDF, PNG, JPG (Max 10MB)
@@ -105,6 +171,35 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                                     </>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Notification Options */}
+                    <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-md">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+                            Bildirim Seçenekleri
+                        </label>
+                        <div className="flex flex-wrap gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={sendSms}
+                                    onChange={(e) => setSendSms(e.target.checked)}
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                />
+                                <MessageSquare className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-700 dark:text-slate-300">SMS ile Bildir</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={sendEmail}
+                                    onChange={(e) => setSendEmail(e.target.checked)}
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                />
+                                <Mail className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-700 dark:text-slate-300">E-posta ile Bildir</span>
+                            </label>
                         </div>
                     </div>
 
@@ -139,7 +234,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || !file || confirmName !== fullName}
+                            disabled={loading || !file || confirmName !== fullName || !resignationReason || !resignationDate}
                             className="flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}

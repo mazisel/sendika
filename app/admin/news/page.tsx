@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser, News } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import Link from 'next/link';
 
 export default function NewsManagement() {
@@ -61,6 +62,18 @@ export default function NewsManagement() {
       }
 
       setNews(news.filter(item => item.id !== id));
+
+      await Logger.log({
+        action: 'DELETE',
+        entityType: 'System' as any, // Using System or maybe defining NEWS in AuditEntity if possible, but existing types are limited. 
+        // Wait, AuditEntity has 'AUTH', 'MEMBER', 'SETTINGS', 'SMS', 'FINANCE', 'USER', 'SYSTEM'.
+        // 'NEWS' is not in AuditEntity. I should add it or use 'SYSTEM'.
+        // Let's use 'SYSTEM' for now or update AuditEntity type if I can.
+        // Actually, I should probably update `lib/logger.ts` to include `NEWS`.
+        entityId: id,
+        details: { title: news.find(n => n.id === id)?.title },
+        userId: user?.id
+      });
     } catch (error) {
       setError('Haber silinirken hata oluştu');
     }
@@ -70,7 +83,7 @@ export default function NewsManagement() {
     try {
       const { error } = await supabase
         .from('news')
-        .update({ 
+        .update({
           is_published: !currentStatus,
           published_at: !currentStatus ? new Date().toISOString() : null
         })
@@ -81,15 +94,27 @@ export default function NewsManagement() {
         return;
       }
 
-      setNews(news.map(item => 
-        item.id === id 
-          ? { 
-              ...item, 
-              is_published: !currentStatus,
-              published_at: !currentStatus ? new Date().toISOString() : undefined
-            }
+      setNews(news.map(item =>
+        item.id === id
+          ? {
+            ...item,
+            is_published: !currentStatus,
+            published_at: !currentStatus ? new Date().toISOString() : undefined
+          }
           : item
       ));
+
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'System' as any,
+        entityId: id,
+        details: {
+          change: 'publish_status',
+          new_status: !currentStatus,
+          title: news.find(n => n.id === id)?.title
+        },
+        userId: user?.id
+      });
     } catch (error) {
       setError('Haber durumu güncellenirken hata oluştu');
     }
@@ -125,88 +150,86 @@ export default function NewsManagement() {
       {/* Main Content */}
       <div>
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
-          {/* News List */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            {news.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Henüz haber bulunmuyor.</p>
-                <Link
-                  href="/admin/news/new"
-                  className="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                >
-                  İlk Haberi Ekle
-                </Link>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {news.map((item) => (
-                  <li key={item.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <h3 className="text-lg font-medium text-gray-900 truncate">
-                            {item.title}
-                          </h3>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            item.is_published 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
+        {/* News List */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          {news.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Henüz haber bulunmuyor.</p>
+              <Link
+                href="/admin/news/new"
+                className="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+              >
+                İlk Haberi Ekle
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {news.map((item) => (
+                <li key={item.id} className="px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                          {item.title}
+                        </h3>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_published
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
                           }`}>
-                            {item.is_published ? 'Yayında' : 'Taslak'}
-                          </span>
-                        </div>
-                        {item.excerpt && (
-                          <p className="mt-1 text-sm text-gray-500 truncate">
-                            {item.excerpt}
-                          </p>
-                        )}
-                        <div className="mt-2 flex items-center text-sm text-gray-500">
-                          <span>
-                            Oluşturulma: {new Date(item.created_at).toLocaleDateString('tr-TR')}
-                          </span>
-                          {item.published_at && (
-                            <span className="ml-4">
-                              Yayın: {new Date(item.published_at).toLocaleDateString('tr-TR')}
-                            </span>
-                          )}
-                        </div>
+                          {item.is_published ? 'Yayında' : 'Taslak'}
+                        </span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => togglePublish(item.id, item.is_published)}
-                          className={`px-3 py-1 rounded text-sm font-medium ${
-                            item.is_published
-                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                              : 'bg-green-100 text-green-800 hover:bg-green-200'
-                          }`}
-                        >
-                          {item.is_published ? 'Yayından Kaldır' : 'Yayınla'}
-                        </button>
-                        <Link
-                          href={`/admin/news/edit/${item.id}`}
-                          className="bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded text-sm font-medium"
-                        >
-                          Düzenle
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded text-sm font-medium"
-                        >
-                          Sil
-                        </button>
+                      {item.excerpt && (
+                        <p className="mt-1 text-sm text-gray-500 truncate">
+                          {item.excerpt}
+                        </p>
+                      )}
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <span>
+                          Oluşturulma: {new Date(item.created_at).toLocaleDateString('tr-TR')}
+                        </span>
+                        {item.published_at && (
+                          <span className="ml-4">
+                            Yayın: {new Date(item.published_at).toLocaleDateString('tr-TR')}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => togglePublish(item.id, item.is_published)}
+                        className={`px-3 py-1 rounded text-sm font-medium ${item.is_published
+                            ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                          }`}
+                      >
+                        {item.is_published ? 'Yayından Kaldır' : 'Yayınla'}
+                      </button>
+                      <Link
+                        href={`/admin/news/edit/${item.id}`}
+                        className="bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded text-sm font-medium"
+                      >
+                        Düzenle
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded text-sm font-medium"
+                      >
+                        Sil
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
+import { Logger } from '@/lib/logger'
 import Link from 'next/link'
 import { Edit, Trash2, Plus, Eye, EyeOff, ArrowUp, ArrowDown } from 'lucide-react'
 
@@ -54,10 +55,23 @@ export default function SlidersPage() {
         .eq('id', id)
 
       if (error) throw error
-      
-      setSliders(sliders.map(slider => 
+
+      setSliders(sliders.map(slider =>
         slider.id === id ? { ...slider, is_active: !currentStatus } : slider
       ))
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'System' as any,
+        entityId: id,
+        details: {
+          change: 'status_toggle',
+          new_status: !currentStatus,
+          slider_title: sliders.find(s => s.id === id)?.title
+        },
+        userId: currentUser?.id
+      });
     } catch (error: any) {
       setError('Durum güncellenirken hata oluştu: ' + error.message)
     }
@@ -105,8 +119,17 @@ export default function SlidersPage() {
         .eq('id', id)
 
       if (error) throw error
-      
+
       setSliders(sliders.filter(slider => slider.id !== id))
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'DELETE',
+        entityType: 'System' as any,
+        entityId: id,
+        details: { slider_title: sliders.find(s => s.id === id)?.title },
+        userId: currentUser?.id
+      });
     } catch (error: any) {
       setError('Slider silinirken hata oluştu: ' + error.message)
     }
@@ -219,11 +242,10 @@ export default function SlidersPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           onClick={() => toggleActive(slider.id, slider.is_active)}
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            slider.is_active
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${slider.is_active
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
-                          }`}
+                            }`}
                         >
                           {slider.is_active ? (
                             <>

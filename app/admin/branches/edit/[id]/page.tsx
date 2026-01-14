@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Save, MapPin } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cityOptions, regionOptions, findCityByName } from '@/lib/cities'
+import { Logger } from '@/lib/logger'
+import { AdminAuth } from '@/lib/auth'
 
 interface BranchFormData {
   city: string
@@ -127,6 +129,16 @@ export default function EditBranchPage({ params }: { params: { id: string } }) {
       if (error) throw error
 
       alert('Şube başarıyla güncellendi!')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'SETTINGS',
+        entityId: params.id,
+        details: { changes: payload },
+        userId: currentUser?.id
+      });
+
       window.location.href = '/admin/branches'
     } catch (error: any) {
       setError('Şube güncellenirken hata oluştu: ' + error.message)
@@ -212,7 +224,7 @@ export default function EditBranchPage({ params }: { params: { id: string } }) {
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                   Şehir Bilgileri
                 </h3>
-                
+
                 <div>
                   <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                     Şehir *
@@ -294,7 +306,7 @@ export default function EditBranchPage({ params }: { params: { id: string } }) {
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                   Başkan Bilgileri
                 </h3>
-                
+
                 <div>
                   <label htmlFor="president_name" className="block text-sm font-medium text-gray-700 mb-1">
                     Başkan Adı *

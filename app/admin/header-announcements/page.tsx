@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
+import { logAuditAction } from '@/lib/audit-logger'
 
 interface HeaderAnnouncement {
   id: string
@@ -48,7 +49,6 @@ export default function HeaderAnnouncementsPage() {
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
-        .eq('type', 'urgent')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -69,12 +69,22 @@ export default function HeaderAnnouncementsPage() {
         .eq('id', id)
 
       if (error) throw error
-      
-      setAnnouncements(announcements.map(announcement => 
-        announcement.id === id 
+
+      setAnnouncements(announcements.map(announcement =>
+        announcement.id === id
           ? { ...announcement, is_active: !currentStatus }
           : announcement
       ))
+
+      await logAuditAction({
+        action: 'UPDATE',
+        entityType: 'ANNOUNCEMENT',
+        entityId: id,
+        details: {
+          change: 'status_toggle',
+          new_status: !currentStatus
+        }
+      })
     } catch (error) {
       console.error('Error updating status:', error)
       setError('Durum güncellenirken hata oluştu')
@@ -93,8 +103,15 @@ export default function HeaderAnnouncementsPage() {
         .eq('id', id)
 
       if (error) throw error
-      
+
       setAnnouncements(announcements.filter(announcement => announcement.id !== id))
+
+      await logAuditAction({
+        action: 'DELETE',
+        entityType: 'ANNOUNCEMENT',
+        entityId: id,
+        details: { deleted_id: id }
+      })
     } catch (error) {
       console.error('Error deleting announcement:', error)
       setError('Duyuru silinirken hata oluştu')
@@ -237,11 +254,10 @@ export default function HeaderAnnouncementsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
                           onClick={() => toggleStatus(announcement.id, announcement.is_active)}
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            announcement.is_active
-                              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                          }`}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${announcement.is_active
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            }`}
                         >
                           {announcement.is_active ? (
                             <>
@@ -260,7 +276,7 @@ export default function HeaderAnnouncementsPage() {
                         {new Date(announcement.start_date).toLocaleDateString('tr-TR')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {announcement.end_date 
+                        {announcement.end_date
                           ? new Date(announcement.end_date).toLocaleDateString('tr-TR')
                           : 'Belirsiz'
                         }

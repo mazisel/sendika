@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { cityOptions, regionOptions } from '@/lib/cities';
+import { logAuditAction } from '@/lib/audit-logger';
 
 type Role = 'admin' | 'super_admin' | 'branch_manager';
 type RoleType = 'general_manager' | 'regional_manager' | 'branch_manager';
@@ -80,6 +81,17 @@ export default function NewUser() {
       });
 
       if (result.success) {
+        await logAuditAction({
+          action: 'CREATE',
+          entityType: 'USER',
+          entityId: 'new_user', // Ideally we'd get the ID from result.data if available
+          details: {
+            email,
+            full_name: fullName,
+            role: resolvedRole,
+            role_type: resolvedRoleType
+          }
+        });
         router.push('/admin/users');
       } else {
         setError(result.error || 'Kullanıcı oluşturulurken hata oluştu');

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { ArrowLeft, Save, MapPin } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cityOptions, regionOptions, findCityByName } from '@/lib/cities'
+import { Logger } from '@/lib/logger'
+import { AdminAuth } from '@/lib/auth'
 
 interface BranchFormData {
   city: string
@@ -75,6 +77,16 @@ export default function NewBranchPage() {
       if (error) throw error
 
       alert('Şube başarıyla eklendi!')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'SETTINGS',
+        entityId: payload.city_code || 'new_branch',
+        details: { branch: payload },
+        userId: currentUser?.id
+      });
+
       window.location.href = '/admin/branches'
     } catch (error: any) {
       setError('Şube eklenirken hata oluştu: ' + error.message)
@@ -148,7 +160,7 @@ export default function NewBranchPage() {
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                   Şehir Bilgileri
                 </h3>
-                
+
                 <div>
                   <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                     Şehir *
@@ -230,7 +242,7 @@ export default function NewBranchPage() {
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                   Başkan Bilgileri
                 </h3>
-                
+
                 <div>
                   <label htmlFor="president_name" className="block text-sm font-medium text-gray-700 mb-1">
                     Başkan Adı *

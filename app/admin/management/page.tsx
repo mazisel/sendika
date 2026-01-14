@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { Management } from '@/lib/types'
+import { Logger } from '@/lib/logger'
 import { Plus, Edit, Trash2, User, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 
@@ -42,6 +43,19 @@ export default function ManagementPage() {
 
       if (!error) {
         loadManagement()
+
+        const currentUser = AdminAuth.getCurrentUser();
+        await Logger.log({
+          action: 'UPDATE',
+          entityType: 'SETTINGS',
+          entityId: id,
+          details: {
+            change: 'status_toggle',
+            new_status: !currentStatus,
+            manager_name: management.find(m => m.id === id)?.full_name
+          },
+          userId: currentUser?.id
+        });
       }
     } catch (error) {
       console.error('Durum güncellenirken hata:', error)
@@ -58,6 +72,17 @@ export default function ManagementPage() {
 
         if (!error) {
           loadManagement()
+
+          const currentUser = AdminAuth.getCurrentUser();
+          await Logger.log({
+            action: 'DELETE',
+            entityType: 'SETTINGS',
+            entityId: id,
+            details: {
+              manager_name: management.find(m => m.id === id)?.full_name
+            },
+            userId: currentUser?.id
+          });
         }
       } catch (error) {
         console.error('Silme işleminde hata:', error)
@@ -151,11 +176,10 @@ export default function ManagementPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => toggleStatus(member.id, member.is_active)}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              member.is_active
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}
                           >
                             {member.is_active ? (
                               <>
@@ -261,11 +285,10 @@ export default function ManagementPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => toggleStatus(member.id, member.is_active)}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              member.is_active
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}
                           >
                             {member.is_active ? (
                               <>

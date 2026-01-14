@@ -7,17 +7,18 @@ import { AdminUser } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { cityOptions, regionOptions } from '@/lib/cities';
 import Link from 'next/link';
-import { 
-  Users, 
-  UserPlus, 
-  Trash2, 
-  Shield, 
-  ShieldCheck, 
-  AlertCircle, 
+import {
+  Users,
+  UserPlus,
+  Trash2,
+  Shield,
+  ShieldCheck,
+  AlertCircle,
   Eye,
   EyeOff,
   User
 } from 'lucide-react';
+import { logAuditAction } from '@/lib/audit-logger';
 
 type AccessLevel = 'super_admin' | 'general_manager' | 'regional_manager' | 'branch_manager';
 
@@ -104,17 +105,17 @@ export default function UserManagement() {
         router.push('/admin/login');
         return;
       }
-      
+
       // Kullanıcı yönetimi yetkisi kontrolü
       if (!user || (user.role !== 'super_admin' && user.role_type !== 'general_manager')) {
         router.push('/admin/dashboard');
         return;
       }
-      
+
       setCurrentUser(user);
       await loadUsers();
     };
-    
+
     checkAuthAndLoad();
   }, [router]);
 
@@ -181,6 +182,13 @@ export default function UserManagement() {
       }
 
       setUsers(users.filter(user => user.id !== id));
+
+      await logAuditAction({
+        action: 'DELETE',
+        entityType: 'USER',
+        entityId: id,
+        details: { deleted_id: id }
+      });
     } catch (error) {
       setError('Kullanıcı silinirken hata oluştu');
     }
@@ -204,11 +212,21 @@ export default function UserManagement() {
         return;
       }
 
-      setUsers(users.map(user => 
-        user.id === id 
+      setUsers(users.map(user =>
+        user.id === id
           ? { ...user, is_active: !currentStatus }
           : user
       ));
+
+      await logAuditAction({
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: id,
+        details: {
+          change: 'status_toggle',
+          new_status: !currentStatus
+        }
+      });
     } catch (error) {
       setError('Kullanıcı durumu güncellenirken hata oluştu');
     }
@@ -298,6 +316,16 @@ export default function UserManagement() {
 
       setUsers(users.map((item) => (item.id === user.id ? { ...item, ...payload } : item)));
       setError('');
+
+      await logAuditAction({
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: user.id,
+        details: {
+          change: 'access_level_update',
+          new_access: payload
+        }
+      });
     } catch (error) {
       setError('Yetki seviyesi güncellenirken hata oluştu');
     } finally {
@@ -405,167 +433,165 @@ export default function UserManagement() {
 
         {/* Users List */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            {users.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-500 mb-4">Henüz kullanıcı bulunmuyor.</p>
-                <Link
-                  href="/admin/users/new"
-                  className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>İlk Kullanıcıyı Ekle</span>
-                </Link>
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-200">
-                {users.map((user) => (
-                  <li key={user.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-medium text-slate-900">
-                              {user.full_name}
-                            </h3>
-                            <p className="text-sm text-slate-500">{user.email}</p>
-                          </div>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user)}`}>
-                            {getRoleText(user)}
+          {users.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500 mb-4">Henüz kullanıcı bulunmuyor.</p>
+              <Link
+                href="/admin/users/new"
+                className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>İlk Kullanıcıyı Ekle</span>
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {users.map((user) => (
+                <li key={user.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-slate-900">
+                            {user.full_name}
+                          </h3>
+                          <p className="text-sm text-slate-500">{user.email}</p>
+                        </div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user)}`}>
+                          {getRoleText(user)}
+                        </span>
+                        {user.role === 'branch_manager' && user.city && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {user.city} Şubesi
                           </span>
-                          {user.role === 'branch_manager' && user.city && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              {user.city} Şubesi
-                            </span>
-                          )}
-                          {user.role_type === 'regional_manager' && user.region && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                              {user.region}. Bölge
-                            </span>
-                          )}
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            user.is_active 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
+                        )}
+                        {user.role_type === 'regional_manager' && user.region && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            {user.region}. Bölge
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
                           }`}>
-                            {user.is_active ? 'Aktif' : 'Pasif'}
+                          {user.is_active ? 'Aktif' : 'Pasif'}
+                        </span>
+                        {currentUser.id === user.id && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Siz
                           </span>
-                          {currentUser.id === user.id && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                              Siz
-                            </span>
-                          )}
-                          <div className="flex items-center space-x-2 mt-2">
-                            <span className="text-xs text-slate-500">
-                              Oluşturulma: {new Date(user.created_at).toLocaleDateString('tr-TR')}
-                            </span>
-                          </div>
+                        )}
+                        <div className="flex items-center space-x-2 mt-2">
+                          <span className="text-xs text-slate-500">
+                            Oluşturulma: {new Date(user.created_at).toLocaleDateString('tr-TR')}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end space-y-2 min-w-[240px]">
-                        {/* Role Change */}
-                        {currentUser.id !== user.id ? (
-                          <div className="flex flex-col space-y-2 w-full">
+                    </div>
+                    <div className="flex flex-col items-end space-y-2 min-w-[240px]">
+                      {/* Role Change */}
+                      {currentUser.id !== user.id ? (
+                        <div className="flex flex-col space-y-2 w-full">
+                          <select
+                            value={accessLevels[user.id] ?? getAccessLevelForUser(user)}
+                            onChange={(e) => handleAccessLevelSelect(user.id, e.target.value as AccessLevel)}
+                            className="text-sm border border-gray-300 rounded px-2 py-1"
+                          >
+                            {accessLevelOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'regional_manager' && (
                             <select
-                              value={accessLevels[user.id] ?? getAccessLevelForUser(user)}
-                              onChange={(e) => handleAccessLevelSelect(user.id, e.target.value as AccessLevel)}
+                              value={regionSelections[user.id] ?? (user.region ? user.region.toString() : '')}
+                              onChange={(e) =>
+                                setRegionSelections((prev) => ({
+                                  ...prev,
+                                  [user.id]: e.target.value
+                                }))
+                              }
                               className="text-sm border border-gray-300 rounded px-2 py-1"
                             >
-                              {accessLevelOptions.map((option) => (
+                              <option value="">Bölge seçiniz</option>
+                              {regionOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                   {option.label}
                                 </option>
                               ))}
                             </select>
+                          )}
 
-                            {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'regional_manager' && (
-                              <select
-                                value={regionSelections[user.id] ?? (user.region ? user.region.toString() : '')}
-                                onChange={(e) =>
-                                  setRegionSelections((prev) => ({
-                                    ...prev,
-                                    [user.id]: e.target.value
-                                  }))
-                                }
-                                className="text-sm border border-gray-300 rounded px-2 py-1"
-                              >
-                                <option value="">Bölge seçiniz</option>
-                                {regionOptions.map((option) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-
-                            {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'branch_manager' && (
-                              <select
-                                value={citySelections[user.id] ?? user.city ?? ''}
-                                onChange={(e) =>
-                                  setCitySelections((prev) => ({
-                                    ...prev,
-                                    [user.id]: e.target.value
-                                  }))
-                                }
-                                className="text-sm border border-gray-300 rounded px-2 py-1"
-                              >
-                                <option value="">İl seçiniz</option>
-                                {cityOptions.map((option) => (
-                                  <option key={option.code} value={option.name}>
-                                    {option.name}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-
-                            <button
-                              onClick={() => updateUserAccess(user)}
-                              disabled={updatingUserId === user.id}
-                              className="flex items-center justify-center space-x-1 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          {(accessLevels[user.id] ?? getAccessLevelForUser(user)) === 'branch_manager' && (
+                            <select
+                              value={citySelections[user.id] ?? user.city ?? ''}
+                              onChange={(e) =>
+                                setCitySelections((prev) => ({
+                                  ...prev,
+                                  [user.id]: e.target.value
+                                }))
+                              }
+                              className="text-sm border border-gray-300 rounded px-2 py-1"
                             >
-                              <ShieldCheck className="w-4 h-4" />
-                              <span>{updatingUserId === user.id ? 'Güncelleniyor...' : 'Yetkiyi Güncelle'}</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-500">Kendi yetkinizi değiştiremezsiniz</span>
-                        )}
+                              <option value="">İl seçiniz</option>
+                              {cityOptions.map((option) => (
+                                <option key={option.code} value={option.name}>
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
 
-                        <div className="flex items-center space-x-2">
-                          {/* Toggle Active */}
                           <button
-                            onClick={() => toggleActive(user.id, user.is_active)}
-                            disabled={currentUser.id === user.id && user.is_active}
-                            className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                              user.is_active
-                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                                : 'bg-green-100 text-green-800 hover:bg-green-200'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            onClick={() => updateUserAccess(user)}
+                            disabled={updatingUserId === user.id}
+                            className="flex items-center justify-center space-x-1 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {user.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            <span>{user.is_active ? 'Pasif Yap' : 'Aktif Yap'}</span>
-                          </button>
-                          
-                          {/* Delete */}
-                          <button
-                            onClick={() => handleDelete(user.id)}
-                            disabled={currentUser.id === user.id}
-                            className="flex items-center space-x-1 bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Sil</span>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>{updatingUserId === user.id ? 'Güncelleniyor...' : 'Yetkiyi Güncelle'}</span>
                           </button>
                         </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">Kendi yetkinizi değiştiremezsiniz</span>
+                      )}
+
+                      <div className="flex items-center space-x-2">
+                        {/* Toggle Active */}
+                        <button
+                          onClick={() => toggleActive(user.id, user.is_active)}
+                          disabled={currentUser.id === user.id && user.is_active}
+                          className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${user.is_active
+                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                              : 'bg-green-100 text-green-800 hover:bg-green-200'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {user.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          <span>{user.is_active ? 'Pasif Yap' : 'Aktif Yap'}</span>
+                        </button>
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          disabled={currentUser.id === user.id}
+                          className="flex items-center space-x-1 bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Sil</span>
+                        </button>
                       </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

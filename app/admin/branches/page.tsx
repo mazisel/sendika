@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, MapPin, Phone, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { AdminUser } from '@/lib/types'
+import { Logger } from '@/lib/logger'
 
 interface Branch {
   id: string
@@ -71,8 +72,19 @@ export default function BranchesPage() {
         .eq('id', id)
 
       if (error) throw error
-      
+
       setBranches(branches.filter(branch => branch.id !== id))
+
+      await Logger.log({
+        action: 'DELETE',
+        entityType: 'SETTINGS',
+        entityId: id,
+        details: {
+          branch_name: branches.find(b => b.id === id)?.branch_name,
+          city: branches.find(b => b.id === id)?.city
+        },
+        userId: currentUser?.id
+      });
       alert('Şube başarıyla silindi!')
     } catch (error: any) {
       alert('Şube silinirken hata oluştu: ' + error.message)
@@ -87,10 +99,22 @@ export default function BranchesPage() {
         .eq('id', id)
 
       if (error) throw error
-      
-      setBranches(branches.map(branch => 
+
+      setBranches(branches.map(branch =>
         branch.id === id ? { ...branch, is_active: !currentStatus } : branch
       ))
+
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'SETTINGS',
+        entityId: id,
+        details: {
+          change: 'status_toggle',
+          new_status: !currentStatus,
+          branch_name: branches.find(b => b.id === id)?.branch_name
+        },
+        userId: currentUser?.id
+      });
     } catch (error: any) {
       alert('Durum güncellenirken hata oluştu: ' + error.message)
     }
@@ -227,11 +251,10 @@ export default function BranchesPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => toggleStatus(branch.id, branch.is_active)}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          branch.is_active
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${branch.is_active
                             ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
-                        }`}
+                          }`}
                       >
                         {branch.is_active ? 'Aktif' : 'Pasif'}
                       </button>

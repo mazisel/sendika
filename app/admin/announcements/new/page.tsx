@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import Link from 'next/link';
 
 export default function NewAnnouncement() {
@@ -49,6 +50,14 @@ export default function NewAnnouncement() {
       }
 
       router.push('/admin/announcements');
+
+      await Logger.log({
+        action: 'CREATE',
+        entityType: 'System' as any,
+        entityId: 'new_announcement',
+        details: { title, is_active: isActive },
+        userId: user.id
+      });
     } catch (error) {
       setError('Duyuru kaydedilirken hata oluştu');
     } finally {

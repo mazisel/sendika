@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { uploadFile } from '@/lib/storage'
 import { Management } from '@/lib/types'
+import { Logger } from '@/lib/logger'
 import { ArrowLeft, Upload, User } from 'lucide-react'
 import Link from 'next/link'
 
@@ -95,6 +96,15 @@ export default function EditManagementPage() {
       }
 
       router.push('/admin/management')
+
+      const currentUser = AdminAuth.getCurrentUser();
+      await Logger.log({
+        action: 'UPDATE',
+        entityType: 'SETTINGS',
+        entityId: params.id as string,
+        details: { manager_name: formData.full_name, changes: formData },
+        userId: currentUser?.id
+      });
     } catch (error) {
       console.error('Yönetici güncellenirken hata:', error)
       alert('Yönetici güncellenirken bir hata oluştu')

@@ -75,6 +75,8 @@ export default function SmsPage() {
 
     // Send SMS state
     const [selectedMembers, setSelectedMembers] = useState<Member[]>([])
+    const [receiverMode, setReceiverMode] = useState<'members' | 'manual'>('members')
+    const [manualNumbers, setManualNumbers] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState<Member[]>([])
     const [message, setMessage] = useState('')
@@ -96,6 +98,26 @@ export default function SmsPage() {
 
     // Logs state
     const [logs, setLogs] = useState<SmsLog[]>([])
+
+    // Check for bulk selected members from Members page
+    useEffect(() => {
+        const storedMembers = sessionStorage.getItem('sms_selected_members')
+        if (storedMembers) {
+            try {
+                const members = JSON.parse(storedMembers)
+                if (Array.isArray(members) && members.length > 0) {
+                    setSelectedMembers(members)
+                    // Clear after using to avoid persisting on reload if not desired
+                    // sessionStorage.removeItem('sms_selected_members') 
+                    // Actually better to keep it? No, standard behavior is one-time handoff.
+                    sessionStorage.removeItem('sms_selected_members')
+                    toast.success(`${members.length} üye seçildi`)
+                }
+            } catch (e) {
+                console.error('Failed to parse selected members', e)
+            }
+        }
+    }, [])
 
     // Groups state
     const [groups, setGroups] = useState<SmsGroup[]>([])
@@ -467,9 +489,33 @@ export default function SmsPage() {
     }
 
     const handleSendSms = async () => {
-        if (selectedMembers.length === 0) {
-            toast.error('En az bir üye seçmelisiniz')
-            return
+        let targets: { phone: string, id?: string }[] = []
+
+        if (receiverMode === 'members') {
+            if (selectedMembers.length === 0) {
+                toast.error('En az bir üye seçmelisiniz')
+                return
+            }
+            targets = selectedMembers.map(m => ({ phone: m.phone, id: m.id }))
+        } else {
+            // Manual mode
+            if (!manualNumbers.trim()) {
+                toast.error('Lütfen telefon numarası girin')
+                return
+            }
+
+            // Parse numbers (split by new lines or commas)
+            const rawNumbers = manualNumbers.split(/[\n,]/)
+            const validNumbers = rawNumbers
+                .map(n => n.trim())
+                .filter(n => n.replace(/\D/g, '').length >= 10) // Basic validation
+
+            if (validNumbers.length === 0) {
+                toast.error('Geçerli bir telefon numarası bulunamadı')
+                return
+            }
+
+            targets = validNumbers.map(phone => ({ phone }))
         }
 
         if (!message.trim()) {
@@ -481,18 +527,36 @@ export default function SmsPage() {
         let successCount = 0
         let failCount = 0
 
-        for (const member of selectedMembers) {
-            // Replace placeholders with actual member data
-            const personalizedMessage = replacePlaceholders(message, member)
-            const result = await sendSms(member.phone, personalizedMessage, scheduledDate || undefined)
+        for (const target of targets) {
+            // Replace placeholders - for manual numbers, we can't replace name etc.
+            // So we might want to warn or just leave placeholders empty
+            let personalizedMessage = message
+
+            if (target.id) {
+                // Member
+                const member = selectedMembers.find(m => m.id === target.id)
+                if (member) {
+                    personalizedMessage = replacePlaceholders(message, member)
+                }
+            } else {
+                // Manual - Remove placeholders or leave them? 
+                // Let's replace standard placeholders with empty string or sensible default
+                personalizedMessage = message
+                    .replace(/{AD}/g, '')
+                    .replace(/{SOYAD}/g, '')
+                    .replace(/{AD_SOYAD}/g, '')
+                    .replace(/{TELEFON}/g, target.phone)
+            }
+
+            const result = await sendSms(target.phone, personalizedMessage, scheduledDate || undefined)
 
             // Get current user for logging
             const { data: { user } } = await supabase.auth.getUser()
 
             await logSms({
                 templateId: selectedTemplateId || undefined,
-                memberId: member.id,
-                phone: member.phone,
+                memberId: target.id, // Will be undefined for manual
+                phone: target.phone,
                 message: personalizedMessage,
                 status: result.success ? 'sent' : 'failed',
                 jobId: result.jobId,
@@ -511,7 +575,12 @@ export default function SmsPage() {
 
         if (failCount === 0) {
             toast.success(`${successCount} SMS başarıyla gönderildi`)
-            setSelectedMembers([])
+            // Reset fields based on mode
+            if (receiverMode === 'members') {
+                setSelectedMembers([])
+            } else {
+                setManualNumbers('')
+            }
             setMessage('')
             setSelectedTemplateId('')
         } else {
@@ -647,146 +716,193 @@ export default function SmsPage() {
                                 Alıcılar
                             </h3>
 
-                            {/* Quick Actions: Filter & Group */}
-                            <div className="flex gap-2 mb-4">
+                            {/* Mode Selection */}
+                            <div className="flex p-1 bg-gray-100 rounded-lg mb-6">
                                 <button
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${showFilters ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    onClick={() => setReceiverMode('members')}
+                                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${receiverMode === 'members'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
-                                    <Filter className="w-4 h-4" />
-                                    Filtreye Göre Ekle
+                                    Rehberden Seç
                                 </button>
-                                <select
-                                    onChange={(e) => e.target.value && loadGroupMembers(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                    value=""
+                                <button
+                                    onClick={() => setReceiverMode('manual')}
+                                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${receiverMode === 'manual'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
                                 >
-                                    <option value="">Gruptan Ekle</option>
-                                    {groups.filter(g => g.is_active).map(g => (
-                                        <option key={g.id} value={g.id}>
-                                            {g.name} ({g.member_count?.[0]?.count || 0})
-                                        </option>
-                                    ))}
-                                </select>
+                                    Manuel Giriş
+                                </button>
                             </div>
 
-                            {/* Filter Panel */}
-                            {showFilters && (
-                                <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-xs text-gray-500">Şehir</label>
-                                            <select
-                                                value={filters.city}
-                                                onChange={(e) => setFilters(f => ({ ...f, city: e.target.value }))}
-                                                className="w-full mt-1 text-sm border-gray-300 rounded-lg"
-                                            >
-                                                <option value="">Tümü</option>
-                                                {filterOptions.cities.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-gray-500">İş Yeri</label>
-                                            <select
-                                                value={filters.workplace}
-                                                onChange={(e) => setFilters(f => ({ ...f, workplace: e.target.value }))}
-                                                className="w-full mt-1 text-sm border-gray-300 rounded-lg"
-                                            >
-                                                <option value="">Tümü</option>
-                                                {filterOptions.workplaces.map(w => <option key={w} value={w}>{w}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-gray-500">Pozisyon</label>
-                                            <select
-                                                value={filters.position}
-                                                onChange={(e) => setFilters(f => ({ ...f, position: e.target.value }))}
-                                                className="w-full mt-1 text-sm border-gray-300 rounded-lg"
-                                            >
-                                                <option value="">Tümü</option>
-                                                {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-gray-500">Cinsiyet</label>
-                                            <select
-                                                value={filters.gender}
-                                                onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
-                                                className="w-full mt-1 text-sm border-gray-300 rounded-lg"
-                                            >
-                                                <option value="">Tümü</option>
-                                                {filterOptions.genders.map(g => <option key={g} value={g}>{g}</option>)}
-                                            </select>
-                                        </div>
+                            {receiverMode === 'members' ? (
+                                <>
+
+                                    {/* Quick Actions: Filter & Group */}
+                                    <div className="flex gap-2 mb-4">
+                                        <button
+                                            onClick={() => setShowFilters(!showFilters)}
+                                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${showFilters ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <Filter className="w-4 h-4" />
+                                            Filtreye Göre Ekle
+                                        </button>
+                                        <select
+                                            onChange={(e) => e.target.value && loadGroupMembers(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                            value=""
+                                        >
+                                            <option value="">Gruptan Ekle</option>
+                                            {groups.filter(g => g.is_active).map(g => (
+                                                <option key={g.id} value={g.id}>
+                                                    {g.name} ({g.member_count?.[0]?.count || 0})
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <button
-                                        onClick={applyFilters}
-                                        className="mt-3 w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg text-sm font-medium"
-                                    >
-                                        Filtreyi Uygula
-                                    </button>
+
+                                    {/* Filter Panel */}
+                                    {showFilters && (
+                                        <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-xs text-gray-500">Şehir</label>
+                                                    <select
+                                                        value={filters.city}
+                                                        onChange={(e) => setFilters(f => ({ ...f, city: e.target.value }))}
+                                                        className="w-full mt-1 text-sm border-gray-300 rounded-lg"
+                                                    >
+                                                        <option value="">Tümü</option>
+                                                        {filterOptions.cities.map(c => <option key={c} value={c}>{c}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-500">İş Yeri</label>
+                                                    <select
+                                                        value={filters.workplace}
+                                                        onChange={(e) => setFilters(f => ({ ...f, workplace: e.target.value }))}
+                                                        className="w-full mt-1 text-sm border-gray-300 rounded-lg"
+                                                    >
+                                                        <option value="">Tümü</option>
+                                                        {filterOptions.workplaces.map(w => <option key={w} value={w}>{w}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-500">Pozisyon</label>
+                                                    <select
+                                                        value={filters.position}
+                                                        onChange={(e) => setFilters(f => ({ ...f, position: e.target.value }))}
+                                                        className="w-full mt-1 text-sm border-gray-300 rounded-lg"
+                                                    >
+                                                        <option value="">Tümü</option>
+                                                        {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-500">Cinsiyet</label>
+                                                    <select
+                                                        value={filters.gender}
+                                                        onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
+                                                        className="w-full mt-1 text-sm border-gray-300 rounded-lg"
+                                                    >
+                                                        <option value="">Tümü</option>
+                                                        {filterOptions.genders.map(g => <option key={g} value={g}>{g}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={applyFilters}
+                                                className="mt-3 w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                Filtreyi Uygula
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Search */}
+                                    <div className="relative mb-4">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Üye ara (isim veya telefon)"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        />
+
+                                        {/* Search Results Dropdown */}
+                                        {searchResults.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                {searchResults.map((member) => (
+                                                    <button
+                                                        key={member.id}
+                                                        onClick={() => addMember(member)}
+                                                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex justify-between items-center"
+                                                    >
+                                                        <span className="font-medium">{member.full_name}</span>
+                                                        <span className="text-sm text-gray-500">{member.phone}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Selected Members */}
+                                    <div className="border border-gray-200 rounded-lg p-4 min-h-[200px]">
+                                        {selectedMembers.length === 0 ? (
+                                            <p className="text-gray-400 text-center py-8">Henüz üye seçilmedi</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {selectedMembers.map((member) => (
+                                                    <div
+                                                        key={member.id}
+                                                        className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
+                                                    >
+                                                        <div>
+                                                            <span className="font-medium">{member.full_name}</span>
+                                                            <span className="text-sm text-gray-500 ml-2">{member.phone}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => removeMember(member.id)}
+                                                            className="text-red-500 hover:text-red-700"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <p className="text-sm text-gray-500 mt-2">
+                                        {selectedMembers.length} üye seçildi
+                                    </p>
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Telefon Numaraları
+                                    </label>
+                                    <div className="text-xs text-gray-500 mb-2">
+                                        Her satıra bir numara gelecek şekilde veya virgülle ayırarak yazabilirsiniz.
+                                        (Örn: 5xx xxx xx xx)
+                                    </div>
+                                    <textarea
+                                        value={manualNumbers}
+                                        onChange={(e) => setManualNumbers(e.target.value)}
+                                        rows={12}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm"
+                                        placeholder={`532 123 45 67\n555 987 65 43`}
+                                    />
+                                    <div className="mt-2 text-right text-sm text-gray-500">
+                                        {manualNumbers.split(/[\n,]/).filter(n => n.replace(/\D/g, '').length >= 10).length} numara algılandı
+                                    </div>
                                 </div>
                             )}
-
-                            {/* Search */}
-                            <div className="relative mb-4">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Üye ara (isim veya telefon)"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                />
-
-                                {/* Search Results Dropdown */}
-                                {searchResults.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                        {searchResults.map((member) => (
-                                            <button
-                                                key={member.id}
-                                                onClick={() => addMember(member)}
-                                                className="w-full px-4 py-2 text-left hover:bg-gray-50 flex justify-between items-center"
-                                            >
-                                                <span className="font-medium">{member.full_name}</span>
-                                                <span className="text-sm text-gray-500">{member.phone}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Selected Members */}
-                            <div className="border border-gray-200 rounded-lg p-4 min-h-[200px]">
-                                {selectedMembers.length === 0 ? (
-                                    <p className="text-gray-400 text-center py-8">Henüz üye seçilmedi</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {selectedMembers.map((member) => (
-                                            <div
-                                                key={member.id}
-                                                className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
-                                            >
-                                                <div>
-                                                    <span className="font-medium">{member.full_name}</span>
-                                                    <span className="text-sm text-gray-500 ml-2">{member.phone}</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => removeMember(member.id)}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <XCircle className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <p className="text-sm text-gray-500 mt-2">
-                                {selectedMembers.length} üye seçildi
-                            </p>
                         </div>
 
                         {/* Right: Message */}
@@ -897,7 +1013,7 @@ export default function SmsPage() {
                             {/* Send Button */}
                             <button
                                 onClick={handleSendSms}
-                                disabled={sending || selectedMembers.length === 0 || !message.trim()}
+                                disabled={sending || (receiverMode === 'members' ? selectedMembers.length === 0 : !manualNumbers.trim()) || !message.trim()}
                                 className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {sending ? (
@@ -908,7 +1024,9 @@ export default function SmsPage() {
                                 ) : (
                                     <>
                                         <Send className="w-5 h-5" />
-                                        {scheduledDate ? `SMS Zamanla (${selectedMembers.length} kişi)` : `SMS Gönder (${selectedMembers.length} kişi)`}
+                                        {scheduledDate
+                                            ? `SMS Zamanla (${receiverMode === 'members' ? selectedMembers.length : manualNumbers.split(/[\n,]/).filter(n => n.replace(/\D/g, '').length >= 10).length} kişi)`
+                                            : `SMS Gönder (${receiverMode === 'members' ? selectedMembers.length : manualNumbers.split(/[\n,]/).filter(n => n.replace(/\D/g, '').length >= 10).length} kişi)`}
                                     </>
                                 )}
                             </button>

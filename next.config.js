@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
+
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'api.e4labs.com.tr'],
   },
 }
 
