@@ -5,111 +5,163 @@ export class PermissionManager {
     return user.role === 'super_admin';
   }
 
-  private static isGeneralManager(user: AdminUser) {
-    return user.role_type === 'general_manager';
+  static hasPermission(user: AdminUser, permissionKey: string): boolean {
+    if (this.isSuperAdmin(user)) return true;
+    return user.permissions?.includes(permissionKey) ?? false;
   }
 
-  private static isRegionalManager(user: AdminUser) {
-    return user.role_type === 'regional_manager' && !!user.region;
-  }
+  // --- Scope Logic ---
 
-  private static isBranchManager(user: AdminUser) {
-    return user.role_type === 'branch_manager' && !!user.city;
-  }
+  /**
+   * Checks if the user has permission to perform an action on a target scope.
+   * Priority: ALL > REGION > BRANCH
+   */
+  static hasScopePermission(
+    user: AdminUser,
+    basePermission: string, // e.g., 'users.manage'
+    targetRegion?: number | null,
+    targetCity?: string | null
+  ): boolean {
+    if (this.isSuperAdmin(user)) return true;
 
-  static canAccessAllMembers(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canAccessRegionMembers(user: AdminUser, region?: number | null): boolean {
-    if (!this.isRegionalManager(user)) {
-      return false;
-    }
-    if (!user.region) return false;
-    return region ? user.region === region : true;
-  }
-
-  static canAccessCityMembers(user: AdminUser, city?: string, region?: number | null): boolean {
-    if (this.canAccessAllMembers(user)) {
+    // 1. Check Global Permission (e.g., 'users.manage.all')
+    // Also support legacy exact match 'users.manage' as global for backward compatibility if needed, 
+    // but we prefer specific permissions now.
+    if (this.hasPermission(user, `${basePermission}.all`) || this.hasPermission(user, basePermission)) {
       return true;
     }
 
-    if (this.canAccessRegionMembers(user, region)) {
-      return true;
+    // 2. Check Regional Permission (e.g., 'users.manage.region')
+    if (this.hasPermission(user, `${basePermission}.region`)) {
+      // Must match user's region
+      if (user.region && targetRegion === user.region) {
+        return true;
+      }
+      // If target has no region (and we are regional manager), debatably we can't manage them 
+      // unless they are unassigned. Let's assume strict: must match region.
     }
 
-    if (this.isBranchManager(user)) {
-      return city ? user.city === city : true;
+    // 3. Check Branch Permission (e.g., 'users.manage.branch')
+    if (this.hasPermission(user, `${basePermission}.branch`)) {
+      // Must match user's city (branch)
+      if (user.city && targetCity === user.city) {
+        return true;
+      }
     }
 
     return false;
   }
 
-  static canManageUsers(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  // --- Specific Managers ---
+
+  static canManageUsers(user: AdminUser, targetUser?: AdminUser): boolean {
+    // If no target provided, check if they have ANY manage permission
+    if (!targetUser) {
+      return this.hasPermission(user, 'users.manage.all') ||
+        this.hasPermission(user, 'users.manage.region') ||
+        this.hasPermission(user, 'users.manage.branch') ||
+        this.hasPermission(user, 'users.manage'); // Legacy
+    }
+
+    // Prevent managing oneself or super admins (unless super admin)
+    if (targetUser.role === 'super_admin' && !this.isSuperAdmin(user)) return false;
+
+    return this.hasScopePermission(user, 'users.manage', targetUser.region, targetUser.city);
   }
 
-  static canManageNews(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  static canViewUsers(user: AdminUser, targetUser?: AdminUser): boolean {
+    if (!targetUser) {
+      return this.hasPermission(user, 'users.view.all') ||
+        this.hasPermission(user, 'users.view.region') ||
+        this.hasPermission(user, 'users.view.branch') ||
+        this.canManageUsers(user);
+    }
+    return this.hasScopePermission(user, 'users.view', targetUser.region, targetUser.city) ||
+      this.canManageUsers(user, targetUser);
   }
 
-  static canManageAnnouncements(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  static canManageMembers(user: AdminUser, targetRegion?: number | null, targetCity?: string | null): boolean {
+    return this.hasScopePermission(user, 'members.manage', targetRegion, targetCity);
   }
 
-  static canManageSliders(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canManageManagement(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canManageBranches(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user) || this.isRegionalManager(user);
-  }
-
-  static canManageCategories(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canManageDefinitions(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canManageSiteSettings(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canManageDues(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user) || this.isRegionalManager(user);
-  }
-
-  static canViewDues(user: AdminUser): boolean {
-    return true;
-  }
-
-  static canManageFinance(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
-  }
-
-  static canViewFinance(user: AdminUser): boolean {
-    return this.isSuperAdmin(user) || this.isGeneralManager(user);
+  static canViewMembers(user: AdminUser, targetRegion?: number | null, targetCity?: string | null): boolean {
+    return this.hasScopePermission(user, 'members.view', targetRegion, targetCity) ||
+      this.canManageMembers(user, targetRegion, targetCity);
   }
 
   static canEditRestrictedFields(user: AdminUser): boolean {
-    return this.isSuperAdmin(user);
+    return this.hasPermission(user, 'members.edit_restricted');
   }
 
+  // --- Other modules (Generic) ---
+
+  static canManageNews(user: AdminUser): boolean {
+    return this.hasPermission(user, 'news.manage');
+  }
+
+  static canManageAnnouncements(user: AdminUser): boolean {
+    return this.hasPermission(user, 'announcements.manage');
+  }
+
+  static canManageSliders(user: AdminUser): boolean {
+    return this.hasPermission(user, 'sliders.manage');
+  }
+
+  static canManageManagement(user: AdminUser): boolean {
+    return this.hasPermission(user, 'management.manage');
+  }
+
+  static canManageBranches(user: AdminUser): boolean {
+    // Usually a global 'structure' task, but could be regional in future.
+    return this.hasPermission(user, 'branches.manage');
+  }
+
+  static canManageCategories(user: AdminUser): boolean {
+    return this.hasPermission(user, 'categories.manage');
+  }
+
+  static canManageDefinitions(user: AdminUser): boolean {
+    return this.hasPermission(user, 'definitions.manage');
+  }
+
+  static canManageSiteSettings(user: AdminUser): boolean {
+    return this.hasPermission(user, 'settings.manage');
+  }
+
+  static canManageDues(user: AdminUser): boolean {
+    return this.hasPermission(user, 'dues.manage');
+  }
+
+  static canViewDues(user: AdminUser): boolean {
+    return this.hasPermission(user, 'dues.view') || this.canManageDues(user);
+  }
+
+  static canManageFinance(user: AdminUser): boolean {
+    return this.hasPermission(user, 'finance.manage');
+  }
+
+  static canViewFinance(user: AdminUser): boolean {
+    return this.hasPermission(user, 'finance.view') || this.canManageFinance(user);
+  }
+
+  static canManageLegal(user: AdminUser): boolean {
+    return this.hasPermission(user, 'legal.manage');
+  }
+
+  static canViewLegal(user: AdminUser): boolean {
+    return this.hasPermission(user, 'legal.view') || this.canManageLegal(user);
+  }
+
+  // --- Helpers ---
+
   static getUserAccessibleCities(user: AdminUser): string[] {
-    if (this.canAccessAllMembers(user)) {
-      return []; // Boş array tüm şehirlere erişim anlamına gelir
+    if (this.hasPermission(user, 'members.view.all') || this.hasPermission(user, 'members.manage.all')) {
+      return []; // All
     }
-
-    if (this.isBranchManager(user) && user.city) {
-      return [user.city];
+    // If regional, return all cities in region? (Need region-city implementation, simplifying for now)
+    if (this.hasPermission(user, 'members.view.branch') || this.hasPermission(user, 'members.manage.branch')) {
+      return user.city ? [user.city] : [];
     }
-
     return [];
   }
 
@@ -118,8 +170,10 @@ export class PermissionManager {
       { name: 'Dashboard', href: '/admin/dashboard', icon: 'dashboard' }
     ];
 
-    // Üye yönetimi - tüm yöneticiler görebilir
-    baseItems.push({ name: 'Üyeler', href: '/admin/members', icon: 'users' });
+    // Üye yönetimi
+    if (this.canViewMembers(user)) {
+      baseItems.push({ name: 'Üyeler', href: '/admin/members', icon: 'users' });
+    }
 
     if (this.canViewDues(user)) {
       baseItems.push({ name: 'Aidatlar', href: '/admin/dues', icon: 'dues' });
@@ -129,7 +183,6 @@ export class PermissionManager {
       baseItems.push({ name: 'Finans', href: '/admin/finance', icon: 'finance' });
     }
 
-    // Sadece genel merkez yöneticileri görebilir
     if (this.canManageNews(user)) {
       baseItems.push({ name: 'Haberler', href: '/admin/news', icon: 'news' });
     }
@@ -159,8 +212,17 @@ export class PermissionManager {
       baseItems.push({ name: 'Tanımlamalar', href: '/admin/definitions', icon: 'definitions' });
     }
 
-    if (this.canManageUsers(user)) {
+    if (this.canViewLegal(user)) {
+      baseItems.push({ name: 'Hukuk Destek', href: '/admin/legal', icon: 'legal' });
+    }
+
+    if (this.canViewUsers(user)) { // Updated to use new check
       baseItems.push({ name: 'Kullanıcılar', href: '/admin/users', icon: 'admin-users' });
+    }
+
+    // Denetim Kayıtları
+    if (this.hasPermission(user, 'logs.view')) {
+      baseItems.push({ name: 'Denetim Kayıtları', href: '/admin/audit-logs', icon: 'shield' });
     }
 
     return baseItems;

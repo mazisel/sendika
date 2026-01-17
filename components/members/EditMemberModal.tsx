@@ -1,312 +1,353 @@
+'use client';
 
-import { useState, useEffect } from 'react'
-import { X, Save, AlertCircle } from 'lucide-react'
-import { MemberService } from '@/lib/services/memberService'
-import { AdminAuth } from '@/lib/auth'
-import { cityOptions as cities } from '@/lib/cities'
+import React, { useState, useEffect } from 'react';
+import {
+    X, Save, AlertCircle, User, Phone, Briefcase,
+    BadgeCheck, Calendar, MapPin, Hash, Activity,
+    Users, Heart, GraduationCap, Building2, FileText,
+    Mail
+} from 'lucide-react';
+import { MemberService } from '@/lib/services/memberService';
+import { AdminAuth } from '@/lib/auth';
+import { cityOptions as cities } from '@/lib/cities';
+import { Member } from '@/lib/types';
+import { formatDateSafe } from '@/lib/dateUtils';
 
 interface EditMemberModalProps {
-    member: any
-    isOpen: boolean
-    onClose: () => void
-    onSuccess: () => void
+    member: Member;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
 }
 
 export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: EditMemberModalProps) {
-    const [formData, setFormData] = useState({
-        first_name: '',
-        last_name: '',
-        tc_identity: '',
-        phone: '',
-        email: '',
-        city: '',
-        district: '',
-        address: '',
-        workplace: '',
-        position: '',
-        education_level: '',
-        marital_status: '',
-        children_count: 0,
-        birth_date: '',
-        gender: ''
-    })
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [workplaces, setWorkplaces] = useState<any[]>([])
-    const [positions, setPositions] = useState<any[]>([])
+    const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'work' | 'membership'>('personal');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const currentUser = AdminAuth.getCurrentUser()
-    const canEditBranch = currentUser?.role_type !== 'branch_manager'
+    // Form State
+    const [formData, setFormData] = useState<Partial<Member>>({});
 
+    // Definitions State
+    const [workplaces, setWorkplaces] = useState<any[]>([]);
+    const [positions, setPositions] = useState<any[]>([]);
+
+    const currentUser = AdminAuth.getCurrentUser();
+    const canEditBranch = currentUser?.role_type !== 'branch_manager';
+
+    // Initialize form data when member changes
     useEffect(() => {
         if (member) {
             setFormData({
-                first_name: member.first_name || '',
-                last_name: member.last_name || '',
-                tc_identity: member.tc_identity || '',
-                phone: member.phone || '',
-                email: member.email || '',
-                city: member.city || '',
-                district: member.district || '',
-                address: member.address || '',
-                workplace: member.workplace || '',
-                position: member.position || '',
-                education_level: member.education_level || '',
-                marital_status: member.marital_status || '',
-                children_count: member.children_count || 0,
+                ...member,
                 birth_date: member.birth_date ? member.birth_date.split('T')[0] : '',
-                gender: member.gender || ''
-            })
+                decision_date: member.decision_date ? member.decision_date.split('T')[0] : '',
+            });
         }
-    }, [member])
+    }, [member]);
 
+    // Fetch definitions
     useEffect(() => {
         const fetchDefinitions = async () => {
             try {
                 const [workplaceData, positionData] = await Promise.all([
                     MemberService.getDefinitions('workplace'),
                     MemberService.getDefinitions('position')
-                ])
-                setWorkplaces(workplaceData)
-                setPositions(positionData)
+                ]);
+                setWorkplaces(workplaceData);
+                setPositions(positionData);
             } catch (error) {
-                console.error('Tanımlar yüklenirken hata:', error)
+                console.error('Tanımlar yüklenirken hata:', error);
             }
-        }
+        };
 
         if (isOpen) {
-            fetchDefinitions()
+            fetchDefinitions();
         }
-    }, [isOpen])
+    }, [isOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target
+        const { name, value, type } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'number' ? parseInt(value) : value
-        }))
-    }
+            [name]: type === 'number' ? (value === '' ? null : parseInt(value)) : value
+        }));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setIsLoading(true)
-        setError(null)
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
 
         try {
-            await MemberService.updateMember(member.id, formData)
-            onSuccess()
-            onClose()
+            await MemberService.updateMember(member.id, formData);
+            onSuccess();
+            onClose();
         } catch (err) {
-            console.error('Update error:', err)
-            setError('Güncelleme sırasında bir hata oluştu.')
+            console.error('Update error:', err);
+            setError('Güncelleme sırasında bir hata oluştu.');
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
+
+    if (!isOpen) return null;
+
+    // Helper for input fields
+    const InputField = ({
+        label, name, type = 'text', required = false,
+        icon: Icon, className = '', options = null, disabled = false
+    }: any) => (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
+                {label} {required && <span className="text-red-500">*</span>}
+            </label>
+            {options ? (
+                <select
+                    name={name}
+                    value={(formData as any)[name] || ''}
+                    onChange={handleChange}
+                    disabled={disabled}
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                >
+                    <option value="">Seçiniz</option>
+                    {options.map((opt: any) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+            ) : (
+                <input
+                    type={type}
+                    name={name}
+                    value={(formData as any)[name] || ''}
+                    onChange={handleChange}
+                    required={required}
+                    disabled={disabled}
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                />
+            )}
+        </div>
+    );
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div className="relative mx-auto p-4 border border-gray-200 dark:border-slate-700 w-full max-w-2xl shadow-lg dark:shadow-slate-900/40 rounded-lg bg-white dark:bg-slate-900">
-                <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-slate-800 pb-3">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Üye Düzenle</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
-                        <X className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div
+                className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[700px] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-6 flex justify-between items-center sticky top-0 z-20">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <User className="w-6 h-6 text-blue-600" />
+                            Üye Düzenle
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            {member.first_name} {member.last_name} ({member.membership_number || 'No Yok'})
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 rounded-full transition-colors"
+                    >
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
+                {/* Error Message */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-center">
-                        <AlertCircle className="w-5 h-5 mr-2" />
-                        {error}
+                    <div className="mx-6 mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        <p className="text-sm font-medium">{error}</p>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Ad</label>
-                            <input
-                                type="text"
-                                name="first_name"
-                                required
-                                value={formData.first_name || ''}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Soyad</label>
-                            <input
-                                type="text"
-                                name="last_name"
-                                required
-                                value={formData.last_name || ''}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">TC Kimlik</label>
-                            <input
-                                type="text"
-                                name="tc_identity"
-                                maxLength={11}
-                                value={formData.tc_identity || ''}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Doğum Tarihi</label>
-                            <input
-                                type="date"
-                                value={formData.birth_date || ''}
-                                onChange={e => setFormData({ ...formData, birth_date: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
+                <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+                    {/* Tabs Panel */}
+                    <div className="px-6 pt-6 sticky top-0 z-10 bg-white dark:bg-slate-900">
+                        <div className="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 flex gap-1 overflow-x-auto no-scrollbar">
+                            {[
+                                { id: 'personal', label: 'Kişisel Bilgiler', icon: User },
+                                { id: 'contact', label: 'İletişim', icon: Phone },
+                                { id: 'work', label: 'Kurum & Görev', icon: Briefcase },
+                                { id: 'membership', label: 'Üyelik Durumu', icon: BadgeCheck },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id
+                                            ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+                                        }`}
+                                >
+                                    <tab.icon className="w-4 h-4" />
+                                    <span>{tab.label}</span>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Telefon</label>
-                            <input
-                                type="tel"
-                                value={formData.phone || ''}
-                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">E-posta</label>
-                            <input
-                                type="email"
-                                value={formData.email || ''}
-                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
+                    {/* Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar bg-slate-50/50 dark:bg-black/20">
+                        <div className="max-w-3xl mx-auto space-y-6">
+
+                            {/* Personal Tab */}
+                            {activeTab === 'personal' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <InputField label="Ad" name="first_name" required icon={User} />
+                                    <InputField label="Soyad" name="last_name" required icon={User} />
+                                    <InputField label="TC Kimlik No" name="tc_identity" required icon={Hash} />
+                                    <InputField label="Cinsiyet" name="gender" icon={Users} options={[
+                                        { value: 'Erkek', label: 'Erkek' },
+                                        { value: 'Kadın', label: 'Kadın' }
+                                    ]} />
+                                    <InputField label="Doğum Tarihi" name="birth_date" type="date" icon={Calendar} />
+                                    <InputField label="Doğum Yeri" name="birth_place" icon={MapPin} />
+                                    <InputField label="Baba Adı" name="father_name" icon={User} />
+                                    <InputField label="Anne Adı" name="mother_name" icon={User} />
+                                    <InputField label="Medeni Durum" name="marital_status" icon={Heart} options={[
+                                        { value: 'Evli', label: 'Evli' },
+                                        { value: 'Bekar', label: 'Bekar' }
+                                    ]} />
+                                    <InputField label="Çocuk Sayısı" name="children_count" type="number" icon={Users} />
+                                    <InputField label="Eğitim Durumu" name="education_level" icon={GraduationCap} options={[
+                                        { value: 'İlköğretim', label: 'İlköğretim' },
+                                        { value: 'Lise', label: 'Lise' },
+                                        { value: 'Önlisans', label: 'Önlisans' },
+                                        { value: 'Lisans', label: 'Lisans' },
+                                        { value: 'Yüksek Lisans', label: 'Yüksek Lisans' },
+                                        { value: 'Doktora', label: 'Doktora' },
+                                    ]} />
+                                    <InputField label="Kan Grubu" name="blood_group" icon={Activity} />
+                                </div>
+                            )}
+
+                            {/* Contact Tab */}
+                            {activeTab === 'contact' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <InputField label="Telefon" name="phone" type="tel" icon={Phone} />
+                                        <InputField label="E-Posta" name="email" type="email" icon={Mail} />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <InputField label="İl" name="city" icon={MapPin} disabled={!canEditBranch} options={cities.map(c => ({ value: c.name, label: c.name }))} />
+                                        <InputField label="İlçe" name="district" icon={MapPin} />
+                                    </div>
+
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                            Adres
+                                        </label>
+                                        <textarea
+                                            name="address"
+                                            value={formData.address || ''}
+                                            onChange={handleChange}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+
+                                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                                            <Activity className="w-4 h-4 text-red-500" />
+                                            Acil Durum İletişim
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <InputField label="İlgili Kişi Adı" name="emergency_contact_name" icon={User} />
+                                            <InputField label="Yakınlık Derecesi" name="emergency_contact_relation" icon={Users} />
+                                            <InputField label="İletişim Telefonu" name="emergency_contact_phone" type="tel" icon={Phone} className="md:col-span-2" />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Work Tab */}
+                            {activeTab === 'work' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <InputField label="Kurum Adı" name="institution" icon={Building2} className="md:col-span-2" />
+                                    <InputField label="İş Yeri" name="workplace" icon={Briefcase} />
+                                    <InputField label="Kadro Unvanı" name="position" icon={Briefcase} />
+                                    <InputField label="Kurum Sicil No" name="institution_register_no" icon={FileText} />
+                                    <InputField label="Emekli Sicil No" name="retirement_register_no" icon={FileText} />
+
+                                    {/* Region - Read Only or Editable if needed */}
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                            Bölge
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.region ? `${formData.region}. Bölge` : ''}
+                                            readOnly // Usually auto-calculated based on city
+                                            className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/50 text-slate-500 text-sm cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Membership Tab */}
+                            {activeTab === 'membership' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <InputField label="Üye Numarası" name="membership_number" icon={Hash} />
+                                    <InputField label="Karar Numarası" name="decision_number" icon={FileText} />
+                                    <InputField label="Üyelik Karar Tarihi" name="decision_date" type="date" icon={Calendar} />
+                                    <InputField label="Üyelik Durumu" name="membership_status" icon={Activity} options={[
+                                        { value: 'active', label: 'Aktif Üye' },
+                                        { value: 'pending', label: 'Onay Bekliyor' },
+                                        { value: 'inactive', label: 'Pasif' },
+                                        { value: 'suspended', label: 'Askıda' },
+                                        { value: 'resigned', label: 'İstifa' },
+                                    ]} />
+
+                                    <div className="md:col-span-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                        <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="is_active"
+                                                checked={formData.is_active || false}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                                                className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <div>
+                                                <div className="font-medium text-slate-900 dark:text-slate-100 text-sm">Sistem Giriş Yetkisi</div>
+                                                <div className="text-xs text-slate-500">Üyenin sisteme giriş yapabilmesini sağlar.</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">İl</label>
-                            <select
-                                value={formData.city || ''}
-                                onChange={e => setFormData({ ...formData, city: e.target.value })}
-                                disabled={!canEditBranch}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700 disabled:opacity-50"
-                            >
-                                <option value="">Seçiniz</option>
-                                {cities.map(city => (
-                                    <option key={city.code} value={city.name}>{city.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">İlçe</label>
-                            <input
-                                type="text"
-                                value={formData.district || ''}
-                                onChange={e => setFormData({ ...formData, district: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                                placeholder="İlçe giriniz"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Adres</label>
-                        <textarea
-                            value={formData.address || ''}
-                            onChange={e => setFormData({ ...formData, address: e.target.value })}
-                            rows={2}
-                            className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">İşyeri</label>
-                            <input
-                                type="text"
-                                value={formData.workplace || ''}
-                                onChange={e => setFormData({ ...formData, workplace: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Pozisyon / Unvan</label>
-                            <input
-                                type="text"
-                                value={formData.position || ''}
-                                onChange={e => setFormData({ ...formData, position: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Eğitim</label>
-                            <select
-                                value={formData.education_level || ''}
-                                onChange={e => setFormData({ ...formData, education_level: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            >
-                                <option value="">Seçiniz</option>
-                                <option value="İlköğretim">İlköğretim</option>
-                                <option value="Lise">Lise</option>
-                                <option value="Önlisans">Önlisans</option>
-                                <option value="Lisans">Lisans</option>
-                                <option value="Yüksek Lisans">Yüksek Lisans</option>
-                                <option value="Doktora">Doktora</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Medeni Durum</label>
-                            <select
-                                value={formData.marital_status || ''}
-                                onChange={e => setFormData({ ...formData, marital_status: e.target.value })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            >
-                                <option value="">Seçiniz</option>
-                                <option value="Evli">Evli</option>
-                                <option value="Bekar">Bekar</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Çocuk Sayısı</label>
-                            <input
-                                type="number"
-                                min="0"
-                                value={formData.children_count || 0}
-                                onChange={e => setFormData({ ...formData, children_count: parseInt(e.target.value) })}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-slate-800">
+                    {/* Footer Actions */}
+                    <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 mr-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                         >
                             İptal
                         </button>
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}
-                            <Save className="w-4 h-4 mr-2" />
-                            Kaydet
+                            {isLoading ? (
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            ) : (
+                                <Save className="w-4 h-4" />
+                            )}
+                            Değişiklikleri Kaydet
                         </button>
                     </div>
                 </form>
             </div>
         </div>
-    )
+    );
 }

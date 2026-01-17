@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  Users, 
-  TrendingUp, 
-  MapPin, 
+import Link from 'next/link';
+import {
+  BarChart3,
+  Users,
+  TrendingUp,
+  MapPin,
   Calendar,
   UserCheck,
   UserX,
@@ -19,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import StatsDetailModal from '@/components/statistics/StatsDetailModal';
 
 interface MemberStats {
   totalMembers: number;
@@ -62,8 +64,20 @@ export default function StatisticsPage() {
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Interactive Stats State
+  const [selectedStat, setSelectedStat] = useState<{
+    type: string;
+    value: any;
+    title: string;
+  } | null>(null);
+
+  const handleStatClick = (type: string, value: any, title: string) => {
+    setSelectedStat({ type, value, title });
+  };
+
   const cardClass =
-    'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-6 transition-colors';
+    'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-6 transition-all duration-300 block hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer transform hover:-translate-y-1';
   const miniCardClass =
     'rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-4 transition-colors';
 
@@ -312,8 +326,8 @@ export default function StatisticsPage() {
         }
         return acc;
       }, [])
-      .sort((a: any, b: any) => b.count - a.count)
-      .slice(0, 10) || [];
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 10) || [];
 
       // Pozisyon dağılımı
       const { data: positionData } = await supabase
@@ -330,8 +344,8 @@ export default function StatisticsPage() {
         }
         return acc;
       }, [])
-      .sort((a: any, b: any) => b.count - a.count)
-      .slice(0, 10) || [];
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 10) || [];
 
       setWorkplaceStats({
         topWorkplaces,
@@ -351,9 +365,9 @@ export default function StatisticsPage() {
         .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
 
       const membershipTrends = timeData?.reduce((acc: any[], member) => {
-        const month = new Date(member.created_at).toLocaleDateString('tr-TR', { 
-          year: 'numeric', 
-          month: 'short' 
+        const month = new Date(member.created_at).toLocaleDateString('tr-TR', {
+          year: 'numeric',
+          month: 'short'
         });
         const existing = acc.find(item => item.month === month);
         if (existing) {
@@ -368,9 +382,9 @@ export default function StatisticsPage() {
       const joinDateAnalysis = timeData?.reduce((acc: any[], member) => {
         const joinDate = new Date(member.created_at);
         const now = new Date();
-        const diffMonths = (now.getFullYear() - joinDate.getFullYear()) * 12 + 
-                          (now.getMonth() - joinDate.getMonth());
-        
+        const diffMonths = (now.getFullYear() - joinDate.getFullYear()) * 12 +
+          (now.getMonth() - joinDate.getMonth());
+
         let period = '';
         if (diffMonths < 1) period = 'Bu ay';
         else if (diffMonths < 3) period = 'Son 3 ay';
@@ -486,7 +500,7 @@ export default function StatisticsPage() {
 
       {/* Genel İstatistikler */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className={cardClass}>
+        <Link href="/admin/members" className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Toplam Üye</p>
@@ -496,9 +510,9 @@ export default function StatisticsPage() {
               <Users className="w-6 h-6 text-blue-600 dark:text-blue-300" />
             </div>
           </div>
-        </div>
+        </Link>
 
-        <div className={cardClass}>
+        <Link href="/admin/members?status=active" className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Aktif Üye</p>
@@ -508,9 +522,9 @@ export default function StatisticsPage() {
               <UserCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
-        </div>
+        </Link>
 
-        <div className={cardClass}>
+        <Link href="/admin/members?status=pending" className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Bekleyen Üye</p>
@@ -520,9 +534,9 @@ export default function StatisticsPage() {
               <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-300" />
             </div>
           </div>
-        </div>
+        </Link>
 
-        <div className={cardClass}>
+        <Link href="/admin/members?date=this_month" className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Bu Ay Yeni</p>
@@ -533,7 +547,7 @@ export default function StatisticsPage() {
               <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Demografik İstatistikler */}
@@ -551,14 +565,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {demographicStats?.genderDistribution.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('gender', item.gender, `Cinsiyet: ${item.gender}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.gender}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                    <div
+                      className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -582,14 +600,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {demographicStats?.ageGroups.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('age', item.ageGroup, `Yaş Grubu: ${item.ageGroup}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.ageGroup}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-orange-600 dark:bg-orange-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                    <div
+                      className="bg-orange-600 dark:bg-orange-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -613,14 +635,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {demographicStats?.maritalStatus.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('marital', item.status, `Medeni Durum: ${item.status}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.status}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-pink-600 dark:bg-pink-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                    <div
+                      className="bg-pink-600 dark:bg-pink-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -644,14 +670,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {demographicStats?.educationLevels.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('education', item.level, `Eğitim Seviyesi: ${item.level}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.level}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                    <div
+                      className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -678,14 +708,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {geographicStats?.topCities.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('city', item.city, `Şehir: ${item.city}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.city}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 dark:bg-green-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (geographicStats?.topCities[0]?.count || 1)) * 100}%` 
+                    <div
+                      className="bg-green-600 dark:bg-green-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (geographicStats?.topCities[0]?.count || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -709,14 +743,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {workplaceStats?.topWorkplaces.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('workplace', item.workplace, `İşyeri: ${item.workplace}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300 truncate">{item.workplace}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (workplaceStats?.topWorkplaces[0]?.count || 1)) * 100}%` 
+                    <div
+                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (workplaceStats?.topWorkplaces[0]?.count || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -743,14 +781,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {demographicStats?.childrenStats.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('children', item.range, `Çocuk Sayısı: ${item.range}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300">{item.range}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-yellow-600 dark:bg-yellow-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                    <div
+                      className="bg-yellow-600 dark:bg-yellow-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -774,14 +816,18 @@ export default function StatisticsPage() {
           </div>
           <div className="space-y-4">
             {workplaceStats?.positionDistribution.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                onClick={() => handleStatClick('position', item.position, `Pozisyon: ${item.position}`)}
+              >
                 <span className="text-slate-700 dark:text-slate-300 truncate">{item.position}</span>
                 <div className="flex items-center space-x-3">
                   <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div 
-                      className="bg-teal-600 dark:bg-teal-400 h-2 rounded-full" 
-                      style={{ 
-                        width: `${(item.count / (workplaceStats?.positionDistribution[0]?.count || 1)) * 100}%` 
+                    <div
+                      className="bg-teal-600 dark:bg-teal-400 h-2 rounded-full"
+                      style={{
+                        width: `${(item.count / (workplaceStats?.positionDistribution[0]?.count || 1)) * 100}%`
                       }}
                     />
                   </div>
@@ -814,10 +860,10 @@ export default function StatisticsPage() {
                   <span className="text-slate-700 dark:text-slate-300">{item.month}</span>
                   <div className="flex items-center space-x-3">
                     <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
-                        style={{ 
-                          width: `${(item.count / Math.max(...(timeStats?.membershipTrends.map(t => t.count) || [1]))) * 100}%` 
+                      <div
+                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
+                        style={{
+                          width: `${(item.count / Math.max(...(timeStats?.membershipTrends.map(t => t.count) || [1]))) * 100}%`
                         }}
                       />
                     </div>
@@ -837,10 +883,10 @@ export default function StatisticsPage() {
                   <span className="text-slate-700 dark:text-slate-300">{item.period}</span>
                   <div className="flex items-center space-x-3">
                     <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full" 
-                        style={{ 
-                          width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%` 
+                      <div
+                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
+                        style={{
+                          width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
                         }}
                       />
                     </div>
@@ -860,7 +906,7 @@ export default function StatisticsPage() {
           <div className={miniCardClass}>
             <div className="text-sm text-slate-600 dark:text-slate-400">Aktiflik Oranı</div>
             <div className="text-2xl font-bold text-green-600 dark:text-green-300">
-              {memberStats?.totalMembers ? 
+              {memberStats?.totalMembers ?
                 Math.round((memberStats.activeMembers / memberStats.totalMembers) * 100) : 0}%
             </div>
           </div>
@@ -878,6 +924,19 @@ export default function StatisticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {selectedStat && (
+        <StatsDetailModal
+          isOpen={!!selectedStat}
+          onClose={() => setSelectedStat(null)}
+          title={selectedStat.title}
+          filter={{
+            type: selectedStat.type,
+            value: selectedStat.value
+          }}
+        />
+      )}
     </div>
   );
 }

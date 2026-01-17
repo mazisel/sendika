@@ -22,9 +22,22 @@ interface FormData {
   phone: string;
   email: string;
   address: string;
-  workplace: string;
-  position: string;
+
+  // Professional
+  workplace: string; // İş Yeri
+  institution: string; // Kurum
+  position: string; // Kadro Unvanı
+  institution_register_no: string; // Kurum Sicil No
+  retirement_register_no: string; // Emekli Sicil No
   start_date: string;
+
+  // Personal Additional
+  father_name: string;
+  mother_name: string;
+  birth_place: string;
+  blood_group: string;
+
+  // Contact & Other
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relation: string;
@@ -34,7 +47,6 @@ interface FormData {
   notes: string;
   membership_number: string;
   membership_date: string;
-
 }
 
 interface PendingDocument {
@@ -55,9 +67,19 @@ const initialFormData: FormData = {
   phone: '',
   email: '',
   address: '',
+
   workplace: '',
+  institution: '',
   position: '',
+  institution_register_no: '',
+  retirement_register_no: '',
   start_date: '',
+
+  father_name: '',
+  mother_name: '',
+  birth_place: '',
+  blood_group: '',
+
   emergency_contact_name: '',
   emergency_contact_phone: '',
   emergency_contact_relation: '',
@@ -67,7 +89,6 @@ const initialFormData: FormData = {
   notes: '',
   membership_number: '',
   membership_date: '',
-
 };
 
 const fieldLabels: Record<string, string> = {
@@ -81,9 +102,16 @@ const fieldLabels: Record<string, string> = {
   phone: 'Telefon',
   email: 'E-posta',
   address: 'Adres',
-  workplace: 'Çalıştığı kurum',
-  position: 'Görevi',
+  workplace: 'İş Yeri',
+  institution: 'Kurum',
+  position: 'Kadro Unvanı',
+  institution_register_no: 'Kurum Sicil No',
+  retirement_register_no: 'Emekli Sicil No',
   start_date: 'Başlangıç tarihi',
+  father_name: 'Baba Adı',
+  mother_name: 'Anne Adı',
+  birth_place: 'Doğum Yeri',
+  blood_group: 'Kan Grubu',
   emergency_contact_name: 'Acil durum kişi adı',
   emergency_contact_phone: 'Acil durum kişi telefonu',
   emergency_contact_relation: 'Acil durum kişi ilişki',
@@ -93,7 +121,6 @@ const fieldLabels: Record<string, string> = {
   notes: 'Notlar',
   membership_number: 'Üye numarası',
   membership_date: 'Üye kayıt tarihi',
-
 };
 
 const documentTypeOptions = [
@@ -144,6 +171,7 @@ export default function NewMemberPage() {
 
     return cityOptions.map(option => option.name);
   }, [branchRegions, currentUser]);
+
   const [documents, setDocuments] = useState<PendingDocument[]>([]);
   const [documentForm, setDocumentForm] = useState<{ name: string; type: string; file: File | null }>({
     name: '',
@@ -157,15 +185,11 @@ export default function NewMemberPage() {
     position: []
   });
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
-  // const [isCustomWorkplace, setIsCustomWorkplace] = useState(false); // Removed
-  // const [isCustomPosition, setIsCustomPosition] = useState(false); // Removed
 
   useEffect(() => {
-    // Kullanıcı bilgilerini al
     const user = AdminAuth.getCurrentUser();
     setCurrentUser(user);
 
-    // Şube yöneticisi ise şehrini otomatik doldur
     if (user && user.role_type === 'branch_manager' && user.city) {
       setFormData(prev => ({
         ...prev,
@@ -248,8 +272,6 @@ export default function NewMemberPage() {
     fetchDefinitions();
   }, []);
 
-  // Custom input switching effects removed
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -257,7 +279,6 @@ export default function NewMemberPage() {
       [name]: name === 'children_count' ? parseInt(value) || 0 : value
     }));
 
-    // Hata mesajını temizle
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -312,11 +333,9 @@ export default function NewMemberPage() {
     }
 
     const file = documentForm.file;
-
-    const uniqueId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const uniqueId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     setDocuments(prev => [
       ...prev,
@@ -334,8 +353,6 @@ export default function NewMemberPage() {
   const handleRemoveDocument = (id: string) => {
     setDocuments(prev => prev.filter(doc => doc.id !== id));
   };
-
-  // Toggle handlers removed
 
   const getDocumentTypeLabel = (value: string) =>
     documentTypeOptions.find(option => option.value === value)?.label || 'Diğer';
@@ -446,7 +463,6 @@ export default function NewMemberPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Zorunlu alanlar
     if (!formData.first_name.trim()) newErrors.first_name = 'Ad zorunludur';
     if (!formData.last_name.trim()) newErrors.last_name = 'Soyad zorunludur';
     if (!formData.tc_identity.trim()) newErrors.tc_identity = 'TC Kimlik No zorunludur';
@@ -460,38 +476,28 @@ export default function NewMemberPage() {
       }
     }
 
-    // TC Kimlik No kontrolü
     if (formData.tc_identity && formData.tc_identity.length !== 11) {
       newErrors.tc_identity = 'TC Kimlik No 11 haneli olmalıdır';
     }
 
-    // E-posta formatı kontrolü
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Geçerli bir e-posta adresi giriniz';
     }
 
-    // Telefon formatı kontrolü
     if (formData.phone && !/^[0-9]{10,11}$/.test(formData.phone.replace(/\s/g, ''))) {
       newErrors.phone = 'Geçerli bir telefon numarası giriniz';
     }
 
-    // Tarih formatı kontrolü
     if (formData.birth_date && !isValidDateString(formData.birth_date)) {
       newErrors.birth_date = 'Geçerli bir tarih seçiniz';
     }
-
     if (formData.start_date && !isValidDateString(formData.start_date)) {
       newErrors.start_date = 'Geçerli bir tarih seçiniz';
     }
-
     if (formData.membership_date && !isValidDateString(formData.membership_date)) {
       newErrors.membership_date = 'Geçerli bir tarih seçiniz';
     }
 
-
-
-
-    // Şube yöneticisi şehir kontrolü
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
     }
@@ -508,7 +514,6 @@ export default function NewMemberPage() {
       if (password.length < 6) {
         newErrors.password = 'Şifre en az 6 karakter olmalıdır';
       }
-
       if (confirmPassword !== password) {
         newErrors.confirmPassword = 'Şifreler eşleşmiyor';
       }
@@ -543,9 +548,19 @@ export default function NewMemberPage() {
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
         address: formData.address.trim(),
+
         workplace: formData.workplace.trim(),
         position: formData.position.trim(),
+        institution: formData.institution.trim(),
+        institution_register_no: formData.institution_register_no.trim(),
+        retirement_register_no: formData.retirement_register_no.trim(),
         start_date: formData.start_date ? formData.start_date : null,
+
+        father_name: formData.father_name.trim(),
+        mother_name: formData.mother_name.trim(),
+        birth_place: formData.birth_place.trim(),
+        blood_group: formData.blood_group,
+
         emergency_contact_name: formData.emergency_contact_name.trim(),
         emergency_contact_phone: formData.emergency_contact_phone.trim(),
         emergency_contact_relation: formData.emergency_contact_relation.trim(),
@@ -555,10 +570,8 @@ export default function NewMemberPage() {
         notes: formData.notes.trim(),
         membership_number: canEditMembershipNumber ? formData.membership_number.trim() : null,
         membership_date: formData.membership_date ? formData.membership_date : null,
-        custom_date_1: null,
-        custom_date_2: null,
-        custom_date_3: null,
-        membership_status: 'active', // Admin tarafından eklenen üyeler direkt aktif
+
+        membership_status: 'active',
         is_active: true,
         region: cityRegion
       };
@@ -614,9 +627,6 @@ export default function NewMemberPage() {
           const payload = await response.json().catch(() => ({}));
           throw new Error(payload?.message || 'Şifre oluşturulurken bir hata oluştu.');
         }
-
-        setPassword('');
-        setConfirmPassword('');
       }
 
       alert(`Üye başarıyla eklendi! Üye numarası: ${data.membership_number}`);
@@ -664,6 +674,7 @@ export default function NewMemberPage() {
         </div>
 
         <div>
+          {/* Document Upload Button */}
           <input
             type="file"
             accept="image/*"
@@ -714,7 +725,6 @@ export default function NewMemberPage() {
                 alert('Kimlik taranırken bir hata oluştu. Lütfen tekrar deneyin veya elle giriş yapın.');
               } finally {
                 setLoading(false);
-                // Reset input value to allow selecting same file again
                 e.target.value = '';
               }
             }}
@@ -871,6 +881,48 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
+                Baba Adı
+              </label>
+              <input
+                type="text"
+                name="father_name"
+                value={formData.father_name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Baba adı"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Anne Adı
+              </label>
+              <input
+                type="text"
+                name="mother_name"
+                value={formData.mother_name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Anne adı"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Doğum Yeri
+              </label>
+              <input
+                type="text"
+                name="birth_place"
+                value={formData.birth_place}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Doğum yeri"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Doğum Tarihi <span className="text-red-500">*</span>
               </label>
               <input
@@ -909,43 +961,146 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
+                Kan Grubu
+              </label>
+              <select
+                name="blood_group"
+                value={formData.blood_group}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Seçiniz</option>
+                <option value="A Rh+">A Rh+</option>
+                <option value="A Rh-">A Rh-</option>
+                <option value="B Rh+">B Rh+</option>
+                <option value="B Rh-">B Rh-</option>
+                <option value="AB Rh+">AB Rh+</option>
+                <option value="AB Rh-">AB Rh-</option>
+                <option value="0 Rh+">0 Rh+</option>
+                <option value="0 Rh-">0 Rh-</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Eğitim Durumu
+              </label>
+              <select
+                name="education_level"
+                value={formData.education_level}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Seçiniz</option>
+                <option value="İlkokul">İlkokul</option>
+                <option value="Ortaokul">Ortaokul</option>
+                <option value="Lise">Lise</option>
+                <option value="Önlisans">Önlisans</option>
+                <option value="Lisans">Lisans</option>
+                <option value="Yüksek Lisans">Yüksek Lisans</option>
+                <option value="Doktora">Doktora</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Medeni Durum
+              </label>
+              <select
+                name="marital_status"
+                value={formData.marital_status}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Seçiniz</option>
+                <option value="Bekar">Bekar</option>
+                <option value="Evli">Evli</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Çocuk Sayısı
+              </label>
+              <input
+                type="number"
+                name="children_count"
+                value={formData.children_count}
+                onChange={handleInputChange}
+                min="0"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* İletişim Bilgileri */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <Phone className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">İletişim Bilgileri</h3>
+              <p className="text-sm text-slate-600">Üyenin iletişim ve adres bilgileri</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Telefon
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-slate-300'
+                  }`}
+                placeholder="5XX XXX XX XX"
+              />
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                E-posta
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-slate-300'
+                  }`}
+                placeholder="ornek@email.com"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 İl <span className="text-red-500">*</span>
               </label>
               <select
                 name="city"
                 value={formData.city}
                 onChange={handleInputChange}
-                disabled={currentUser?.role_type === 'branch_manager'}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.city ? 'border-red-500' : 'border-slate-300'
-                  } ${currentUser?.role_type === 'branch_manager' ? 'bg-slate-100 cursor-not-allowed' : ''}`}
+                  }`}
               >
-                <option value="">İl seçiniz</option>
+                <option value="">İl Seçiniz</option>
                 {allowedCities.map(city => (
                   <option key={city} value={city}>{city}</option>
                 ))}
               </select>
               {errors.city && (
                 <p className="mt-1 text-sm text-red-600">{errors.city}</p>
-              )}
-              {currentUser?.role_type === 'branch_manager' && (
-                <p className="mt-1 text-sm text-blue-600">
-                  Şube yöneticisi olarak sadece {currentUser.city} iline üye ekleyebilirsiniz.
-                </p>
-              )}
-              {currentUser?.role_type === 'regional_manager' && currentUser.region && (
-                <p className="mt-1 text-sm text-blue-600">
-                  Sadece {currentUser.region}. bölgedeki şehirlere üye ekleyebilirsiniz.
-                </p>
-              )}
-              {!branchesLoading && currentUser?.role_type === 'regional_manager' && currentUser.region && allowedCities.length === 0 && (
-                <p className="mt-1 text-sm text-red-600">
-                  Bu bölgeye bağlı aktif şube bulunamadı. Lütfen önce şube ekleyin.
-                </p>
-              )}
-              {cityRegion && (
-                <p className="mt-1 text-sm text-slate-500">
-                  Seçilen şehir {cityRegion}. bölgeye bağlı.
-                </p>
               )}
             </div>
 
@@ -967,116 +1122,6 @@ export default function NewMemberPage() {
               )}
             </div>
 
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Medeni Durum
-              </label>
-              <select
-                name="marital_status"
-                value={formData.marital_status}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Medeni durum seçiniz</option>
-                <option value="Bekar">Bekar</option>
-                <option value="Evli">Evli</option>
-                <option value="Boşanmış">Boşanmış</option>
-                <option value="Dul">Dul</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Çocuk Sayısı
-              </label>
-              <input
-                type="number"
-                name="children_count"
-                value={formData.children_count}
-                onChange={handleInputChange}
-                min="0"
-                max="20"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Eğitim Durumu
-              </label>
-              <select
-                name="education_level"
-                value={formData.education_level}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Eğitim durumu seçiniz</option>
-                <option value="İlkokul">İlkokul</option>
-                <option value="Ortaokul">Ortaokul</option>
-                <option value="Lise">Lise</option>
-                <option value="Ön Lisans">Ön Lisans</option>
-                <option value="Lisans">Lisans</option>
-                <option value="Yüksek Lisans">Yüksek Lisans</option>
-                <option value="Doktora">Doktora</option>
-              </select>
-            </div>
-
-
-
-          </div>
-        </div>
-
-        {/* İletişim Bilgileri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Phone className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">İletişim Bilgileri</h3>
-              <p className="text-sm text-slate-600">Üyenin iletişim bilgileri</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Telefon <span className="text-xs text-slate-500 ml-1">(opsiyonel)</span>
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-slate-300'
-                  }`}
-                placeholder="05XX XXX XX XX"
-              />
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                E-posta <span className="text-xs text-slate-500 ml-1">(opsiyonel)</span>
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-slate-300'
-                  }`}
-                placeholder="ornek@email.com"
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
-
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Adres
@@ -1087,99 +1132,113 @@ export default function NewMemberPage() {
                 onChange={handleInputChange}
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ev adresi giriniz"
+                placeholder="Açık adres giriniz"
               />
             </div>
           </div>
         </div>
 
-        {/* İş Bilgileri */}
+        {/* Mesleki Bilgiler */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">İş Bilgileri</h3>
-              <p className="text-sm text-slate-600">Üyenin çalışma bilgileri</p>
+              <h3 className="text-lg font-semibold text-slate-900">Mesleki Bilgiler</h3>
+              <p className="text-sm text-slate-600">Üyenin çalışma hayatı ile ilgili bilgiler</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                İşyeri
+                İş Yeri (Çalıştığı Kurum)
               </label>
               <select
                 name="workplace"
                 value={formData.workplace}
                 onChange={handleInputChange}
-                disabled={definitionsLoading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">
-                  {definitionsLoading ? 'Tanımlar yükleniyor...' : 'İşyeri seçiniz'}
-                </option>
-                {definitionOptions.workplace.map((option) => (
-                  <option key={option.id} value={option.label}>
-                    {option.label}
-                  </option>
+                <option value="">Seçiniz</option>
+                {definitionOptions.workplace.map(opt => (
+                  <option key={opt.id} value={opt.label}>{opt.label}</option>
                 ))}
               </select>
-              <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                <span className="text-slate-400">
-                  {definitionsLoading
-                    ? 'Tanımlar yükleniyor'
-                    : `${definitionOptions.workplace.length} kayıt`}
-                </span>
-              </div>
               {canManageDefinitions && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/admin/definitions')}
-                  className="mt-1 text-xs text-blue-600 hover:text-blue-700"
-                >
-                  Tanımları yönet
-                </button>
+                <div className="mt-1">
+                  <a href="/admin/definitions?tab=workplace" target="_blank" className="text-xs text-blue-600 hover:underline">
+                    + Yeni İş Yeri Ekle
+                  </a>
+                </div>
               )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Pozisyon
+                Kurum
+              </label>
+              <input
+                type="text"
+                name="institution"
+                value={formData.institution}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Kurum adı"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Kadro Unvanı (Pozisyon)
               </label>
               <select
                 name="position"
                 value={formData.position}
                 onChange={handleInputChange}
-                disabled={definitionsLoading}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">
-                  {definitionsLoading ? 'Tanımlar yükleniyor...' : 'Pozisyon seçiniz'}
-                </option>
-                {definitionOptions.position.map((option) => (
-                  <option key={option.id} value={option.label}>
-                    {option.label}
-                  </option>
+                <option value="">Seçiniz</option>
+                {definitionOptions.position.map(opt => (
+                  <option key={opt.id} value={opt.label}>{opt.label}</option>
                 ))}
               </select>
-              <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-                <span className="text-slate-400">
-                  {definitionsLoading
-                    ? 'Tanımlar yükleniyor'
-                    : `${definitionOptions.position.length} kayıt`}
-                </span>
-              </div>
               {canManageDefinitions && (
-                <button
-                  type="button"
-                  onClick={() => router.push('/admin/definitions')}
-                  className="mt-1 text-xs text-blue-600 hover:text-blue-700"
-                >
-                  Tanımları yönet
-                </button>
+                <div className="mt-1">
+                  <a href="/admin/definitions?tab=position" target="_blank" className="text-xs text-blue-600 hover:underline">
+                    + Yeni Unvan Ekle
+                  </a>
+                </div>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Kurum Sicil No
+              </label>
+              <input
+                type="text"
+                name="institution_register_no"
+                value={formData.institution_register_no}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Sicil No"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Emekli Sicil No
+              </label>
+              <input
+                type="text"
+                name="retirement_register_no"
+                value={formData.retirement_register_no}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Emekli Sicil No"
+              />
             </div>
 
             <div>
@@ -1191,7 +1250,8 @@ export default function NewMemberPage() {
                 name="start_date"
                 value={formData.start_date}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.start_date ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.start_date && (
                 <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
@@ -1200,208 +1260,15 @@ export default function NewMemberPage() {
           </div>
         </div>
 
-        {/* Acil Durum İletişim */}
+        {/* Portföy ve Şifre (Opsiyonel) */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+              <Key className="w-5 h-5 text-gray-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Acil Durum İletişim</h3>
-              <p className="text-sm text-slate-600">Acil durumlarda ulaşılacak kişi bilgileri</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kişi Adı
-              </label>
-              <input
-                type="text"
-                name="emergency_contact_name"
-                value={formData.emergency_contact_name}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Acil durum kişisi"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Telefon
-              </label>
-              <input
-                type="tel"
-                name="emergency_contact_phone"
-                value={formData.emergency_contact_phone}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="05XX XXX XX XX"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Yakınlık Derecesi
-              </label>
-              <select
-                name="emergency_contact_relation"
-                value={formData.emergency_contact_relation}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Yakınlık derecesi seçiniz</option>
-                <option value="Eş">Eş</option>
-                <option value="Anne">Anne</option>
-                <option value="Baba">Baba</option>
-                <option value="Kardeş">Kardeş</option>
-                <option value="Çocuk">Çocuk</option>
-                <option value="Arkadaş">Arkadaş</option>
-                <option value="Diğer">Diğer</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Üye Belgeleri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <Upload className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Üye Belgeleri</h3>
-              <p className="text-sm text-slate-600">Kimlik, diploma vb. belgeleri üyeyi kaydederken yükleyin</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Belge Adı
-                </label>
-                <input
-                  type="text"
-                  value={documentForm.name}
-                  onChange={(e) => handleDocumentFieldChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Örn. Kimlik Fotokopisi"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Belge Türü
-                </label>
-                <select
-                  value={documentForm.type}
-                  onChange={(e) => handleDocumentFieldChange('type', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Belge türü seçiniz</option>
-                  {documentTypeOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Dosya
-                </label>
-                <input
-                  key={documentInputKey}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  onChange={(e) => handleDocumentFileChange(e.target.files?.[0] || null)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="text-xs text-slate-500 mt-1">PDF, Word, JPG veya PNG dosyaları desteklenir</p>
-              </div>
-            </div>
-
-            {documentError && (
-              <p className="text-sm text-red-600">{documentError}</p>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleAddDocument}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Belgeyi listeye ekle
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            {documents.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Henüz eklenmiş belge yok. Belgeleri kayıttan önce listeye ekleyebilirsiniz.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Belge Adı
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Tür
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Dosya
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        İşlem
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {documents.map(doc => (
-                      <tr key={doc.id}>
-                        <td className="px-4 py-2 text-sm text-slate-900">{doc.name}</td>
-                        <td className="px-4 py-2 text-sm text-slate-600">{getDocumentTypeLabel(doc.type)}</td>
-                        <td className="px-4 py-2 text-sm text-slate-600">
-                          <div>{doc.file.name}</div>
-                          <div className="text-xs text-slate-400">{formatFileSize(doc.file.size)}</div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDocument(doc.id)}
-                            className="inline-flex items-center px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Kaldır
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Üye Giriş Bilgileri */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Key className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Üye Giriş Bilgileri</h3>
-              <p className="text-sm text-slate-600">
-                Mobil uygulamaya giriş için şifre belirleyin. Bu alanı boş bırakırsanız üyenin şifresini daha sonra güncelleyebilirsiniz.
-              </p>
+              <h3 className="text-lg font-semibold text-slate-900">Üye Hesabı (Opsiyonel)</h3>
+              <p className="text-sm text-slate-600">Üyenin sisteme giriş yapabilmesi için şifre belirleyin</p>
             </div>
           </div>
 
@@ -1414,15 +1281,13 @@ export default function NewMemberPage() {
                 type="password"
                 value={password}
                 onChange={(e) => handlePasswordChange(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="En az 6 karakter"
-                autoComplete="new-password"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-slate-300'}`}
+                placeholder="******"
               />
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
-
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Şifre (Tekrar)
@@ -1431,67 +1296,123 @@ export default function NewMemberPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => handleConfirmPasswordChange(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Şifreyi tekrar girin"
-                autoComplete="new-password"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.confirmPassword ? 'border-red-500' : 'border-slate-300'}`}
+                placeholder="******"
               />
               {errors.confirmPassword && (
                 <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Notlar */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Mail className="w-5 h-5 text-gray-600" />
+          <div className="mt-6 border-t pt-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                <Upload className="w-4 h-4 text-blue-600" />
+              </div>
+              <h4 className="text-md font-semibold text-slate-900">Belgeler</h4>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Ek Notlar</h3>
-              <p className="text-sm text-slate-600">Üye hakkında ek bilgiler</p>
+
+            {/* Document Upload Area */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                <div className="sm:col-span-5">
+                  <input
+                    type="text"
+                    placeholder="Belge Adı"
+                    value={documentForm.name}
+                    onChange={(e) => handleDocumentFieldChange('name', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <select
+                    value={documentForm.type}
+                    onChange={(e) => handleDocumentFieldChange('type', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                  >
+                    <option value="">Belge Türü</option>
+                    {documentTypeOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-4 flex gap-2">
+                  <input
+                    key={documentInputKey}
+                    type="file"
+                    onChange={(e) => handleDocumentFileChange(e.target.files?.[0] || null)}
+                    className="flex-1 text-sm text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddDocument}
+                    className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 text-sm"
+                  >
+                    Ekle
+                  </button>
+                </div>
+              </div>
+              {documentError && <p className="text-xs text-red-500">{documentError}</p>}
+
+              {/* Pending Document List */}
+              {documents.length > 0 && (
+                <div className="bg-slate-50 rounded-lg border border-slate-200">
+                  <ul className="divide-y divide-slate-200">
+                    {documents.map((doc) => (
+                      <li key={doc.id} className="px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-3 overflow-hidden">
+                          <div className="p-2 bg-white rounded border border-slate-200">
+                            <Upload className="w-4 h-4 text-slate-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
+                            <p className="text-xs text-slate-500 flex items-center">
+                              <span>{getDocumentTypeLabel(doc.type)}</span>
+                              <span className="mx-1">•</span>
+                              <span>{formatFileSize(doc.file.size)}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDocument(doc.id)}
+                          className="text-slate-400 hover:text-red-600 p-1"
+                          title="Kaldır"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Notlar
-            </label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              rows={4}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Üye hakkında ek bilgiler, özel durumlar vb."
-            />
-          </div>
         </div>
 
-        {/* Form Butonları */}
-        <div className="flex items-center justify-end space-x-4 pt-6">
+        {/* Submit Actions */}
+        <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+            className="px-6 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium transition-colors"
           >
             İptal
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center space-x-2 px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Kaydediliyor...</span>
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" />
-                <span>Üye Ekle</span>
+                <Save className="w-5 h-5" />
+                <span>Üyeyi Kaydet</span>
               </>
             )}
           </button>

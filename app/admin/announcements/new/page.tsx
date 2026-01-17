@@ -6,6 +6,8 @@ import { AdminAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import Link from 'next/link';
+import NotificationSelector from '@/components/admin/NotificationSelector';
+import { NotificationService } from '@/lib/services/notificationService';
 
 export default function NewAnnouncement() {
   const [title, setTitle] = useState('');
@@ -14,6 +16,7 @@ export default function NewAnnouncement() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [notificationChannels, setNotificationChannels] = useState({ push: false, sms: false, email: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -30,7 +33,7 @@ export default function NewAnnouncement() {
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('announcements')
         .insert([
           {
@@ -42,14 +45,13 @@ export default function NewAnnouncement() {
             end_date: endDate ? new Date(endDate).toISOString() : null,
             created_by: user.id
           }
-        ]);
+        ])
+        .select();
 
       if (error) {
         setError('Duyuru kaydedilirken hata oluştu');
         return;
       }
-
-      router.push('/admin/announcements');
 
       await Logger.log({
         action: 'CREATE',
@@ -58,6 +60,17 @@ export default function NewAnnouncement() {
         details: { title, is_active: isActive },
         userId: user.id
       });
+
+      // Send notifications
+      if (data && data.length > 0) {
+        await NotificationService.sendContentNotification('announcement', data[0].id, notificationChannels, {
+          title: title,
+          message: content
+        });
+      }
+
+      router.push('/admin/announcements');
+
     } catch (error) {
       setError('Duyuru kaydedilirken hata oluştu');
     } finally {
@@ -180,6 +193,13 @@ export default function NewAnnouncement() {
                 <label htmlFor="isActive" className="ml-2 block text-sm text-gray-900">
                   Duyuru aktif
                 </label>
+              </div>
+
+              <div className="pt-4 border-t border-gray-200">
+                <NotificationSelector
+                  channels={notificationChannels}
+                  onChange={setNotificationChannels}
+                />
               </div>
 
               <div className="flex justify-end space-x-3">

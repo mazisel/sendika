@@ -26,27 +26,81 @@ export class AdminAuth {
         return { success: false, error: 'E-posta veya şifre hatalı' };
       }
 
-      // Admin kullanıcı bilgilerini al
-      const { data: adminUser, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', credentials.email)
-        .eq('is_active', true)
-        .single();
+      // Admin kullanıcı bilgilerini al (Rol detaylarıyla)
+      // Önce yeni yapıyı dene (RBAC)
+      let adminUser: any = null;
+      let dbError: any = null;
 
-      if (adminError || !adminUser) {
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select(`
+            *,
+            role_details:roles (
+              id,
+              name,
+              is_system_role,
+              permissions:role_permissions (
+                permission:permissions (
+                  key
+                )
+              )
+            )
+          `)
+          .eq('email', credentials.email)
+          .eq('is_active', true)
+          .single();
+
+        if (error) throw error;
+        adminUser = data;
+      } catch (err) {
+        console.warn('RBAC query failed, falling back to simple query:', err);
+        // Fallback: Eski yapı (Sadece admin_users)
+        // Tablolar veya ilişki henüz yoksa bu çalışır
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('*')
+          .eq('email', credentials.email)
+          .eq('is_active', true)
+          .single();
+
+        if (error) {
+          dbError = error;
+        } else {
+          adminUser = data;
+        }
+      }
+
+      if (dbError || !adminUser) {
+        console.error('Login database error:', dbError);
         // Supabase auth'dan çıkış yap
         await supabase.auth.signOut();
         return { success: false, error: 'Admin yetkisi bulunamadı' };
       }
 
+      // İzinleri düzleştir
+      const permissions: string[] = [];
+      if (adminUser.role_details?.permissions) {
+        adminUser.role_details.permissions.forEach((p: any) => {
+          if (p.permission?.key) {
+            permissions.push(p.permission.key);
+          }
+        });
+      }
+
+      // Kullanıcı objesine ekle
+      const userWithPermissions: AdminUser = {
+        ...adminUser,
+        permissions
+      };
+
       // Local storage'a admin bilgilerini kaydet
       if (typeof window !== 'undefined') {
-        localStorage.setItem('admin_user', JSON.stringify(adminUser));
+        localStorage.setItem('admin_user', JSON.stringify(userWithPermissions));
       }
 
       await Logger.logLogin(adminUser.id);
-      return { success: true, user: adminUser };
+      return { success: true, user: userWithPermissions };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: 'Giriş işlemi başarısız' };

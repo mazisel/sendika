@@ -37,6 +37,17 @@ export interface Member {
   marital_status: string;
   children_count: number;
   blood_group: string | null;
+  father_name?: string | null;
+  mother_name?: string | null;
+  birth_place?: string | null;
+  institution?: string | null;
+  institution_register_no?: string | null;
+  retirement_register_no?: string | null;
+  mobile_password?: string | null;
+  last_login_at?: string | null;
+
+  resignation_date?: string | null;
+  resignation_reason?: string | null;
 
   is_active: boolean;
   created_at: string;
@@ -49,12 +60,40 @@ export interface AdminUser {
   full_name: string;
   role: 'admin' | 'super_admin' | 'branch_manager' | 'legal_manager';
   role_type: 'general_manager' | 'regional_manager' | 'branch_manager' | 'legal_manager' | null;
+  role_id?: string | null;
+  role_details?: Role;
+  permissions?: string[]; // Runtime only
   city?: string | null;
   region?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   password_hash?: string | null;
+}
+
+export interface Permission {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  group_name: string;
+  created_at: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  is_system_role: boolean;
+  created_at: string;
+  updated_at: string;
+  permissions?: Permission[];
+}
+
+export interface RolePermission {
+  role_id: string;
+  permission_id: string;
+  created_at: string;
 }
 
 export interface Region {

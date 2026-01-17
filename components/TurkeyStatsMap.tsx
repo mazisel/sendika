@@ -116,13 +116,14 @@ export default function TurkeyStatsMap({
 
     const currentMode = viewModes.find(m => m.id === viewMode)!
 
-    // Renk göstergesi
+    // Renk göstergesi - Dinamik hesaplama
+    const currentMax = maxValues[viewMode];
     const colorLegend = [
-        { label: '296+', color: viewMode === 'active' ? '#1D4ED8' : viewMode === 'resigned' ? '#DC2626' : viewMode === 'registered' ? '#059669' : '#4F46E5' },
-        { label: '168+', color: viewMode === 'active' ? '#3B82F6' : viewMode === 'resigned' ? '#EF4444' : viewMode === 'registered' ? '#10B981' : '#6366F1' },
-        { label: '95+', color: viewMode === 'active' ? '#60A5FA' : viewMode === 'resigned' ? '#F87171' : viewMode === 'registered' ? '#34D399' : '#818CF8' },
-        { label: '54+', color: viewMode === 'active' ? '#93C5FD' : viewMode === 'resigned' ? '#FCA5A5' : viewMode === 'registered' ? '#6EE7B7' : '#A5B4FC' },
-        { label: '30+', color: viewMode === 'active' ? '#DBEAFE' : viewMode === 'resigned' ? '#FEE2E2' : viewMode === 'registered' ? '#D1FAE5' : '#E0E7FF' },
+        { label: `${Math.floor(currentMax * 0.8)}+`, color: viewMode === 'active' ? '#1D4ED8' : viewMode === 'resigned' ? '#DC2626' : viewMode === 'registered' ? '#059669' : '#4F46E5' },
+        { label: `${Math.floor(currentMax * 0.6)}+`, color: viewMode === 'active' ? '#3B82F6' : viewMode === 'resigned' ? '#EF4444' : viewMode === 'registered' ? '#10B981' : '#6366F1' },
+        { label: `${Math.floor(currentMax * 0.4)}+`, color: viewMode === 'active' ? '#60A5FA' : viewMode === 'resigned' ? '#F87171' : viewMode === 'registered' ? '#34D399' : '#818CF8' },
+        { label: `${Math.floor(currentMax * 0.2)}+`, color: viewMode === 'active' ? '#93C5FD' : viewMode === 'resigned' ? '#FCA5A5' : viewMode === 'registered' ? '#6EE7B7' : '#A5B4FC' },
+        { label: `1-${Math.floor(currentMax * 0.2)}`, color: viewMode === 'active' ? '#DBEAFE' : viewMode === 'resigned' ? '#FEE2E2' : viewMode === 'registered' ? '#D1FAE5' : '#E0E7FF' },
     ]
 
     // Mouse event handlers

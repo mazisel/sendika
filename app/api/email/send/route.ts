@@ -78,13 +78,55 @@ Sorularınız için bizimle iletişime geçebilirsiniz.
 Saygılarımızla,
 ${process.env.ORGANIZATION_NAME || 'Sendika Yönetimi'}
         `
+    }),
+    general: (subject: string, title: string, message: string) => ({
+        subject: subject,
+        html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                    .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
+                    .footer { background: #1f2937; color: #9ca3af; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0;">${title}</h1>
+                    </div>
+                    <div class="content">
+                        ${message.split('\n').map(line => `<p>${line}</p>`).join('')}
+                        
+                        <p style="margin-top: 30px;">Saygılarımızla,<br><strong>${process.env.ORGANIZATION_NAME || 'Sendika Yönetimi'}</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>Bu e-posta otomatik olarak gönderilmiştir.</p>
+                        <p>${process.env.ORGANIZATION_NAME || 'Sendika'} © ${new Date().getFullYear()}</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `,
+        text: `
+${title}
+
+${message}
+
+Saygılarımızla,
+${process.env.ORGANIZATION_NAME || 'Sendika Yönetimi'}
+        `
     })
 };
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { type, to, memberName, resignationReason, resignationDate } = body;
+        const { type, to, memberName, resignationReason, resignationDate, subject, title, message } = body;
 
         if (!to || !type) {
             return NextResponse.json({ error: 'Eksik parametreler' }, { status: 400 });
@@ -93,6 +135,8 @@ export async function POST(request: NextRequest) {
         let template;
         if (type === 'resignation') {
             template = emailTemplates.resignation(memberName, resignationReason, resignationDate);
+        } else if (type === 'general') {
+            template = emailTemplates.general(subject, title, message);
         } else {
             return NextResponse.json({ error: 'Geçersiz şablon tipi' }, { status: 400 });
         }

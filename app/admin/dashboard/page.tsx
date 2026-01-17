@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -286,11 +287,12 @@ export default function AdminDashboard() {
         statsData.newMembersThisMonth = newMembersResult.count || 0;
 
         // Bu ay istifa edenler (inactive veya suspended olmuşlar)
+        // Not: Migration sonrası resignation_date kullanılmalı, ancak eski veriler için updated_at yedeği migration ile sağlanmalı
         const resignedResult = await supabase
           .from('members')
           .select('*', { count: 'exact', head: true })
-          .in('membership_status', ['inactive', 'suspended'])
-          .gte('updated_at', firstDayOfMonth);
+          .in('membership_status', ['inactive', 'suspended', 'resigned'])
+          .gte('resignation_date', firstDayOfMonth);
         statsData.resignedMembersThisMonth = resignedResult.count || 0;
 
       } catch (e) {
@@ -381,7 +383,8 @@ export default function AdminDashboard() {
       change: statsLoading ? '-' : `+${stats?.recentNews || 0} bu ay`,
       changeType: 'positive',
       icon: FileText,
-      color: 'blue'
+      color: 'blue',
+      href: '/admin/news'
     },
     {
       title: 'Aktif Duyuru',
@@ -389,7 +392,8 @@ export default function AdminDashboard() {
       change: statsLoading ? '-' : `${stats?.activeHeaderAnnouncements || 0} başlık duyurusu`,
       changeType: 'neutral',
       icon: Megaphone,
-      color: 'green'
+      color: 'green',
+      href: '/admin/announcements'
     },
     {
       title: 'Toplam Üye',
@@ -397,7 +401,8 @@ export default function AdminDashboard() {
       change: statsLoading ? '-' : `+${stats?.recentMembers || 0} bu ay`,
       changeType: 'positive',
       icon: Users,
-      color: 'purple'
+      color: 'purple',
+      href: '/admin/members'
     },
     {
       title: 'Bekleyen Üye',
@@ -405,7 +410,8 @@ export default function AdminDashboard() {
       change: 'Onay bekliyor',
       changeType: 'warning',
       icon: Clock,
-      color: 'orange'
+      color: 'orange',
+      href: '/admin/members?status=pending'
     }
   ];
 
@@ -489,96 +495,104 @@ export default function AdminDashboard() {
       {/* Üye İstatistikleri - Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Aktif Üye Sayısı */}
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-emerald-100 text-sm font-medium">Aktif Üye Sayısı</p>
-              <p className="text-4xl font-bold mt-2">
-                {statsLoading ? (
-                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                ) : (
-                  stats?.activeMembers || 0
-                )}
-              </p>
-              <p className="text-emerald-100 text-xs mt-2 flex items-center">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Onaylanmış üyeler
-              </p>
-            </div>
-            <div className="bg-white/20 rounded-full p-3">
-              <Users className="w-8 h-8" />
+        <Link href="/admin/members?status=active" className="block transform transition-transform hover:-translate-y-1">
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-emerald-100 text-sm font-medium">Aktif Üye Sayısı</p>
+                <p className="text-4xl font-bold mt-2">
+                  {statsLoading ? (
+                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                  ) : (
+                    stats?.activeMembers || 0
+                  )}
+                </p>
+                <p className="text-emerald-100 text-xs mt-2 flex items-center">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Onaylanmış üyeler
+                </p>
+              </div>
+              <div className="bg-white/20 rounded-full p-3">
+                <Users className="w-8 h-8" />
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Bu Ay Yeni Üyeler */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">Bu Ay Yeni Üyeler</p>
-              <p className="text-4xl font-bold mt-2">
-                {statsLoading ? (
-                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                ) : (
-                  stats?.newMembersThisMonth || 0
-                )}
-              </p>
-              <p className="text-blue-100 text-xs mt-2 flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {new Date().toLocaleDateString('tr-TR', { month: 'long' })} ayı
-              </p>
-            </div>
-            <div className="bg-white/20 rounded-full p-3">
-              <UserPlus className="w-8 h-8" />
+        <Link href="/admin/members?date=this_month" className="block transform transition-transform hover:-translate-y-1">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium">Bu Ay Yeni Üyeler</p>
+                <p className="text-4xl font-bold mt-2">
+                  {statsLoading ? (
+                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                  ) : (
+                    stats?.newMembersThisMonth || 0
+                  )}
+                </p>
+                <p className="text-blue-100 text-xs mt-2 flex items-center">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  {new Date().toLocaleDateString('tr-TR', { month: 'long' })} ayı
+                </p>
+              </div>
+              <div className="bg-white/20 rounded-full p-3">
+                <UserPlus className="w-8 h-8" />
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Bu Ay İstifalar */}
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-red-100 text-sm font-medium">Bu Ay İstifalar</p>
-              <p className="text-4xl font-bold mt-2">
-                {statsLoading ? (
-                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                ) : (
-                  stats?.resignedMembersThisMonth || 0
-                )}
-              </p>
-              <p className="text-red-100 text-xs mt-2 flex items-center">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                Ayrılan/Askıya alınan
-              </p>
-            </div>
-            <div className="bg-white/20 rounded-full p-3">
-              <Activity className="w-8 h-8" />
+        <Link href="/admin/members?status=resigned&date=this_month" className="block transform transition-transform hover:-translate-y-1">
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-100 text-sm font-medium">Bu Ay İstifalar</p>
+                <p className="text-4xl font-bold mt-2">
+                  {statsLoading ? (
+                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                  ) : (
+                    stats?.resignedMembersThisMonth || 0
+                  )}
+                </p>
+                <p className="text-red-100 text-xs mt-2 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Ayrılan/Askıya alınan
+                </p>
+              </div>
+              <div className="bg-white/20 rounded-full p-3">
+                <Activity className="w-8 h-8" />
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Bekleyen Üyeler */}
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-100 text-sm font-medium">Bekleyen Başvurular</p>
-              <p className="text-4xl font-bold mt-2">
-                {statsLoading ? (
-                  <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                ) : (
-                  stats?.pendingMembers || 0
-                )}
-              </p>
-              <p className="text-amber-100 text-xs mt-2 flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                Onay bekliyor
-              </p>
-            </div>
-            <div className="bg-white/20 rounded-full p-3">
-              <Clock className="w-8 h-8" />
+        <Link href="/admin/members?status=pending" className="block transform transition-transform hover:-translate-y-1">
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-amber-100 text-sm font-medium">Bekleyen Başvurular</p>
+                <p className="text-4xl font-bold mt-2">
+                  {statsLoading ? (
+                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                  ) : (
+                    stats?.pendingMembers || 0
+                  )}
+                </p>
+                <p className="text-amber-100 text-xs mt-2 flex items-center">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Onay bekliyor
+                </p>
+              </div>
+              <div className="bg-white/20 rounded-full p-3">
+                <Clock className="w-8 h-8" />
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Quick Stats */}
@@ -586,33 +600,35 @@ export default function AdminDashboard() {
         {quickStats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">{stat.title}</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
-                  <div className="flex items-center mt-2">
-                    <div className={`w-4 h-4 mr-1 ${stat.changeType === 'positive' ? 'text-green-500' :
-                      stat.changeType === 'negative' ? 'text-red-500' :
-                        stat.changeType === 'warning' ? 'text-orange-500' : 'text-slate-400'
-                      }`}>
-                      {stat.changeType === 'positive' && <TrendingUp className="w-4 h-4" />}
-                      {stat.changeType === 'warning' && <AlertCircle className="w-4 h-4" />}
-                      {stat.changeType === 'neutral' && <CheckCircle className="w-4 h-4" />}
+            <Link key={index} href={stat.href || '#'} className="block transform transition-transform hover:-translate-y-1">
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer h-full">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">{stat.title}</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
+                    <div className="flex items-center mt-2">
+                      <div className={`w-4 h-4 mr-1 ${stat.changeType === 'positive' ? 'text-green-500' :
+                        stat.changeType === 'negative' ? 'text-red-500' :
+                          stat.changeType === 'warning' ? 'text-orange-500' : 'text-slate-400'
+                        }`}>
+                        {stat.changeType === 'positive' && <TrendingUp className="w-4 h-4" />}
+                        {stat.changeType === 'warning' && <AlertCircle className="w-4 h-4" />}
+                        {stat.changeType === 'neutral' && <CheckCircle className="w-4 h-4" />}
+                      </div>
+                      <span className={`text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' :
+                        stat.changeType === 'negative' ? 'text-red-600' :
+                          stat.changeType === 'warning' ? 'text-orange-600' : 'text-slate-500'
+                        }`}>
+                        {stat.change}
+                      </span>
                     </div>
-                    <span className={`text-sm font-medium ${stat.changeType === 'positive' ? 'text-green-600' :
-                      stat.changeType === 'negative' ? 'text-red-600' :
-                        stat.changeType === 'warning' ? 'text-orange-600' : 'text-slate-500'
-                      }`}>
-                      {stat.change}
-                    </span>
+                  </div>
+                  <div className={`p-3 rounded-xl bg-${stat.color}-100`}>
+                    <Icon className={`w-6 h-6 text-${stat.color}-600`} />
                   </div>
                 </div>
-                <div className={`p-3 rounded-xl bg-${stat.color}-100`}>
-                  <Icon className={`w-6 h-6 text-${stat.color}-600`} />
-                </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

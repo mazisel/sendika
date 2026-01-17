@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
 import { ArrowLeft, Save } from 'lucide-react'
 import { logAuditAction } from '@/lib/audit-logger'
+import NotificationSelector from '@/components/admin/NotificationSelector'
+import { NotificationService } from '@/lib/services/notificationService'
 
 export default function NewHeaderAnnouncementPage() {
   const [formData, setFormData] = useState({
@@ -16,6 +18,7 @@ export default function NewHeaderAnnouncementPage() {
     start_date: new Date().toISOString().slice(0, 16),
     end_date: ''
   })
+  const [notificationChannels, setNotificationChannels] = useState({ push: false, sms: false, email: false })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -49,11 +52,10 @@ export default function NewHeaderAnnouncementPage() {
         created_by: currentUser?.id
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('announcements')
         .insert([announcementData])
-
-      if (error) throw error
+        .select()
 
       if (error) throw error
 
@@ -61,12 +63,20 @@ export default function NewHeaderAnnouncementPage() {
       await logAuditAction({
         action: 'CREATE',
         entityType: 'ANNOUNCEMENT',
-        entityId: 'new', //Ideally we would get the ID from the insert response if we selected it
+        entityId: data && data[0] ? data[0].id : 'new',
         details: {
           title: announcementData.title,
           type: announcementData.type
         }
       })
+
+      // Send notifications
+      if (data && data.length > 0) {
+        await NotificationService.sendContentNotification('header', data[0].id, notificationChannels, {
+          title: announcementData.title,
+          message: announcementData.content
+        })
+      }
 
       router.push('/admin/header-announcements')
     } catch (error) {
@@ -246,6 +256,14 @@ export default function NewHeaderAnnouncementPage() {
               <p className="mt-1 text-sm text-gray-500">
                 Aktif olmayan duyurular header'da gösterilmez
               </p>
+            </div>
+
+            {/* Notification Options */}
+            <div>
+              <NotificationSelector
+                channels={notificationChannels}
+                onChange={setNotificationChannels}
+              />
             </div>
 
             {/* Preview */}

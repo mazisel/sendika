@@ -1,28 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { cityOptions, regionOptions } from '@/lib/cities';
 import { logAuditAction } from '@/lib/audit-logger';
-
-type Role = 'admin' | 'super_admin' | 'branch_manager';
-type RoleType = 'general_manager' | 'regional_manager' | 'branch_manager';
-type AccessLevel = 'super_admin' | 'general_manager' | 'regional_manager' | 'branch_manager';
+import { supabase } from '@/lib/supabase';
+import { Role } from '@/lib/types';
+import { PermissionManager } from '@/lib/permissions';
 
 export default function NewUser() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<Role>('admin');
-  const [roleType, setRoleType] = useState<RoleType>('general_manager');
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>('general_manager');
-  const [city, setCity] = useState('');
-  const [region, setRegion] = useState('');
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+
+  // Default hidden values
+  // We keep these logic internally but hide from user.
+  // Unless we have specific dynamic roles that map to these, we default to standard admin.
+  // We will assume 'admin' role and 'general_manager' type for now, relying on permissions.
+  // Exception: If needed, we can add a checkbox for specific "Scope" later, but request was to remove options.
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
+  const loadRoles = async () => {
+    const { data } = await supabase.from('roles').select('*').order('name');
+    if (data) setAvailableRoles(data);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,61 +47,43 @@ export default function NewUser() {
       return;
     }
 
-    // Sadece super_admin kullanıcıları yeni kullanıcı oluşturabilir
-    if (currentUser.role !== 'super_admin' && currentUser.role_type !== 'general_manager') {
+    // Role management permission check
+    if (!PermissionManager.canManageUsers(currentUser) && !PermissionManager.isSuperAdmin(currentUser)) {
       setError('Bu işlem için yetkiniz bulunmuyor');
       setLoading(false);
       return;
     }
 
-    // Form validasyonu
-    if (accessLevel === 'branch_manager' && !city) {
-      setError('Şube yöneticisi için il seçimi zorunludur');
-      setLoading(false);
-      return;
-    }
-
-    if (accessLevel === 'regional_manager' && !region) {
-      setError('Bölge sorumlusu için bölge seçimi zorunludur');
+    if (!selectedRoleId) {
+      setError('Lütfen bir rol seçiniz');
       setLoading(false);
       return;
     }
 
     try {
-      const resolvedRole: Role =
-        accessLevel === 'super_admin'
-          ? 'super_admin'
-          : accessLevel === 'branch_manager'
-            ? 'branch_manager'
-            : 'admin';
-
-      const resolvedRoleType: RoleType =
-        accessLevel === 'branch_manager'
-          ? 'branch_manager'
-          : accessLevel === 'regional_manager'
-            ? 'regional_manager'
-            : 'general_manager';
-
+      // Varsayılan olarak 'admin' ve 'general_manager' atıyoruz.
+      // Tüm yetki kontrolü artık role_id (RBAC) üzerinden yapılacak.
       const result = await AdminAuth.createUser({
         email,
         password,
         full_name: fullName,
-        role: resolvedRole,
-        role_type: resolvedRoleType,
-        city: accessLevel === 'branch_manager' ? city : undefined,
-        region: accessLevel === 'regional_manager' ? Number(region) : undefined
+        role: 'admin',
+        role_type: 'general_manager',
+        role_id: selectedRoleId,
+        // Şube/Bölge ataması statik olarak kaldırıldı, ileride dinamik role eklenebilir
+        city: undefined,
+        region: undefined
       });
 
       if (result.success) {
         await logAuditAction({
           action: 'CREATE',
           entityType: 'USER',
-          entityId: 'new_user', // Ideally we'd get the ID from result.data if available
+          entityId: 'new_user',
           details: {
             email,
             full_name: fullName,
-            role: resolvedRole,
-            role_type: resolvedRoleType
+            role_id: selectedRoleId
           }
         });
         router.push('/admin/users');
@@ -130,6 +124,7 @@ export default function NewUser() {
                 </div>
               )}
 
+              {/* Temel Bilgiler */}
               <div>
                 <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
                   Ad Soyad *
@@ -179,94 +174,38 @@ export default function NewUser() {
                 </p>
               </div>
 
-              <div>
-                <label htmlFor="roleType" className="block text-sm font-medium text-gray-700">
-                  Yetki Seviyesi *
-                </label>
-                <select
-                  id="roleType"
-                  value={accessLevel}
-                  onChange={(e) => {
-                    const value = e.target.value as AccessLevel;
-                    setAccessLevel(value);
-                    setError('');
-                    setCity('');
-                    setRegion('');
+              {/* Rol Seçimi */}
+              <div className="p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
+                <h3 className="font-medium text-gray-900">Yetkilendirme</h3>
 
-                    if (value === 'super_admin') {
-                      setRole('super_admin');
-                      setRoleType('general_manager');
-                    } else if (value === 'branch_manager') {
-                      setRole('branch_manager');
-                      setRoleType('branch_manager');
-                    } else if (value === 'regional_manager') {
-                      setRole('admin');
-                      setRoleType('regional_manager');
-                    } else {
-                      setRole('admin');
-                      setRoleType('general_manager');
-                    }
-                  }}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                >
-                  <option value="super_admin">Süper Admin</option>
-                  <option value="general_manager">Genel Merkez Yöneticisi</option>
-                  <option value="regional_manager">Bölge Sorumlusu</option>
-                  <option value="branch_manager">Şube Yöneticisi</option>
-                </select>
-                <div className="mt-2 text-sm text-gray-600 space-y-1">
-                  <div><strong>Süper Admin:</strong> Sistem genelinde sınırsız yetki.</div>
-                  <div><strong>Genel Merkez Yöneticisi:</strong> Tüm modüllere erişir, kritik alanlarda sınırlı değişiklik.</div>
-                  <div><strong>Bölge Sorumlusu:</strong> Yalnızca bağlı olduğu bölgedeki şube ve üyeleri yönetir.</div>
-                  <div><strong>Şube Yöneticisi:</strong> Sadece kendi ilindeki üyeleri yönetir.</div>
+                <div>
+                  <label htmlFor="customRole" className="block text-sm font-medium text-gray-700">
+                    Kullanıcı Rolü *
+                  </label>
+                  <select
+                    id="customRole"
+                    value={selectedRoleId}
+                    onChange={(e) => setSelectedRoleId(e.target.value)}
+                    required
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  >
+                    <option value="">-- Rol Seçiniz --</option>
+                    {availableRoles.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                        {r.is_system_role ? ' (Sistem)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-2 text-xs text-gray-500">
+                    Kullanıcının sisteme erişim yetkilerini belirleyen rol.
+                    <br />
+                    Not: Yeni roller "Tanımlamalar > Rol Yönetimi" sayfasından oluşturulabilir.
+                  </div>
                 </div>
               </div>
 
-              {accessLevel === 'regional_manager' && (
-                <div>
-                  <label htmlFor="region" className="block text-sm font-medium text-gray-700">
-                    Bölge *
-                  </label>
-                  <select
-                    id="region"
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                    required={accessLevel === 'regional_manager'}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                  >
-                    <option value="">Bölge seçiniz</option>
-                    {regionOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {accessLevel === 'branch_manager' && (
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                    İl *
-                  </label>
-                  <select
-                    id="city"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    required={accessLevel === 'branch_manager'}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                  >
-                    <option value="">İl seçiniz</option>
-                    {cityOptions.map(option => (
-                      <option key={option.code} value={option.name}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-4">
                 <Link
                   href="/admin/users"
                   className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm font-medium"
@@ -276,7 +215,7 @@ export default function NewUser() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                 >
                   {loading ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur'}
                 </button>

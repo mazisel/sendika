@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { X, Save, Upload, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cityOptions } from '@/lib/cities';
+import NotificationSelector from '@/components/admin/NotificationSelector';
+import { NotificationService } from '@/lib/services/notificationService';
+import { toast } from 'react-hot-toast';
 
 interface DiscountModalProps {
     discount?: any;
@@ -28,6 +31,7 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [notificationChannels, setNotificationChannels] = useState({ push: false, sms: false, email: false });
 
     useEffect(() => {
         if (discount) {
@@ -58,6 +62,7 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                 category: '',
                 is_active: true
             });
+            setNotificationChannels({ push: false, sms: false, email: false });
         }
     }, [discount, isOpen]);
 
@@ -119,12 +124,23 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                     .eq('id', discount.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('discounts')
-                    .insert([formData]);
+                    .insert([formData])
+                    .select()
+                    .single();
                 if (error) throw error;
+
+                // Send notifications for new discounts
+                if (data) {
+                    await NotificationService.sendContentNotification('discount', data.id, notificationChannels, {
+                        title: 'Yeni İndirim Fırsatı!',
+                        message: `${formData.title} - ${formData.discount_amount} indirim fırsatını kaçırmayın!`
+                    });
+                }
             }
 
+            toast.success('İndirim başarıyla kaydedildi');
             onSuccess();
             onClose();
         } catch (err) {
@@ -288,6 +304,13 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                             />
                             <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Aktif</span>
                         </label>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-200 dark:border-slate-800">
+                        <NotificationSelector
+                            channels={notificationChannels}
+                            onChange={setNotificationChannels}
+                        />
                     </div>
 
                     <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-slate-800">

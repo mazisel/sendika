@@ -852,7 +852,20 @@ export default function SmsPage() {
                                     </div>
 
                                     {/* Selected Members */}
-                                    <div className="border border-gray-200 rounded-lg p-4 min-h-[200px]">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Seçili Üyeler ({selectedMembers.length})
+                                        </label>
+                                        {selectedMembers.length > 0 && (
+                                            <button
+                                                onClick={() => setSelectedMembers([])}
+                                                className="text-xs text-red-600 hover:text-red-700 font-medium hover:underline"
+                                            >
+                                                Tümünü Temizle
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="border border-gray-200 rounded-lg p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
                                         {selectedMembers.length === 0 ? (
                                             <p className="text-gray-400 text-center py-8">Henüz üye seçilmedi</p>
                                         ) : (
@@ -877,10 +890,6 @@ export default function SmsPage() {
                                             </div>
                                         )}
                                     </div>
-
-                                    <p className="text-sm text-gray-500 mt-2">
-                                        {selectedMembers.length} üye seçildi
-                                    </p>
                                 </>
                             ) : (
                                 <div>
