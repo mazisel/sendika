@@ -387,17 +387,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   };
 
-  // Login sayfasında layout gösterme
-  if (pathname === '/admin/login') {
-    return <>{children}</>;
-  }
-
   // Reset expanded menus when sidebar closes (mobile)
   useEffect(() => {
     if (!sidebarOpen) {
       setExpandedMenus({});
     }
   }, [sidebarOpen]);
+
+  // Login sayfasında layout gösterme
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="admin-theme h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex text-slate-900 dark:text-slate-100 transition-colors duration-200 overflow-hidden">
