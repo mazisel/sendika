@@ -200,7 +200,7 @@ export default function NewUser() {
                   <div className="mt-2 text-xs text-gray-500">
                     Kullanıcının sisteme erişim yetkilerini belirleyen rol.
                     <br />
-                    Not: Yeni roller "Tanımlamalar > Rol Yönetimi" sayfasından oluşturulabilir.
+                    Not: Yeni roller "Tanımlamalar &gt; Rol Yönetimi" sayfasından oluşturulabilir.
                   </div>
                 </div>
               </div>

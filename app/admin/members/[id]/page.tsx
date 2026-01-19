@@ -74,7 +74,7 @@ export default function MemberDetailPage() {
       if (memberError) throw memberError;
 
       const viewer = AdminAuth.getCurrentUser();
-      if (viewer && !PermissionManager.canAccessCityMembers(viewer, memberData?.city, memberData?.region)) {
+      if (viewer && !PermissionManager.canViewMembers(viewer, memberData?.region, memberData?.city)) {
         alert('Bu üyeyi görüntüleme yetkiniz bulunmuyor.');
         router.push('/admin/members');
         return;
@@ -111,7 +111,7 @@ export default function MemberDetailPage() {
       // Dosyayı storage'a yükle
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${memberId}/${Date.now()}.${fileExt}`;
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('member-documents')
         .upload(fileName, selectedFile);
@@ -180,7 +180,7 @@ export default function MemberDetailPage() {
     try {
       const { error } = await supabase
         .from('members')
-        .update({ 
+        .update({
           membership_status: newStatus,
           is_active: newStatus === 'active'
         })
@@ -316,16 +316,16 @@ export default function MemberDetailPage() {
                 <dt className="text-sm font-medium text-gray-500">E-posta</dt>
                 <dd className="text-sm text-gray-900 mt-1">{member.email || '-'}</dd>
               </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">İl / İlçe</dt>
-                    <dd className="text-sm text-gray-900 mt-1">{member.city} / {member.district}</dd>
-                  </div>
-                  {member.region && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Bölge</dt>
-                      <dd className="text-sm text-gray-900 mt-1">{member.region}. Bölge</dd>
-                    </div>
-                  )}
+              <div>
+                <dt className="text-sm font-medium text-gray-500">İl / İlçe</dt>
+                <dd className="text-sm text-gray-900 mt-1">{member.city} / {member.district}</dd>
+              </div>
+              {member.region && (
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Bölge</dt>
+                  <dd className="text-sm text-gray-900 mt-1">{member.region}. Bölge</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-sm font-medium text-gray-500">Adres</dt>
                 <dd className="text-sm text-gray-900 mt-1">{member.address || '-'}</dd>

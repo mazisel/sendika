@@ -78,12 +78,11 @@ const formatDataForExport = (data: Member[]) => {
         'İş Yeri': member.workplace,
         'Kurum': member.institution,
         'Kadro': member.position,
-        'Kurum Sicil': member.institution_register_number,
-        'Emekli Sicil': member.retirement_register_number,
+        'Kurum Sicil': member.institution_register_no,
+        'Emekli Sicil': member.retirement_register_no,
         'Üyelik Durumu': member.membership_status === 'active' ? 'Aktif' : member.membership_status === 'pending' ? 'Beklemede' : 'Pasif',
-        'Aidat Durumu': member.due_status === 'paid' ? 'Ödendi' : 'Ödenmedi',
-        'Üyelik Başlangıç': member.membership_start_date ? new Date(member.membership_start_date).toLocaleDateString('tr-TR') : '',
-        'Üyelik Bitiş': member.membership_end_date ? new Date(member.membership_end_date).toLocaleDateString('tr-TR') : '',
+        'Üyelik Başlangıç': member.created_at ? new Date(member.created_at).toLocaleDateString('tr-TR') : '',
+        'Üyelik Bitiş': member.resignation_date ? new Date(member.resignation_date).toLocaleDateString('tr-TR') : '',
     }));
 };
 

@@ -159,6 +159,7 @@ export class AdminAuth {
     full_name: string;
     role?: 'admin' | 'super_admin' | 'branch_manager';
     role_type?: 'general_manager' | 'regional_manager' | 'branch_manager';
+    role_id?: string;
     city?: string;
     region?: number;
   }): Promise<AuthResponse> {
@@ -183,6 +184,7 @@ export class AdminAuth {
             full_name: userData.full_name,
             role: userData.role || 'admin',
             role_type: userData.role_type || 'general_manager',
+            role_id: userData.role_id || null,
             city: userData.city,
             region: userData.region ?? null
           }

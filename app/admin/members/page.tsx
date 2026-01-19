@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
@@ -21,7 +21,7 @@ import BulkUpdateTab, { Condition } from '@/components/members/BulkUpdateTab';
 import MemberDistributionTab from '@/components/members/MemberDistributionTab';
 import ExportMenu from '@/components/ExportMenu';
 
-export default function AdminMembersPage() {
+function AdminMembersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'list' | 'search' | 'bulk' | 'distribution'>('list');
@@ -759,5 +759,13 @@ export default function AdminMembersPage() {
 
 
     </div>
+  );
+}
+
+export default function AdminMembersPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+      <AdminMembersContent />
+    </Suspense>
   );
 }
