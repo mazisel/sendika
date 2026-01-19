@@ -79,7 +79,7 @@ export default function DecisionsPage() {
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-colors"
                 >
                     <Plus className="w-5 h-5 mr-2" />
-                    Yeni Karar Al
+                    Yeni Karar Ekle
                 </Link>
             </div>
 

@@ -69,6 +69,7 @@ export interface AdminUser {
   created_at: string;
   updated_at: string;
   password_hash?: string | null;
+  signature_url?: string | null;
 }
 
 export interface Permission {
