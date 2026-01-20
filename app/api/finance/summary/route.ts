@@ -4,6 +4,8 @@ import { getAuthenticatedAdmin } from '@/lib/api-admin-auth';
 
 const DEFAULT_LOOKBACK_DAYS = 90;
 
+export const dynamic = 'force-dynamic';
+
 const sumByType = (items: any[], type: string) =>
   items
     .filter(item => item.transaction_type === type)
@@ -57,9 +59,9 @@ export async function GET(request: NextRequest) {
     const accountIds = accounts?.map(account => account.id) ?? [];
     const { data: accountSummaries, error: summaryError } = accountIds.length
       ? await supabaseAdmin
-          .from('finance_account_summary')
-          .select('*')
-          .in('account_id', accountIds)
+        .from('finance_account_summary')
+        .select('*')
+        .in('account_id', accountIds)
       : { data: [], error: null };
 
     if (summaryError) {

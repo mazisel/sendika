@@ -1,16 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation' // Add imports
 import { Plus, Edit, Trash2, MapPin, Phone, Mail, User, Building } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
-import { AdminUser, Branch } from '@/lib/types'
+import { AdminUser, Branch, Region } from '@/lib/types'
 import { Logger } from '@/lib/logger'
 import Link from 'next/link'
 import RegionList from '@/components/admin/regions/RegionList'
 
 export default function BranchesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+      <BranchesContent />
+    </Suspense>
+  );
+}
+
+function BranchesContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   // Initialize from URL or default to 'regions'
@@ -21,6 +29,15 @@ export default function BranchesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null)
+  const [regions, setRegions] = useState<Region[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
+
+  // Modals
+  const [showEditBranch, setShowEditBranch] = useState(false)
+  const [showDeleteBranch, setShowDeleteBranch] = useState(false)
+  const [showDeleteRegion, setShowDeleteRegion] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
 
   // Update URL activeTab changes
   const handleTabChange = (tab: 'regions' | 'branches') => {
