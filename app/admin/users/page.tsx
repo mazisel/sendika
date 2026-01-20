@@ -48,7 +48,7 @@ interface AccessPayload {
   role_type: 'general_manager' | 'regional_manager' | 'branch_manager';
   role_id?: string | null;
   city: string | null;
-  region: number | null;
+  region: string | null;
 }
 
 const buildAccessPayload = (
@@ -75,7 +75,7 @@ const buildAccessPayload = (
         role: 'admin',
         role_type: 'regional_manager',
         city: null,
-        region: regionValue ?? null
+        region: regionValue ? String(regionValue) : null
       };
     case 'branch_manager':
       return {
