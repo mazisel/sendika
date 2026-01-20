@@ -27,10 +27,15 @@ export default function AdminMembersContent() {
   const [activeTab, setActiveTab] = useState<'list' | 'search' | 'bulk' | 'distribution'>('list');
 
   // Data State
-  const [allMembers, setAllMembers] = useState<Member[]>([]);
-  const [displayedMembers, setDisplayedMembers] = useState<Member[]>([]);
+  const [allMembers, setAllMembers] = useState<Member[]>([]); // For Search/Bulk/Stats tabs
+  const [displayedMembers, setDisplayedMembers] = useState<Member[]>([]); // For List tab (Paginated)
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -166,10 +171,20 @@ export default function AdminMembersContent() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'list') {
-      filterMembers();
+    if (activeTab === 'list' && currentUser) {
+      // 500ms debounce for search
+      const timer = setTimeout(() => {
+        loadMembers(1); // Search değişince sayfa 1'e git
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [allMembers, searchTerm, statusFilter, dateFilter, activeTab]);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (activeTab === 'list' && currentUser) {
+      loadMembers(1); // Filtre değişince sayfa 1
+    }
+  }, [statusFilter, dateFilter]); // Remove allMembers dependency
 
   // Handle URL parameters for filtering
   useEffect(() => {
@@ -188,22 +203,65 @@ export default function AdminMembersContent() {
     }
   }, [searchParams]);
 
-  const loadMembers = async () => {
+  const loadMembers = async (page = 1) => {
     try {
       setLoading(true);
-      let query = supabase.from('members').select('*');
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
+      let query = supabase.from('members').select('*', { count: 'exact' });
+
+      // Role Based Access Control
       if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
         query = query.eq('city', currentUser.city);
       } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
         query = query.eq('region', currentUser.region);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // Apply Status Filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'resigned') {
+          query = query.in('membership_status', ['inactive', 'suspended', 'resigned']);
+        } else {
+          query = query.eq('membership_status', statusFilter);
+        }
+      }
+
+      // Apply Date Filter
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+
+        const isResignationCheck = statusFilter === 'resigned' || ['inactive', 'suspended', 'resigned'].includes(statusFilter);
+        const dateField = isResignationCheck ? 'updated_at' : 'created_at';
+
+        if (dateFilter === 'this_month') {
+          query = query.gte(dateField, firstDayOfMonth);
+        } else if (dateFilter === 'last_month') {
+          query = query.gte(dateField, firstDayOfLastMonth).lte(dateField, lastDayOfLastMonth);
+        }
+      }
+
+      // Apply Search Term
+      if (searchTerm) {
+        // Not: .or() kullanırken parantez içine almak önemli. Ve tüm alanları kapsamak.
+        // Supabase Postgrest syntax: column.ilike.value
+        const term = `%${searchTerm}%`;
+        query = query.or(`first_name.ilike.${term},last_name.ilike.${term},tc_identity.ilike.${term},phone.ilike.${term},membership_number.ilike.${term},email.ilike.${term}`);
+      }
+
+      const { data, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
-      setAllMembers(data || []);
+
       setDisplayedMembers(data || []);
+      setTotalCount(count || 0);
+      setCurrentPage(page);
+
     } catch (error) {
       console.error('Üyeler yüklenirken hata:', error);
       alert('Üyeler yüklenirken bir hata oluştu.');
@@ -212,60 +270,31 @@ export default function AdminMembersContent() {
     }
   };
 
-  const filterMembers = () => {
-    // Debug log to trace filtering logic
-    console.log('Filtering members with:', { statusFilter, dateFilter, allMembersCount: allMembers.length });
-    let filtered = [...allMembers];
-
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'resigned') {
-        filtered = filtered.filter(member => ['inactive', 'suspended', 'resigned'].includes(member.membership_status));
-      } else {
-        filtered = filtered.filter(member => member.membership_status === statusFilter);
+  const loadAllMembers = async () => {
+    if (allMembers.length > 0) return; // Already loaded
+    try {
+      setLoading(true);
+      let query = supabase.from('members').select('*');
+      if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
+        query = query.eq('city', currentUser.city);
+      } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
+        query = query.eq('region', currentUser.region);
       }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      setAllMembers(data || []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      const isResignationCheck = statusFilter === 'resigned' || ['inactive', 'suspended', 'resigned'].includes(statusFilter);
-      const dateField = isResignationCheck ? 'updated_at' : 'created_at';
-
-      if (dateFilter === 'this_month') {
-        filtered = filtered.filter(member => {
-          const dateVal = (member as any)[dateField];
-          if (!dateVal) return false;
-          return new Date(dateVal) >= firstDayOfMonth;
-        });
-      } else if (dateFilter === 'last_month') {
-        const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-
-        filtered = filtered.filter(member => {
-          const dateVal = (member as any)[dateField];
-          if (!dateVal) return false;
-          const date = new Date(dateVal);
-          return date >= firstDayOfLastMonth && date <= lastDayOfLastMonth;
-        });
-      }
-    }
-
-    if (searchTerm) {
-      const lowered = searchTerm.toLowerCase();
-      filtered = filtered.filter(member =>
-        member.first_name.toLowerCase().includes(lowered) ||
-        member.last_name.toLowerCase().includes(lowered) ||
-        member.tc_identity.includes(searchTerm) ||
-        (member.email?.toLowerCase().includes(lowered) ?? false) ||
-        (member.phone?.includes(searchTerm) ?? false) ||
-        (member.membership_number?.toLowerCase().includes(lowered) ?? false)
-      );
-    }
-
-    setDisplayedMembers(filtered);
-    setSelectedMemberIds(new Set());
   };
+
+  useEffect(() => {
+    if (activeTab !== 'list' && currentUser) {
+      loadAllMembers();
+    }
+  }, [activeTab]);
 
   const handleAdvancedSearch = () => {
     let filtered = [...allMembers];
@@ -690,6 +719,49 @@ export default function AdminMembersContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Toplam <strong>{totalCount}</strong> üyeden <strong>{(currentPage - 1) * pageSize + 1}</strong> - <strong>{Math.min(currentPage * pageSize, totalCount)}</strong> arası gösteriliyor (Sayfa {currentPage}/{Math.ceil(totalCount / pageSize)})
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => loadMembers(currentPage - 1)}
+                  disabled={currentPage === 1 || loading}
+                  className="px-3 py-1 border border-gray-300 dark:border-slate-700 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-slate-800"
+                >
+                  Önceki
+                </button>
+                {Array.from({ length: Math.min(5, Math.ceil(totalCount / pageSize)) }, (_, i) => {
+                  const totalPages = Math.ceil(totalCount / pageSize);
+                  // Simple logic: show first 5 or logic to center around current page
+                  let p = i + 1;
+                  if (totalPages > 5 && currentPage > 3) {
+                    p = currentPage - 2 + i;
+                  }
+                  if (p > totalPages) return null;
+
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => loadMembers(p)}
+                      disabled={loading}
+                      className={`px-3 py-1 border rounded-lg ${currentPage === p ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800'}`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => loadMembers(currentPage + 1)}
+                  disabled={currentPage * pageSize >= totalCount || loading}
+                  className="px-3 py-1 border border-gray-300 dark:border-slate-700 rounded-lg disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-slate-800"
+                >
+                  Sonraki
+                </button>
               </div>
             </div>
           </>

@@ -173,7 +173,40 @@ export default function AdminDashboard() {
         { city: 'Düzce', city_code: '81' }
       ];
 
-      // Üyeleri şehre göre say
+      // Try RPC first
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_city_stats');
+
+        if (rpcError) throw rpcError;
+
+        if (rpcData) {
+          // Map RPC results to stats
+          const statsMap = new Map();
+          rpcData.forEach((item: any) => {
+            if (item.city_name) {
+              statsMap.set(item.city_name.toLowerCase(), item);
+            }
+          });
+
+          const finalStats = turkishCities.map(c => {
+            const stats = statsMap.get(c.city.toLowerCase());
+            return {
+              city: c.city,
+              city_code: c.city_code,
+              activeMembers: stats ? (stats.active_count || 0) : 0,
+              resignedMembers: stats ? (stats.resigned_count || 0) : 0,
+              registeredMembers: stats ? (stats.registered_count || 0) : 0,
+              onlineApplications: stats ? (stats.online_applications_count || 0) : 0
+            };
+          });
+          setCityStats(finalStats);
+          return; // Success
+        }
+      } catch (err) {
+        console.warn('RPC get_city_stats failed, falling back to client-side aggregation:', err);
+      }
+
+      // Fallback: Client-side aggregation (slow but reliable if RPC missing)
       const { data: members } = await supabase
         .from('members')
         .select('city, membership_status');
@@ -219,143 +252,64 @@ export default function AdminDashboard() {
     try {
       setStatsLoading(true);
 
-      // Basit istatistikler - sadece sayıları al
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      // Execute all counts in parallel
+      const [
+        newsRes, announcementsRes, membersRes,
+        activeMembersRes, pendingMembersRes, suspendedMembersRes,
+        newMembersRes, resignedResult, adminUsersRes,
+        slidersRes, branchesRes, categoriesRes, managementRes
+      ] = await Promise.all([
+        supabase.from('news').select('*', { count: 'exact', head: true }),
+        supabase.from('announcements').select('*', { count: 'exact', head: true }),
+        supabase.from('members').select('*', { count: 'exact', head: true }),
+        supabase.from('members').select('*', { count: 'exact', head: true }).eq('membership_status', 'active'),
+        supabase.from('members').select('*', { count: 'exact', head: true }).eq('membership_status', 'pending'),
+        supabase.from('members').select('*', { count: 'exact', head: true }).in('membership_status', ['inactive', 'suspended']),
+        supabase.from('members').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth),
+        supabase.from('members').select('*', { count: 'exact', head: true }).in('membership_status', ['inactive', 'suspended', 'resigned']).gte('resignation_date', firstDayOfMonth), // Assuming resignation_date exists or fallback to updated_at in types
+        supabase.from('admin_users').select('*', { count: 'exact', head: true }),
+        supabase.from('sliders').select('*', { count: 'exact', head: true }),
+        supabase.from('branches').select('*', { count: 'exact', head: true }),
+        supabase.from('categories').select('*', { count: 'exact', head: true }),
+        supabase.from('management').select('*', { count: 'exact', head: true })
+      ]);
+
       const statsData: DashboardStats = {
-        totalNews: 0,
-        totalAnnouncements: 0,
-        totalMembers: 0,
-        totalAdminUsers: 0,
-        totalSliders: 0,
-        totalBranches: 0,
-        totalCategories: 0,
-        totalManagement: 0,
-        recentNews: 0,
-        recentMembers: 0,
-        activeHeaderAnnouncements: 0,
-        pendingMembers: 0,
-        activeMembers: 0,
-        newMembersThisMonth: 0,
-        resignedMembersThisMonth: 0,
-        suspendedMembers: 0
+        totalNews: newsRes.count || 0,
+        totalAnnouncements: announcementsRes.count || 0,
+        totalMembers: membersRes.count || 0,
+        totalAdminUsers: adminUsersRes.count || 0,
+        totalSliders: slidersRes.count || 0,
+        totalBranches: branchesRes.count || 0,
+        totalCategories: categoriesRes.count || 0,
+        totalManagement: managementRes.count || 0,
+        recentNews: 0, // Bu değer ayrıca hesaplanmalı veya count'a dahil edilmeli (logic eksikti, eski kodda da 0 atamışım ama bir yerde kullanılıyor mu? Evet, recentNews change'de var. Count olarak değil, son eklenenler. Şimdilik 0.)
+        recentMembers: newMembersRes.count || 0, // Bu ay eklenenler aynı zamanda recentMembers olarak kullanılabilir
+        activeHeaderAnnouncements: 0, // Ayrı sorgu gerekir veya logic. Şimdilik 0 veya eski mantık. Eski kodda activeHeaderAnnouncements sorgusu yoktu, 0 dönüyordu.
+        pendingMembers: pendingMembersRes.count || 0,
+        activeMembers: activeMembersRes.count || 0,
+        newMembersThisMonth: newMembersRes.count || 0,
+        resignedMembersThisMonth: resignedResult.count || 0,
+        suspendedMembers: suspendedMembersRes.count || 0
       };
 
-      // Her tabloyu ayrı ayrı kontrol et
-      try {
-        const newsResult = await supabase.from('news').select('*', { count: 'exact', head: true });
-        statsData.totalNews = newsResult.count || 0;
-      } catch (e) {
-        console.warn('News tablosu bulunamadı:', e);
-      }
-
-      try {
-        const announcementsResult = await supabase.from('announcements').select('*', { count: 'exact', head: true });
-        statsData.totalAnnouncements = announcementsResult.count || 0;
-      } catch (e) {
-        console.warn('Announcements tablosu bulunamadı:', e);
-      }
-
-      try {
-        const membersResult = await supabase.from('members').select('*', { count: 'exact', head: true });
-        statsData.totalMembers = membersResult.count || 0;
-
-        // Aktif üye sayısı
-        const activeMembersResult = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .eq('membership_status', 'active');
-        statsData.activeMembers = activeMembersResult.count || 0;
-
-        // Bekleyen üye sayısı
-        const pendingMembersResult = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .eq('membership_status', 'pending');
-        statsData.pendingMembers = pendingMembersResult.count || 0;
-
-        // Askıya alınmış (istifa/pasif) üye sayısı
-        const suspendedMembersResult = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .in('membership_status', ['inactive', 'suspended']);
-        statsData.suspendedMembers = suspendedMembersResult.count || 0;
-
-        // Bu ayki yeni üyeler
-        const now = new Date();
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        const newMembersResult = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', firstDayOfMonth);
-        statsData.newMembersThisMonth = newMembersResult.count || 0;
-
-        // Bu ay istifa edenler (inactive veya suspended olmuşlar)
-        // Not: Migration sonrası resignation_date kullanılmalı, ancak eski veriler için updated_at yedeği migration ile sağlanmalı
-        const resignedResult = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .in('membership_status', ['inactive', 'suspended', 'resigned'])
-          .gte('resignation_date', firstDayOfMonth);
-        statsData.resignedMembersThisMonth = resignedResult.count || 0;
-
-      } catch (e) {
-        console.warn('Members tablosu bulunamadı:', e);
-      }
-
-      try {
-        const adminUsersResult = await supabase.from('admin_users').select('*', { count: 'exact', head: true });
-        statsData.totalAdminUsers = adminUsersResult.count || 0;
-      } catch (e) {
-        console.warn('Admin users tablosu bulunamadı:', e);
-      }
-
-      try {
-        const slidersResult = await supabase.from('sliders').select('*', { count: 'exact', head: true });
-        statsData.totalSliders = slidersResult.count || 0;
-      } catch (e) {
-        console.warn('Sliders tablosu bulunamadı:', e);
-      }
-
-      try {
-        const branchesResult = await supabase.from('branches').select('*', { count: 'exact', head: true });
-        statsData.totalBranches = branchesResult.count || 0;
-      } catch (e) {
-        console.warn('Branches tablosu bulunamadı:', e);
-      }
-
-      try {
-        const categoriesResult = await supabase.from('categories').select('*', { count: 'exact', head: true });
-        statsData.totalCategories = categoriesResult.count || 0;
-      } catch (e) {
-        console.warn('Categories tablosu bulunamadı:', e);
-      }
-
-      try {
-        const managementResult = await supabase.from('management').select('*', { count: 'exact', head: true });
-        statsData.totalManagement = managementResult.count || 0;
-      } catch (e) {
-        console.warn('Management tablosu bulunamadı:', e);
-      }
+      // Optional: Get recent news count if needed (e.g. this month)
+      // newsRes sadece total news.
+      // activeHeaderAnnouncements için logic ekleyebiliriz ama orijinal parallelization'a sadık kaldım.
 
       setStats(statsData);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
       // Hata durumunda varsayılan değerler
       setStats({
-        totalNews: 0,
-        totalAnnouncements: 0,
-        totalMembers: 0,
-        totalAdminUsers: 0,
-        totalSliders: 0,
-        totalBranches: 0,
-        totalCategories: 0,
-        totalManagement: 0,
-        recentNews: 0,
-        recentMembers: 0,
-        activeHeaderAnnouncements: 0,
-        pendingMembers: 0,
-        activeMembers: 0,
-        newMembersThisMonth: 0,
-        resignedMembersThisMonth: 0,
+        totalNews: 0, totalAnnouncements: 0, totalMembers: 0,
+        totalAdminUsers: 0, totalSliders: 0, totalBranches: 0,
+        totalCategories: 0, totalManagement: 0, recentNews: 0,
+        recentMembers: 0, activeHeaderAnnouncements: 0, pendingMembers: 0,
+        activeMembers: 0, newMembersThisMonth: 0, resignedMembersThisMonth: 0,
         suspendedMembers: 0
       });
     } finally {
