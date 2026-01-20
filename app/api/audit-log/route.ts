@@ -97,7 +97,16 @@ export async function POST(request: Request) {
         // Fetch location data if IP is valid and not local
         if (ip && ip !== 'Unknown' && ip !== '::1' && ip !== '127.0.0.1') {
             try {
-                const geoRes = await fetch(`http://ip-api.com/json/${ip}`);
+                // Add a timeout to prevent ETIMEDOUT errors
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const geoRes = await fetch(`http://ip-api.com/json/${ip}`, {
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
                 if (geoRes.ok) {
                     const geoData = await geoRes.json();
                     if (geoData.status === 'success') {
@@ -112,8 +121,12 @@ export async function POST(request: Request) {
                         city = geoData.city;
                     }
                 }
-            } catch (err) {
-                console.error('GeoIP lookup failed:', err);
+            } catch (err: any) {
+                if (err.name === 'AbortError') {
+                    console.warn('GeoIP lookup timed out');
+                } else {
+                    console.error('GeoIP lookup failed:', err);
+                }
             }
         }
 

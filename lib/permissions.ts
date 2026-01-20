@@ -34,7 +34,7 @@ export class PermissionManager {
     // 2. Check Regional Permission (e.g., 'users.manage.region')
     if (this.hasPermission(user, `${basePermission}.region`)) {
       // Must match user's region
-      if (user.region && targetRegion === user.region) {
+      if (user.region && Number(targetRegion) === Number(user.region)) {
         return true;
       }
       // If target has no region (and we are regional manager), debatably we can't manage them 
@@ -44,7 +44,7 @@ export class PermissionManager {
     // 3. Check Branch Permission (e.g., 'users.manage.branch')
     if (this.hasPermission(user, `${basePermission}.branch`)) {
       // Must match user's city (branch)
-      if (user.city && targetCity === user.city) {
+      if (user.city && String(targetCity) === String(user.city)) {
         return true;
       }
     }
@@ -66,7 +66,7 @@ export class PermissionManager {
     // Prevent managing oneself or super admins (unless super admin)
     if (targetUser.role === 'super_admin' && !this.isSuperAdmin(user)) return false;
 
-    return this.hasScopePermission(user, 'users.manage', targetUser.region, targetUser.city);
+    return this.hasScopePermission(user, 'users.manage', Number(targetUser.region), String(targetUser.city));
   }
 
   static canViewUsers(user: AdminUser, targetUser?: AdminUser): boolean {
@@ -76,7 +76,7 @@ export class PermissionManager {
         this.hasPermission(user, 'users.view.branch') ||
         this.canManageUsers(user);
     }
-    return this.hasScopePermission(user, 'users.view', targetUser.region, targetUser.city) ||
+    return this.hasScopePermission(user, 'users.view', Number(targetUser.region), String(targetUser.city)) ||
       this.canManageUsers(user, targetUser);
   }
 

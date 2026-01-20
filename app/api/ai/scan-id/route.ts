@@ -27,8 +27,8 @@ export async function POST(request: Request) {
         const buffer = Buffer.from(bytes);
 
         // Model configuration
-        // Using gemini-3-flash-preview as requested by user
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        // Using gemini-1.5-flash for OCR efficiency and speed
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         const prompt = `
             Analyze this Turkish Identity Card (Kimlik Kartı) image.
