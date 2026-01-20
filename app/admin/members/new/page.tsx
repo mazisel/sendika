@@ -728,7 +728,8 @@ export default function NewMemberPage() {
                 });
 
                 if (!response.ok) {
-                  throw new Error('Kimlik tarama başarısız oldu.');
+                  const errorData = await response.json().catch(() => null);
+                  throw new Error(errorData?.error || 'Kimlik tarama başarısız oldu.');
                 }
 
                 const data = await response.json();

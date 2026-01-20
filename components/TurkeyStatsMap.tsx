@@ -55,7 +55,7 @@ export default function TurkeyStatsMap({
     const [viewMode, setViewMode] = useState<ViewMode>('active')
     const [hoveredCity, setHoveredCity] = useState<CityStats | null>(null)
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-    const [zoom, setZoom] = useState(100)
+    const [zoom, setZoom] = useState(75)
     const [isDragging, setIsDragging] = useState(false)
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
     const [position, setPosition] = useState({ x: 0, y: 0 })
@@ -246,10 +246,10 @@ export default function TurkeyStatsMap({
         }
     }, [cityStats, viewMode, onCityClick])
 
-    const handleZoomIn = () => setZoom(prev => Math.min(prev + 50, 800))
-    const handleZoomOut = () => setZoom(prev => Math.max(prev - 50, 50))
+    const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 800))
+    const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25))
     const handleZoomReset = () => {
-        setZoom(100)
+        setZoom(75)
         setPosition({ x: 0, y: 0 })
     }
 

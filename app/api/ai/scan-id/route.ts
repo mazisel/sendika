@@ -27,8 +27,8 @@ export async function POST(request: Request) {
         const buffer = Buffer.from(bytes);
 
         // Model configuration
-        // Using gemini-2.0-flash as observed in available models list
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        // Using gemini-3-flash-preview as requested by user
+        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
         const prompt = `
             Analyze this Turkish Identity Card (Kimlik Kartı) image.
@@ -78,10 +78,19 @@ export async function POST(request: Request) {
             );
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('ID Scan Error:', error);
+
+        // Handle Google API Rate Limiting (429)
+        if (error.message?.includes('429') || error.message?.includes('Quota exceeded') || error.status === 429) {
+            return NextResponse.json(
+                { error: 'AI servisi işlem limitine ulaştı. Lütfen 1 dakika bekleyip tekrar deneyin. (Google Gemini Free Tier Quota)' },
+                { status: 429 }
+            );
+        }
+
         return NextResponse.json(
-            { error: 'Internal server error during ID scan' },
+            { error: 'Kimlik tarama işlemi sırasında bir hata oluştu.' },
             { status: 500 }
         );
     }
