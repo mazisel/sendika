@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         // Detaylı permission check frontend'de zaten yapıldı (PermissionManager).
 
         const body = await request.json();
-        const { email, password, full_name, role, role_type, role_id, city, region } = body;
+        const { email, password, full_name, role, role_type, role_id, city, region, phone } = body;
 
         if (!email || !password || !full_name) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
                     role_id: role_id || null, // RBAC role id
                     city: city || null,
                     region: region || null,
+                    phone: phone || null,
                     is_active: true
                 }
             ]);

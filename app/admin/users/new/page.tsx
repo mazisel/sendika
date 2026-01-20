@@ -13,6 +13,7 @@ import { PermissionManager } from '@/lib/permissions';
 export default function NewUser() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
@@ -67,6 +68,7 @@ export default function NewUser() {
         email,
         password,
         full_name: fullName,
+        phone,
         role: 'admin',
         role_type: 'general_manager',
         role_id: selectedRoleId,
@@ -83,6 +85,7 @@ export default function NewUser() {
           details: {
             email,
             full_name: fullName,
+            phone,
             role_id: selectedRoleId
           }
         });
@@ -152,6 +155,20 @@ export default function NewUser() {
                   required
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   placeholder="kullanici@sendika.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                  Telefon Numarası
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  placeholder="05xxxxxxxxx"
                 />
               </div>
 

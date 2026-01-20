@@ -162,6 +162,7 @@ export class AdminAuth {
     role_id?: string;
     city?: string;
     region?: number;
+    phone?: string;
   }): Promise<AuthResponse> {
     try {
       // Get current session for authorization

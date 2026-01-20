@@ -19,6 +19,8 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, en
 import { tr } from 'date-fns/locale';
 import { logAuditAction } from '@/lib/audit-logger';
 import { PermissionManager } from '@/lib/permissions';
+import { AdminUser } from '@/lib/types';
+import { Mail, MessageSquare, Users as UsersIcon } from 'lucide-react';
 
 interface CalendarEvent {
     id: string;
@@ -39,6 +41,11 @@ export default function CalendarPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+    const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+    const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+    const [notifySms, setNotifySms] = useState(false);
+    const [notifyEmail, setNotifyEmail] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // Form states
     const [title, setTitle] = useState('');
@@ -51,7 +58,35 @@ export default function CalendarPage() {
 
     useEffect(() => {
         fetchEvents();
+        fetchAdminUsers();
     }, [currentMonth]);
+
+    const fetchAdminUsers = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('admin_users')
+                .select('*')
+                .eq('is_active', true)
+                .order('full_name');
+            if (error) throw error;
+            setAdminUsers(data || []);
+        } catch (err) {
+            console.error('Admin users fetch error:', err);
+        }
+    };
+
+    const fetchParticipants = async (eventId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('calendar_event_participants')
+                .select('admin_id')
+                .eq('event_id', eventId);
+            if (error) throw error;
+            setSelectedParticipants(data.map(p => p.admin_id));
+        } catch (err) {
+            console.error('Participants fetch error:', err);
+        }
+    };
 
     const fetchEvents = async () => {
         setLoading(true);
@@ -80,6 +115,7 @@ export default function CalendarPage() {
             return;
         }
 
+        setIsProcessing(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -103,6 +139,8 @@ export default function CalendarPage() {
                 created_by: adminUser.id
             };
 
+            let eventId = editingEvent?.id;
+
             if (editingEvent) {
                 const { error } = await supabase
                     .from('calendar_events')
@@ -118,11 +156,14 @@ export default function CalendarPage() {
                     details: { title }
                 });
             } else {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('calendar_events')
-                    .insert(eventData);
+                    .insert(eventData)
+                    .select()
+                    .single();
 
                 if (error) throw error;
+                eventId = data.id;
 
                 await logAuditAction({
                     action: 'CREATE',
@@ -131,12 +172,69 @@ export default function CalendarPage() {
                 });
             }
 
+            // Sync participants
+            if (eventId) {
+                // Delete existing
+                await supabase
+                    .from('calendar_event_participants')
+                    .delete()
+                    .eq('event_id', eventId);
+
+                // Insert new
+                if (selectedParticipants.length > 0) {
+                    const participantData = selectedParticipants.map(adminId => ({
+                        event_id: eventId,
+                        admin_id: adminId
+                    }));
+                    const { error: pError } = await supabase
+                        .from('calendar_event_participants')
+                        .insert(participantData);
+                    if (pError) throw pError;
+                }
+
+                // Send notifications
+                if (notifySms || notifyEmail) {
+                    await sendNotifications(eventId);
+                }
+            }
+
             setIsModalOpen(false);
             resetForm();
             fetchEvents();
         } catch (error) {
             console.error('Save error:', error);
             alert('Hata oluştu');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const sendNotifications = async (eventId: string) => {
+        const selectedUsers = adminUsers.filter(u => selectedParticipants.includes(u.id));
+        const message = `YENİ ETKİNLİK: ${title}\nTarih: ${format(parseISO(startDate), 'dd.MM.yyyy HH:mm')}\nKonum: ${location || 'Belirtilmedi'}`;
+
+        for (const user of selectedUsers) {
+            if (notifySms && user.phone) {
+                await fetch('/api/sms/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: user.phone, message })
+                });
+            }
+
+            if (notifyEmail && user.email) {
+                await fetch('/api/email/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'general',
+                        to: user.email,
+                        subject: 'Yeni Takvim Etkinliği Daveti',
+                        title: 'Takvim Etkinliği',
+                        message: `${title}\n\nDetaylar:\nTarih: ${format(parseISO(startDate), 'dd.MM.yyyy HH:mm')}\nKonum: ${location || 'Belirtilmedi'}\nAçıklama: ${description || '-'}`
+                    })
+                });
+            }
         }
     };
 
@@ -172,6 +270,9 @@ export default function CalendarPage() {
         setCategory('meeting');
         setColor('blue');
         setEditingEvent(null);
+        setSelectedParticipants([]);
+        setNotifySms(false);
+        setNotifyEmail(false);
     };
 
     const openEditModal = (event: CalendarEvent) => {
@@ -183,6 +284,7 @@ export default function CalendarPage() {
         setLocation(event.location);
         setCategory(event.category);
         setColor(event.color);
+        fetchParticipants(event.id);
         setIsModalOpen(true);
     };
 
@@ -283,10 +385,10 @@ export default function CalendarPage() {
                                     key={event.id}
                                     onClick={(e) => { e.stopPropagation(); openEditModal(event); }}
                                     className={`text-[10px] px-2 py-1.5 rounded-lg border-l-4 shadow-sm cursor-pointer transition-all hover:scale-105 ${event.color === 'blue' ? "bg-blue-50 text-blue-700 border-blue-500 dark:bg-blue-900/20 dark:text-blue-300" :
-                                            event.color === 'red' ? "bg-red-50 text-red-700 border-red-500 dark:bg-red-900/20 dark:text-red-300" :
-                                                event.color === 'green' ? "bg-green-50 text-green-700 border-green-500 dark:bg-green-900/20 dark:text-green-300" :
-                                                    event.color === 'purple' ? "bg-purple-50 text-purple-700 border-purple-500 dark:bg-purple-900/20 dark:text-purple-300" :
-                                                        "bg-orange-50 text-orange-700 border-orange-500 dark:bg-orange-900/20 dark:text-orange-300"
+                                        event.color === 'red' ? "bg-red-50 text-red-700 border-red-500 dark:bg-red-900/20 dark:text-red-300" :
+                                            event.color === 'green' ? "bg-green-50 text-green-700 border-green-500 dark:bg-green-900/20 dark:text-green-300" :
+                                                event.color === 'purple' ? "bg-purple-50 text-purple-700 border-purple-500 dark:bg-purple-900/20 dark:text-purple-300" :
+                                                    "bg-orange-50 text-orange-700 border-orange-500 dark:bg-orange-900/20 dark:text-orange-300"
                                         }`}
                                 >
                                     <div className="font-bold truncate">{event.title}</div>
@@ -427,8 +529,63 @@ export default function CalendarPage() {
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Detaylı bilgi..."
-                                    className="w-full h-24 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                                    className="w-full h-20 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
                                 />
+                            </div>
+
+                            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center">
+                                        <UsersIcon className="w-3 h-3 mr-1" /> Katılımcılar
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-200">
+                                        {adminUsers.map(user => (
+                                            <label key={user.id} className="flex items-center space-x-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedParticipants.includes(user.id)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedParticipants([...selectedParticipants, user.id]);
+                                                        } else {
+                                                            setSelectedParticipants(selectedParticipants.filter(id => id !== user.id));
+                                                        }
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{user.full_name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center space-x-6 pt-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer group">
+                                        <div className={`p-1.5 rounded-lg transition-colors ${notifySms ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                                            <MessageSquare className="w-4 h-4" />
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={notifySms}
+                                            onChange={(e) => setNotifySms(e.target.checked)}
+                                            className="hidden"
+                                        />
+                                        <span className={`text-xs font-bold uppercase ${notifySms ? 'text-orange-600' : 'text-slate-500'}`}>SMS Gönder</span>
+                                    </label>
+
+                                    <label className="flex items-center space-x-2 cursor-pointer group">
+                                        <div className={`p-1.5 rounded-lg transition-colors ${notifyEmail ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                                            <Mail className="w-4 h-4" />
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={notifyEmail}
+                                            onChange={(e) => setNotifyEmail(e.target.checked)}
+                                            className="hidden"
+                                        />
+                                        <span className={`text-xs font-bold uppercase ${notifyEmail ? 'text-blue-600' : 'text-slate-500'}`}>E-Posta Gönder</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -451,9 +608,10 @@ export default function CalendarPage() {
                                 </button>
                                 <button
                                     onClick={handleSaveEvent}
-                                    className="px-10 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-200 dark:shadow-none transition-all"
+                                    disabled={isProcessing}
+                                    className="px-10 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-200 dark:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {editingEvent ? 'Güncelle' : 'Kaydet'}
+                                    {isProcessing ? 'İşleniyor...' : (editingEvent ? 'Güncelle' : 'Kaydet')}
                                 </button>
                             </div>
                         </div>

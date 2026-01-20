@@ -65,6 +65,7 @@ export interface AdminUser {
   permissions?: string[]; // Runtime only
   city?: string | null;
   region?: string | null;
+  phone?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

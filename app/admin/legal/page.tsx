@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { LegalRequest } from '@/lib/types';
-import { formatDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, formatDateTimeSafe } from '@/lib/dateUtils';
 import { Loader2, Search, Filter, Eye, Gavel, FileText } from 'lucide-react';
 import Link from 'next/link';
 
@@ -135,7 +135,7 @@ export default function LegalRequestsPage() {
                             {filteredRequests.map((req) => (
                                 <tr key={req.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                                        {formatDateSafe(req.created_at)}
+                                        {formatDateTimeSafe(req.created_at)}
                                     </td>
                                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                                         {req.member ? (

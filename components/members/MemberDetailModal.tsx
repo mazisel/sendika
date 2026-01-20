@@ -9,7 +9,7 @@ import {
     Upload, Trash2, Download, AlertCircle, Folder, Edit,
     MessageSquare, Key, Send, RefreshCw, Copy, Check
 } from 'lucide-react';
-import { formatDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, formatDateTimeSafe } from '@/lib/dateUtils';
 import { MemberService, MemberDocument } from '@/lib/services/memberService';
 import { AdminAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -460,7 +460,7 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                                                                     {doc.file_name}
                                                                 </p>
                                                                 <p className="text-xs text-slate-500">
-                                                                    {formatDateSafe(doc.created_at)} • {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                                                                    {formatDateTimeSafe(doc.created_at)} • {(doc.file_size / 1024 / 1024).toFixed(2)} MB
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -616,7 +616,7 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                                                                 <>
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
                                                                     <span className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                                                        {formatDateSafe(member.last_login_at)}
+                                                                        {formatDateTimeSafe(member.last_login_at)}
                                                                     </span>
                                                                 </>
                                                             ) : (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { LegalRequest, AdminUser } from '@/lib/types';
-import { formatDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, formatDateTimeSafe } from '@/lib/dateUtils';
 import { Loader2, ArrowLeft, Save, User, Calendar, Tag, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -112,7 +112,7 @@ export default function LegalRequestDetailPage() {
                             {request.subject}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm">
-                            Talep No: #{request.id.slice(0, 8)} • Oluşturulma: {formatDateSafe(request.created_at)}
+                            Talep No: #{request.id.slice(0, 8)} • Oluşturulma: {formatDateTimeSafe(request.created_at)}
                         </p>
                     </div>
                     <button
@@ -223,7 +223,7 @@ export default function LegalRequestDetailPage() {
                                 </div>
                                 <div className="flex justify-between text-sm py-1">
                                     <span className="text-slate-500">Son Güncelleme</span>
-                                    <span className="font-medium text-slate-900 dark:text-white">{formatDateSafe(request.updated_at)}</span>
+                                    <span className="font-medium text-slate-900 dark:text-white">{formatDateTimeSafe(request.updated_at)}</span>
                                 </div>
                             </div>
                         </div>

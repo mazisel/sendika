@@ -326,15 +326,15 @@ export default function UserManagement() {
     const level = getAccessLevelForUser(user);
     switch (level) {
       case 'super_admin':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
       case 'general_manager':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
       case 'regional_manager':
-        return 'bg-amber-100 text-amber-800';
+        return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
       case 'branch_manager':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
     }
   };
 
@@ -385,7 +385,7 @@ export default function UserManagement() {
       <div className="space-y-6">
         {/* Actions */}
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-slate-900">Admin Kullanıcıları</h2>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Admin Kullanıcıları</h2>
           {PermissionManager.canManageUsers(currentUser) && (
             <Link
               href="/admin/users/new"
@@ -405,19 +405,19 @@ export default function UserManagement() {
         )}
 
         {/* Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-lg font-medium text-blue-900 mb-2 flex items-center">
+        <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
+          <h3 className="text-lg font-medium text-blue-900 dark:text-blue-300 mb-2 flex items-center">
             <Shield className="w-5 h-5 mr-2" />
             Erişim ve Roller
           </h3>
-          <div>
+          <div className="text-blue-800 dark:text-blue-400/90 text-sm">
             <h4 className="font-bold mb-1">Rol ve Yetki Sistemi</h4>
             <div>Tüm kullanıcı yetkileri artık <strong>Roller</strong> üzerinden yönetilmektedir. Kullanıcılara "Muhasebe", "İnsan Kaynakları" veya "Süper Admin" gibi roller atayarak menü ve işlem yetkilerini belirleyebilirsiniz.</div>
           </div>
         </div>
 
         {/* Users List */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
           {visibleUsers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
@@ -433,12 +433,12 @@ export default function UserManagement() {
               )}
             </div>
           ) : (
-            <ul className="divide-y divide-slate-200">
+            <ul className="divide-y divide-slate-200 dark:divide-slate-800">
               {visibleUsers.map((user) => {
                 const canManageThisUser = PermissionManager.canManageUsers(currentUser, user);
 
                 return (
-                  <li key={user.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+                  <li key={user.id} className="px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3">
@@ -446,10 +446,10 @@ export default function UserManagement() {
                             <User className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-lg font-medium text-slate-900">
+                            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
                               {user.full_name}
                             </h3>
-                            <p className="text-sm text-slate-500">{user.email}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
                           </div>
                           {!user.role_details && (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user)}`}>
@@ -459,31 +459,31 @@ export default function UserManagement() {
 
                           {/* Scope Badges */}
                           {user.role === 'branch_manager' && user.city && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
                               {user.city} Şubesi
                             </span>
                           )}
                           {user.role_type === 'regional_manager' && user.region && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
                               {user.region}. Bölge
                             </span>
                           )}
 
                           {/* Custom Role Badge */}
                           {user.role_details && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300">
                               {user.role_details.name}
                             </span>
                           )}
 
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300'
                             }`}>
                             {user.is_active ? 'Aktif' : 'Pasif'}
                           </span>
                           {currentUser.id === user.id && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
                               Siz
                             </span>
                           )}
@@ -499,11 +499,11 @@ export default function UserManagement() {
                               <select
                                 value={roleSelections[user.id] ?? user.role_id ?? ''}
                                 onChange={(e) => setRoleSelections(prev => ({ ...prev, [user.id]: e.target.value }))}
-                                className="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+                                className="flex-1 text-sm border border-gray-300 dark:border-slate-700 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                               >
                                 <option value="">Rol Seç</option>
                                 {roles.map(r => (
-                                  <option key={r.id} value={r.id}>
+                                  <option key={r.id} value={r.id} className="bg-white dark:bg-slate-800">
                                     {r.name}
                                   </option>
                                 ))}
@@ -521,9 +521,9 @@ export default function UserManagement() {
                           </div>
                         ) : (
                           currentUser.id !== user.id ? (
-                            <span className="text-xs text-slate-400 italic">Bu kullanıcıyı yönetemezsiniz</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 italic">Bu kullanıcıyı yönetemezsiniz</span>
                           ) : (
-                            <span className="text-xs text-slate-500">Kendi yetkinizi değiştiremezsiniz</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">Kendi yetkinizi değiştiremezsiniz</span>
                           )
                         )}
 
@@ -534,8 +534,8 @@ export default function UserManagement() {
                               onClick={() => toggleActive(user)}
                               disabled={currentUser.id === user.id && user.is_active}
                               className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${user.is_active
-                                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                                : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
+                                : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                               {user.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -548,7 +548,7 @@ export default function UserManagement() {
                             <button
                               onClick={() => handleDelete(user)}
                               disabled={currentUser.id === user.id}
-                              className="flex items-center space-x-1 bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="flex items-center space-x-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 px-3 py-1 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                               <span>Sil</span>

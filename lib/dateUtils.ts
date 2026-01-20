@@ -4,6 +4,19 @@ export const formatDateSafe = (dateString: string | null | undefined): string =>
         return new Date(dateString).toLocaleDateString('tr-TR', {
             day: '2-digit',
             month: '2-digit',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return '-';
+    }
+};
+
+export const formatDateTimeSafe = (dateString: string | null | undefined): string => {
+    if (!dateString) return '-';
+    try {
+        return new Date(dateString).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
