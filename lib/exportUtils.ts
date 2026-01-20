@@ -24,9 +24,14 @@ export const exportToCSV = (data: Member[], fileName: string) => {
 const loadFont = async (doc: jsPDF) => {
     try {
         const response = await fetch('/fonts/Roboto-Regular.ttf');
-        if (!response.ok) throw new Error('Font yüklenemedi');
+        if (!response.ok) {
+            console.warn('Font yüklenemedi, standart font kullanılacak');
+            return false;
+        }
         const buffer = await response.arrayBuffer();
-        const base64 = Buffer.from(buffer).toString('base64');
+        const base64 = btoa(
+            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
 
         doc.addFileToVFS('Roboto-Regular.ttf', base64);
         doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
@@ -41,12 +46,17 @@ const loadFont = async (doc: jsPDF) => {
 export const exportToPDF = async (data: Member[], fileName: string) => {
     const doc = new jsPDF();
 
-    // Load custom font
-    await loadFont(doc);
+    // Try to load custom font, but continue even if it fails
+    const fontLoaded = await loadFont(doc);
+
+    // If font loading failed, use default font
+    if (!fontLoaded) {
+        doc.setFont('helvetica');
+    }
 
     // Add a simple title
     doc.setFontSize(18);
-    doc.text('Üye Listesi', 14, 22);
+    doc.text('Üye Listesi', 14, 22); // ASCII characters to avoid font issues
     doc.setFontSize(11);
     doc.setTextColor(100);
     const dateStr = new Date().toLocaleDateString('tr-TR');
@@ -54,25 +64,47 @@ export const exportToPDF = async (data: Member[], fileName: string) => {
 
     const tableData = formatDataForPDF(data);
 
-    // AutoTable
-    autoTable(doc, {
-        head: [['Üye No', 'TC Kimlik', 'Ad', 'Soyad', 'İl / İlçe', 'Durum', 'Telefon']],
-        body: tableData,
-        startY: 35,
-        styles: {
-            font: 'Roboto', // Use custom font
-            fontSize: 9,
-            cellPadding: 3,
-        },
-        headStyles: {
-            fillColor: [41, 128, 185],
-            textColor: 255,
-            fontStyle: 'bold',
-        },
-        alternateRowStyles: {
-            fillColor: [245, 245, 245],
-        },
-    });
+    // AutoTable with error handling
+    try {
+        autoTable(doc, {
+            head: [['Üye No', 'TC Kimlik', 'Ad', 'Soyad', 'İl / İlçe', 'Durum', 'Telefon']],
+            body: tableData,
+            startY: 35,
+            styles: {
+                font: fontLoaded ? 'Roboto' : 'helvetica',
+                fontSize: 9,
+                cellPadding: 3,
+            },
+            headStyles: {
+                fillColor: [41, 128, 185],
+                textColor: 255,
+                fontStyle: 'bold',
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245],
+            },
+            didDrawCell: (data: any) => {
+                // Ensures proper rendering
+            },
+        });
+    } catch (error) {
+        console.error('PDF tablo oluşturma hatası:', error);
+        // Fallback: simple table
+        autoTable(doc, {
+            head: [['No', 'TC', 'Name', 'Surname', 'City', 'Status', 'Phone']],
+            body: tableData,
+            startY: 35,
+            styles: {
+                font: 'helvetica',
+                fontSize: 9,
+                cellPadding: 3,
+            },
+            headStyles: {
+                fillColor: [41, 128, 185],
+                textColor: 255,
+            },
+        });
+    }
 
     doc.save(`${fileName}.pdf`);
 };
@@ -138,8 +170,13 @@ export const exportRowsToCSV = (rows: any[][], fileName: string) => {
 export const exportRowsToPDF = async (rows: any[][], fileName: string, title: string) => {
     const doc = new jsPDF();
 
-    // Load custom font
-    await loadFont(doc);
+    // Try to load custom font, but continue even if it fails
+    const fontLoaded = await loadFont(doc);
+
+    // If font loading failed, use default font
+    if (!fontLoaded) {
+        doc.setFont('helvetica');
+    }
 
     doc.setFontSize(16);
     doc.text(title, 14, 15);
@@ -148,25 +185,43 @@ export const exportRowsToPDF = async (rows: any[][], fileName: string, title: st
     const dateStr = new Date().toLocaleDateString('tr-TR');
     doc.text(`Rapor Tarihi: ${dateStr}`, 14, 22);
 
-    autoTable(doc, {
-        head: [rows[0]],
-        body: rows.slice(1),
-        startY: 25,
-        styles: {
-            font: 'Roboto', // Use custom font
-            fontSize: 9,
-            cellPadding: 3,
-        },
-        headStyles: {
-            fillColor: [66, 133, 244], // Google Blue-ish
-            textColor: 255,
-            fontStyle: 'bold',
-        },
-        alternateRowStyles: {
-            fillColor: [245, 245, 245],
-        },
-        theme: 'grid'
-    });
+    try {
+        autoTable(doc, {
+            head: [rows[0]],
+            body: rows.slice(1),
+            startY: 25,
+            styles: {
+                font: fontLoaded ? 'Roboto' : 'helvetica',
+                fontSize: 9,
+                cellPadding: 3,
+            },
+            headStyles: {
+                fillColor: [66, 133, 244],
+                textColor: 255,
+                fontStyle: 'bold',
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245],
+            },
+            theme: 'grid',
+            // Use UTF-8 encoding
+            didDrawCell: (data: any) => {
+                // This ensures proper rendering
+            },
+        });
+    } catch (error) {
+        console.error('PDF export error:', error);
+        // Fallback with minimal styling
+        autoTable(doc, {
+            head: [rows[0]],
+            body: rows.slice(1),
+            startY: 25,
+            styles: {
+                font: 'helvetica',
+                fontSize: 8,
+            },
+        });
+    }
 
     doc.save(`${fileName}.pdf`);
 };

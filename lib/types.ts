@@ -25,7 +25,7 @@ export interface Member {
   district: string;
   phone: string | null;
   email: string | null;
-  region: number | null;
+  region: string | null;
   address: string;
   workplace: string;
   position: string;
@@ -64,7 +64,7 @@ export interface AdminUser {
   role_details?: Role;
   permissions?: string[]; // Runtime only
   city?: string | null;
-  region?: number | null;
+  region?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -148,8 +148,7 @@ export interface Branch {
   region?: Region;
   responsible_id?: string | null;
   responsible_user?: Member;
-  // Legacy field
-  legacy_region_number?: number;
+
   created_at: string;
   updated_at: string;
 }

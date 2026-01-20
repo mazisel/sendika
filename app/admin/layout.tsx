@@ -29,11 +29,14 @@ import {
   Moon,
   Shield,
   Gavel,
-  BookOpen
+  BookOpen,
+  Wrench,
+  MessageSquare
 } from 'lucide-react';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
 import { AdminUser } from '@/lib/types';
+import StickyMessageBanner from '@/components/StickyMessageBanner';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -283,6 +286,37 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
 
+    // Araçlar Menüsü
+    const toolsItems: MenuItem[] = [];
+
+    if (PermissionManager.canManageStickyMessages(currentUser)) {
+      toolsItems.push({
+        title: 'Sabit Metin',
+        href: '/admin/tools/sticky-message',
+        icon: MessageSquare,
+        description: 'Üst menüde gösterilecek sabit mesaj'
+      });
+    }
+
+    if (PermissionManager.canManageCalendar(currentUser)) {
+      toolsItems.push({
+        title: 'Ortak Ajanda',
+        href: '/admin/tools/calendar',
+        icon: Calendar,
+        description: 'Yönetim ve etkinlik takvimi'
+      });
+    }
+
+    if (toolsItems.length > 0) {
+      baseItems.push({
+        title: 'Araçlar',
+        href: '#',
+        icon: Wrench,
+        description: 'Yönetim araçları',
+        items: toolsItems
+      });
+    }
+
 
     if (PermissionManager.canManageSiteSettings(currentUser)) {
       baseItems.push({
@@ -446,19 +480,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {menuItems.map(item => renderMenuItem(item))}
           </div>
 
-          {/* Logout Button */}
-          <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
-            <button
-              onClick={handleLogout}
-              className="group/btn flex items-center lg:justify-center lg:group-hover:justify-start w-full px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200 rounded-xl hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-all duration-200 whitespace-nowrap overflow-hidden"
-            >
-              <LogOut className="mr-0 lg:mr-0 lg:group-hover:mr-5 h-6 w-6 flex-shrink-0 text-slate-500 dark:text-slate-400 group-hover/btn:text-red-600 dark:group-hover/btn:text-red-400 transition-colors" />
-              <div className="transition-all duration-300 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:max-w-0 lg:group-hover:max-w-[200px] overflow-hidden">
-                <div className="font-medium">Çıkış Yap</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Oturumu sonlandır</div>
-              </div>
-            </button>
-          </div>
         </nav>
       </div>
 
@@ -477,7 +498,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
             {/* User menu */}
             <div className="flex items-center space-x-4 ml-auto">
-              {/* ... existing header ... */}
+              <StickyMessageBanner />
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"

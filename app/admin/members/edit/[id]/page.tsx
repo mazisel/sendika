@@ -48,7 +48,9 @@ interface FormData {
   membership_status: string;
   is_active: boolean;
   membership_date: string;
-
+  decision_number: string;
+  selected_branch_id: string; // UI only
+  region: string | null; // Manual override or calculated
 }
 
 const initialFormData: FormData = {
@@ -84,7 +86,9 @@ const initialFormData: FormData = {
   membership_status: 'active',
   is_active: true,
   membership_date: '',
-
+  decision_number: '',
+  selected_branch_id: '',
+  region: null,
 };
 
 const emptyMemberDueSummary = {
@@ -140,8 +144,10 @@ export default function EditMemberPage() {
   const [duesError, setDuesError] = useState('');
   const [memberDuesSummary, setMemberDuesSummary] = useState(emptyMemberDueSummary);
   const [memberDueRecords, setMemberDueRecords] = useState<MemberDueRecord[]>([]);
-  const [branchRegions, setBranchRegions] = useState<Record<string, number>>({});
-  const [cityRegion, setCityRegion] = useState<number | null>(null);
+  const [branchRegions, setBranchRegions] = useState<Record<string, string>>({});
+  const [branches, setBranches] = useState<{ id: string; branch_name: string; city: string; region_id: string | null }[]>([]);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [cityRegion, setCityRegion] = useState<string | null>(null);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const canEditMembershipNumber = currentUser ? PermissionManager.canEditRestrictedFields(currentUser) : false;
   const [definitionOptions, setDefinitionOptions] = useState<Record<DefinitionType, GeneralDefinition[]>>({
@@ -151,6 +157,23 @@ export default function EditMemberPage() {
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
   const canManageDefinitions = currentUser ? PermissionManager.canManageDefinitions(currentUser) : false;
 
+  useEffect(() => {
+    const fetchRegionsData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('regions')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setRegions(data || []);
+      } catch (error) {
+        console.error('Bölgeler alınamadı:', error);
+      }
+    };
+    fetchRegionsData();
+  }, []);
+
   const allowedCities = useMemo(() => {
     if (currentUser?.role_type === 'branch_manager' && currentUser.city) {
       return [currentUser.city];
@@ -158,7 +181,7 @@ export default function EditMemberPage() {
 
     if (currentUser?.role_type === 'regional_manager' && currentUser.region) {
       const cities = Object.entries(branchRegions)
-        .filter(([, region]) => region === currentUser.region)
+        .filter(([, region]) => region === currentUser.region?.toString())
         .map(([city]) => city)
         .sort((a, b) => a.localeCompare(b, 'tr'));
       return cities;
@@ -214,14 +237,25 @@ export default function EditMemberPage() {
         setBranchesLoading(true)
         const { data, error } = await supabase
           .from('branches')
-          .select('city, region, is_active');
+          .select('id, branch_name, city, region_id, is_active')
+          .eq('is_active', true);
 
         if (error) throw error;
 
-        const mapping: Record<string, number> = {};
-        (data || []).forEach(branch => {
-          if (branch.city && typeof branch.region === 'number') {
-            mapping[branch.city] = branch.region;
+        const validBranches = (data || [])
+          .map(b => ({
+            id: b.id,
+            branch_name: b.branch_name,
+            city: b.city,
+            region_id: b.region_id
+          }));
+
+        setBranches(validBranches);
+
+        const mapping: Record<string, string> = {};
+        validBranches.forEach(branch => {
+          if (branch.city && branch.region_id) {
+            mapping[branch.city] = branch.region_id;
           }
         });
 
@@ -238,11 +272,25 @@ export default function EditMemberPage() {
 
   useEffect(() => {
     if (formData.city) {
-      setCityRegion(branchRegions[formData.city] ?? null);
+      const region = branchRegions[formData.city] ?? null;
+      setCityRegion(region);
+      if (!formData.region && region) {
+        setFormData(prev => ({ ...prev, region }));
+      }
     } else {
       setCityRegion(null);
     }
   }, [formData.city, branchRegions]);
+
+  // Sync selected branch if city matches an existing branch
+  useEffect(() => {
+    if (branches.length > 0 && formData.city && !formData.selected_branch_id) {
+      const matchingBranch = branches.find(b => b.city === formData.city);
+      if (matchingBranch) {
+        setFormData(prev => ({ ...prev, selected_branch_id: matchingBranch.id }));
+      }
+    }
+  }, [branches, formData.city]);
 
   useEffect(() => {
     const fetchDefinitions = async () => {
@@ -331,10 +379,12 @@ export default function EditMemberPage() {
           membership_status: data.membership_status || 'active',
           is_active: data.is_active || true,
           membership_date: data.membership_date || '',
-
+          decision_number: data.decision_number || '',
+          selected_branch_id: '',
+          region: data.region || null,
         });
         setMembershipNumber(data.membership_number || '');
-        setCityRegion(data.region ?? null);
+        setCityRegion(data.region || null);
       }
     } catch (error) {
       console.error('Üye bilgileri yüklenirken hata:', error);
@@ -453,12 +503,28 @@ export default function EditMemberPage() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked :
-        name === 'children_count' ? parseInt(value) || 0 : value
-    }));
+    const { name, value } = e.target;
+
+    if (name === 'selected_branch_id') {
+      const selectedBranch = branches.find(b => b.id === value);
+      if (selectedBranch) {
+        setFormData(prev => ({
+          ...prev,
+          selected_branch_id: value,
+          city: selectedBranch.city,
+          region: selectedBranch.region_id
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, selected_branch_id: '' }));
+      }
+    } else if (name === 'region') {
+      setFormData(prev => ({ ...prev, region: value || null }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: name === 'children_count' ? Math.max(0, parseInt(value) || 0) : value
+      }));
+    }
 
     if (errors[name]) {
       setErrors(prev => ({
@@ -483,7 +549,7 @@ export default function EditMemberPage() {
     if (!formData.father_name.trim()) newErrors.father_name = 'Baba adı zorunludur';
     if (!formData.mother_name.trim()) newErrors.mother_name = 'Anne adı zorunludur';
     if (!formData.birth_place.trim()) newErrors.birth_place = 'Doğum yeri zorunludur';
-    if (!formData.blood_group) newErrors.blood_group = 'Kan grubu zorunludur';
+
     if (!formData.marital_status) newErrors.marital_status = 'Medeni durum zorunludur';
     if (!formData.education_level) newErrors.education_level = 'Öğrenim durumu zorunludur';
     if (!formData.institution.trim()) newErrors.institution = 'Kurum adı zorunludur';
@@ -578,11 +644,12 @@ export default function EditMemberPage() {
         children_count: formData.children_count,
         notes: formData.notes.trim(),
         membership_date: formData.membership_date ? formData.membership_date : null,
+        decision_number: formData.decision_number.trim() || null,
 
         membership_status: formData.membership_status,
         is_active: formData.is_active,
         updated_at: new Date().toISOString(),
-        region: cityRegion
+        region: formData.region || cityRegion
       };
 
       if (canEditMembershipNumber) {
@@ -741,6 +808,69 @@ export default function EditMemberPage() {
                 <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
               )}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Karar Numarası
+              </label>
+              <input
+                type="text"
+                name="decision_number"
+                value={formData.decision_number}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Örn: 2024/15"
+              />
+            </div>
+
+            {/* Şube ve Bölge Seçimi (Admin için) */}
+            {!currentUser?.role_type || currentUser.role_type !== 'branch_manager' ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2 flex justify-between">
+                    <span>Şube Seçimi</span>
+                    {branchesLoading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+                  </label>
+                  <select
+                    name="selected_branch_id"
+                    value={formData.selected_branch_id || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Şube Seçiniz (Otomatik Doldur)</option>
+                    {branches.length > 0 ? (
+                      branches.map(branch => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.branch_name} ({branch.city})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>Şube listesi yüklenemedi veya boş</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Bölge
+                  </label>
+                  <select
+                    name="region"
+                    value={formData.region || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Bölge Seçiniz</option>
+                    {regions.length > 0 ? (
+                      regions.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))
+                    ) : (
+                      <option value="" disabled>Bölge listesi yükleniyor...</option>
+                    )}
+                  </select>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -894,7 +1024,7 @@ export default function EditMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kan Grubu <span className="text-red-500">*</span>
+                Kan Grubu
               </label>
               <select
                 name="blood_group"

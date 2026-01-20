@@ -2,7 +2,7 @@
 import { AdminAuth } from '@/lib/auth';
 
 export type AuditAction = 'LOGIN' | 'LOGOUT' | 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW';
-export type AuditEntity = 'AUTH' | 'MEMBER' | 'SETTINGS' | 'USER' | 'ANNOUNCEMENT' | 'UNKNOWN';
+export type AuditEntity = 'AUTH' | 'MEMBER' | 'SETTINGS' | 'USER' | 'ANNOUNCEMENT' | 'STICKY_MESSAGE' | 'CALENDAR' | 'UNKNOWN';
 
 interface AuditLogParams {
     action: AuditAction;

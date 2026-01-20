@@ -107,6 +107,14 @@ export class PermissionManager {
     return this.hasPermission(user, 'sliders.manage');
   }
 
+  static canManageStickyMessages(user: AdminUser): boolean {
+    return this.hasPermission(user, 'announcements.manage'); // Re-using announcement permission for now or we could add 'sticky_message.manage'
+  }
+
+  static canManageCalendar(user: AdminUser): boolean {
+    return this.hasPermission(user, 'calendar.manage') || this.hasPermission(user, 'announcements.manage');
+  }
+
   static canManageManagement(user: AdminUser): boolean {
     return this.hasPermission(user, 'management.manage');
   }

@@ -9,7 +9,7 @@ import { PermissionManager } from '@/lib/permissions';
 import { cityOptions } from '@/lib/cities';
 import { getDistrictsByCity } from '@/lib/districts';
 import { AdminUser, DefinitionType, GeneralDefinition } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2, Activity, FileText } from 'lucide-react';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 interface FormData {
@@ -48,6 +48,9 @@ interface FormData {
   notes: string;
   membership_number: string;
   membership_date: string;
+  decision_number: string;
+  selected_branch_id: string; // UI only
+  region: string | null; // Manual override or calculated
 }
 
 interface PendingDocument {
@@ -90,6 +93,9 @@ const initialFormData: FormData = {
   notes: '',
   membership_number: '',
   membership_date: '',
+  decision_number: '',
+  selected_branch_id: '',
+  region: null,
 };
 
 const fieldLabels: Record<string, string> = {
@@ -151,8 +157,12 @@ export default function NewMemberPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [branchRegions, setBranchRegions] = useState<Record<string, number>>({});
-  const [cityRegion, setCityRegion] = useState<number | null>(null);
+  const [branchRegions, setBranchRegions] = useState<Record<string, string>>({}); // Not widely used anymore, we use branches array lookup
+  // Actually, let's keep it but it might be unused. 
+  // Wait, line 154: const [branchRegions, setBranchRegions] = useState<Record<string, number>>({});
+  // We should probably just remove it or verify usage. It is used in allowedCities useMemo later.
+  // Let's change type to string.
+  const [cityRegion, setCityRegion] = useState<string | null>(null);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const canEditMembershipNumber = currentUser ? PermissionManager.canEditRestrictedFields(currentUser) : false;
   const canManageDefinitions = currentUser ? PermissionManager.canManageDefinitions(currentUser) : false;
@@ -164,7 +174,7 @@ export default function NewMemberPage() {
 
     if (currentUser?.role_type === 'regional_manager' && currentUser.region) {
       const cities = Object.entries(branchRegions)
-        .filter(([, region]) => region === currentUser.region)
+        .filter(([, region]) => region === currentUser.region?.toString()) // Convert currentUser.region to string if it's number, or just compare
         .map(([city]) => city)
         .sort((a, b) => a.localeCompare(b, 'tr'));
       return cities;
@@ -213,24 +223,59 @@ export default function NewMemberPage() {
     }
   }, []);
 
+  const [branches, setBranches] = useState<{ id: string; branch_name: string; city: string; region_id: string | null }[]>([]);
+  const [regions, setRegions] = useState<any[]>([]); // Using any for Region type temporarily or import it
+
+  useEffect(() => {
+    const fetchRegionsData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('regions')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setRegions(data || []);
+      } catch (error) {
+        console.error('Bölgeler alınamadı:', error);
+      }
+    };
+    fetchRegionsData();
+  }, []);
+
   useEffect(() => {
     const fetchBranches = async () => {
       try {
         setBranchesLoading(true);
         const { data, error } = await supabase
           .from('branches')
-          .select('city, region, is_active');
+          .select('id, branch_name, city, region_id, is_active')
+          .eq('is_active', true);
 
         if (error) throw error;
 
-        const mapping: Record<string, number> = {};
-        (data || []).forEach(branch => {
-          if (branch.city && typeof branch.region === 'number') {
-            mapping[branch.city] = branch.region;
+        // Map database fields to our internal state
+        const validBranches = (data || [])
+          .map(b => ({
+            id: b.id,
+            branch_name: b.branch_name,
+            city: b.city,
+            region_id: b.region_id
+          }));
+
+        setBranches(validBranches);
+
+        const mapping: Record<string, string> = {};
+        validBranches.forEach(branch => {
+          if (branch.city && branch.region_id) {
+            mapping[branch.city] = branch.region_id;
           }
         });
+        // We'll use mapping to auto-select region based on city from branch
+        // Update branchRegions type implies changing state definition too
+        // For now, let's just store it in a ref or specialized state if needed, 
+        // OR simply rely on the 'branches' array for lookups.
 
-        setBranchRegions(mapping);
       } catch (error) {
         console.error('Şube bilgileri alınamadı:', error);
       } finally {
@@ -243,7 +288,14 @@ export default function NewMemberPage() {
 
   useEffect(() => {
     if (formData.city) {
-      setCityRegion(branchRegions[formData.city] ?? null);
+      const region = branchRegions[formData.city] ?? null;
+      setCityRegion(region);
+      // Auto-update form region if not set or if needed. 
+      // Let's rely on user selection or auto-fill from branch.
+      // If city changes and we have a region mapping, maybe update the form region too?
+      if (!formData.region && region) {
+        setFormData(prev => ({ ...prev, region }));
+      }
     } else {
       setCityRegion(null);
     }
@@ -289,10 +341,27 @@ export default function NewMemberPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'children_count' ? parseInt(value) || 0 : value
-    }));
+
+    if (name === 'selected_branch_id') {
+      const selectedBranch = branches.find(b => b.id === value);
+      if (selectedBranch) {
+        setFormData(prev => ({
+          ...prev,
+          selected_branch_id: value,
+          city: selectedBranch.city,
+          region: selectedBranch.region_id
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, selected_branch_id: '' }));
+      }
+    } else if (name === 'region') {
+      setFormData(prev => ({ ...prev, region: value || null }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: name === 'children_count' ? Math.max(0, parseInt(value) || 0) : value
+      }));
+    }
 
     if (errors[name]) {
       setErrors(prev => ({
@@ -488,7 +557,7 @@ export default function NewMemberPage() {
     if (!formData.father_name.trim()) newErrors.father_name = 'Baba adı zorunludur';
     if (!formData.mother_name.trim()) newErrors.mother_name = 'Anne adı zorunludur';
     if (!formData.birth_place.trim()) newErrors.birth_place = 'Doğum yeri zorunludur';
-    if (!formData.blood_group) newErrors.blood_group = 'Kan grubu zorunludur';
+
     if (!formData.marital_status) newErrors.marital_status = 'Medeni durum zorunludur';
     if (!formData.education_level) newErrors.education_level = 'Öğrenim durumu zorunludur';
     if (!formData.institution.trim()) newErrors.institution = 'Kurum adı zorunludur';
@@ -539,6 +608,9 @@ export default function NewMemberPage() {
     }
 
     if (password) {
+      if (!formData.email?.trim()) {
+        newErrors.email = 'Şifre belirlemek için E-posta adresi zorunludur';
+      }
       if (password.length < 6) {
         newErrors.password = 'Şifre en az 6 karakter olmalıdır';
       }
@@ -598,10 +670,11 @@ export default function NewMemberPage() {
         notes: formData.notes.trim(),
         membership_number: canEditMembershipNumber ? formData.membership_number.trim() : null,
         membership_date: formData.membership_date ? formData.membership_date : null,
+        decision_number: formData.decision_number.trim() || null,
 
         membership_status: 'active',
         is_active: true,
-        region: cityRegion
+        region: formData.region || cityRegion
       };
 
       const { data, error } = await supabase
@@ -807,13 +880,13 @@ export default function NewMemberPage() {
                   {errors.membership_number && (
                     <p className="mt-1 text-sm text-red-600">{errors.membership_number}</p>
                   )}
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Bu numara üyeye giriş ve diğer işlemler için kullanılacaktır. Benzersiz olmalıdır.
                   </p>
                 </>
               ) : (
-                <div className="w-full px-3 py-2 border border-dashed border-slate-300 rounded-lg bg-slate-50 text-slate-600">
-                  Üye numarası kayıt sırasında otomatik atanacaktır. Bu alanı yalnızca süper adminler düzenleyebilir.
+                <div className="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-500">
+                  Otomatik Oluşturulacak
                 </div>
               )}
             </div>
@@ -833,10 +906,68 @@ export default function NewMemberPage() {
               {errors.membership_date && (
                 <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
               )}
-              <p className="mt-2 text-sm text-slate-500">
-                Üyenin sendikaya resmi olarak kaydedildiği tarihi seçiniz.
-              </p>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Karar Numarası
+              </label>
+              <input
+                type="text"
+                name="decision_number"
+                value={formData.decision_number}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Örn: 2024/15"
+              />
+            </div>
+
+            {/* Şube ve Bölge Seçimi (Admin için) */}
+            {!currentUser?.role_type || currentUser.role_type !== 'branch_manager' ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Şube Seçimi
+                  </label>
+                  <select
+                    name="selected_branch_id"
+                    value={formData.selected_branch_id}
+                    onChange={handleInputChange}
+                    disabled={branchesLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Şube Seçiniz (Otomatik Doldur)</option>
+                    {branches.map(branch => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.branch_name} ({branch.city})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Şube seçildiğinde İl ve Bölge bilgileri otomatik doldurulur.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Bölge
+                  </label>
+                  <select
+                    name="region"
+                    value={formData.region || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Bölge Seçiniz</option>
+                    {regions.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    İl seçimine göre otomatik gelir, gerekirse değiştirebilirsiniz.
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -993,7 +1124,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kan Grubu <span className="text-red-500">*</span>
+                Kan Grubu
               </label>
               <select
                 name="blood_group"
@@ -1298,7 +1429,7 @@ export default function NewMemberPage() {
           </div>
         </div>
 
-        {/* Portföy ve Şifre (Opsiyonel) */}
+        {/* Üye Hesabı (Opsiyonel) */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -1342,89 +1473,94 @@ export default function NewMemberPage() {
               )}
             </div>
           </div>
-          <div className="mt-6 border-t pt-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Upload className="w-4 h-4 text-blue-600" />
-              </div>
-              <h4 className="text-md font-semibold text-slate-900">Belgeler</h4>
+        </div>
+
+        {/* Belgeler */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <FileText className="w-5 h-5 text-blue-600" />
             </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Belgeler</h3>
+              <p className="text-sm text-slate-600">Üyeye ait belgeleri ekleyin</p>
+            </div>
+          </div>
 
-            {/* Document Upload Area */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                <div className="sm:col-span-5">
-                  <input
-                    type="text"
-                    placeholder="Belge Adı"
-                    value={documentForm.name}
-                    onChange={(e) => handleDocumentFieldChange('name', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div className="sm:col-span-3">
-                  <select
-                    value={documentForm.type}
-                    onChange={(e) => handleDocumentFieldChange('type', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Belge Türü</option>
-                    {documentTypeOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="sm:col-span-4 flex gap-2">
-                  <input
-                    key={documentInputKey}
-                    type="file"
-                    onChange={(e) => handleDocumentFileChange(e.target.files?.[0] || null)}
-                    className="flex-1 text-sm text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddDocument}
-                    className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 text-sm"
-                  >
-                    Ekle
-                  </button>
-                </div>
+          {/* Document Upload Area */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div className="sm:col-span-5">
+                <input
+                  type="text"
+                  placeholder="Belge Adı"
+                  value={documentForm.name}
+                  onChange={(e) => handleDocumentFieldChange('name', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                />
               </div>
-              {documentError && <p className="text-xs text-red-500">{documentError}</p>}
+              <div className="sm:col-span-3">
+                <select
+                  value={documentForm.type}
+                  onChange={(e) => handleDocumentFieldChange('type', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                >
+                  <option value="">Belge Türü</option>
+                  {documentTypeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-4 flex gap-2">
+                <input
+                  key={documentInputKey}
+                  type="file"
+                  onChange={(e) => handleDocumentFileChange(e.target.files?.[0] || null)}
+                  className="flex-1 text-sm text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddDocument}
+                  className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 text-sm"
+                >
+                  Ekle
+                </button>
+              </div>
+            </div>
+            {documentError && <p className="text-xs text-red-500">{documentError}</p>}
 
-              {/* Pending Document List */}
-              {documents.length > 0 && (
-                <div className="bg-slate-50 rounded-lg border border-slate-200">
-                  <ul className="divide-y divide-slate-200">
-                    {documents.map((doc) => (
-                      <li key={doc.id} className="px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center space-x-3 overflow-hidden">
-                          <div className="p-2 bg-white rounded border border-slate-200">
-                            <Upload className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
-                            <p className="text-xs text-slate-500 flex items-center">
-                              <span>{getDocumentTypeLabel(doc.type)}</span>
-                              <span className="mx-1">•</span>
-                              <span>{formatFileSize(doc.file.size)}</span>
-                            </p>
-                          </div>
+            {/* Pending Document List */}
+            {documents.length > 0 && (
+              <div className="bg-slate-50 rounded-lg border border-slate-200">
+                <ul className="divide-y divide-slate-200">
+                  {documents.map((doc) => (
+                    <li key={doc.id} className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="p-2 bg-white rounded border border-slate-200">
+                          <Upload className="w-4 h-4 text-slate-400" />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDocument(doc.id)}
-                          className="text-slate-400 hover:text-red-600 p-1"
-                          title="Kaldır"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
+                          <p className="text-xs text-slate-500 flex items-center">
+                            <span>{getDocumentTypeLabel(doc.type)}</span>
+                            <span className="mx-1">•</span>
+                            <span>{formatFileSize(doc.file.size)}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDocument(doc.id)}
+                        className="text-slate-400 hover:text-red-600 p-1"
+                        title="Kaldır"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 

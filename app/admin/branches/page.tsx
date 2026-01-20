@@ -61,7 +61,7 @@ function BranchesContent() {
         .select(`
           id, city, city_code, branch_name, address, 
           president_name, president_phone, president_email, 
-          is_active, legacy_region_number, created_at, updated_at,
+          is_active, created_at, updated_at,
           responsible_user:members!responsible_id(first_name, last_name),
           region:regions(*)
         `)
@@ -260,7 +260,7 @@ function BranchesContent() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                               {/* Prefer new region name if available, else legacy number */}
-                              {branch.region ? branch.region.name : (branch.legacy_region_number ? `${branch.legacy_region_number}. Bölge` : '-')}
+                              {branch.region ? branch.region.name : '-'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

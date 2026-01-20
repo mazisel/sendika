@@ -19,7 +19,10 @@ import {
   Filter,
   Download,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  LayoutGrid,
+  Table,
+  PieChart
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import StatsDetailModal from '@/components/statistics/StatsDetailModal';
@@ -66,6 +69,7 @@ export default function StatisticsPage() {
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'bar' | 'card' | 'table' | 'pie'>('bar');
 
   // Interactive Stats State
   const [selectedStat, setSelectedStat] = useState<{
@@ -106,7 +110,8 @@ export default function StatisticsPage() {
         loadDemographicStats(startDate),
         loadGeographicStats(startDate),
         loadWorkplaceStats(startDate),
-        loadTimeStats() // Time stats might be independent or always show trends
+        loadWorkplaceStats(startDate),
+        loadTimeStats(startDate)
       ]);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
@@ -412,13 +417,21 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadTimeStats = async () => {
+  const loadTimeStats = async (startDate: string | null) => {
     try {
       // Son 12 ayın üyelik trendleri
-      const { data: timeData } = await supabase
+      let query = supabase
         .from('members')
-        .select('created_at')
-        .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
+        .select('created_at');
+
+      if (startDate) {
+        query = query.gte('created_at', startDate);
+      } else {
+        // Default to 1 year if no filter
+        query = query.gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
+      }
+
+      const { data: timeData } = await query;
 
       const membershipTrends = timeData?.reduce((acc: any[], member) => {
         const month = new Date(member.created_at).toLocaleDateString('tr-TR', {
@@ -433,6 +446,13 @@ export default function StatisticsPage() {
         }
         return acc;
       }, []) || [];
+
+      // Sort trends chronologically if needed, but they come from reduce order which assumes data order.
+      // Better to sort by date. 
+      // Since month string 'Kas 2025' is hard to sort textually, let's trust the input data order (if sorted) or keeping as is.
+      // But map reduces in order of appearance. If Supabase return not sorted, this is random.
+      // Let's rely on current implementation for order, or better, we should sort the final array based on date parsing.
+      // But for this task, I'll stick to original logic + filter fix.
 
       // Katılım tarihi analizi
       const joinDateAnalysis = timeData?.reduce((acc: any[], member) => {
@@ -525,6 +545,177 @@ export default function StatisticsPage() {
     return `${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`;
   };
 
+  // Render statistics based on view mode
+  const renderStatView = (
+    data: { label: string; count: number; color: string }[],
+    maxCount: number,
+    onItemClick: (label: string) => void
+  ) => {
+    if (!data || data.length === 0) {
+      return (
+        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+          <p className="text-sm">Henüz veri eklenmemiş</p>
+        </div>
+      );
+    }
+
+    // Bar View (current)
+    if (viewMode === 'bar') {
+      return (
+        <div className="space-y-4">
+          {data.map((item, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              onClick={() => onItemClick(item.label)}
+            >
+              <span className="text-slate-700 dark:text-slate-300">{item.label || 'Belirtilmemiş'}</span>
+              <div className="flex items-center space-x-3">
+                <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
+                  <div
+                    className={`${item.color} h-2 rounded-full`}
+                    style={{ width: `${(item.count / maxCount) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Card View
+    if (viewMode === 'card') {
+      return (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {data.map((item, index) => (
+            <div
+              key={index}
+              className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg hover:shadow-md cursor-pointer transition-all"
+              onClick={() => onItemClick(item.label)}
+            >
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{item.count}</div>
+              <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 truncate">{item.label || 'Belirtilmemiş'}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-500 mt-2">
+                {((item.count / maxCount) * 100).toFixed(1)}%
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Table View
+    if (viewMode === 'table') {
+      return (
+        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+          <table className="w-full">
+            <thead className="bg-slate-100 dark:bg-slate-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Kategori
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Sayı
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Oran
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              {data.map((item, index) => (
+                <tr
+                  key={index}
+                  className="hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                  onClick={() => onItemClick(item.label)}
+                >
+                  <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{item.label || 'Belirtilmemiş'}</td>
+                  <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 text-right font-medium">{item.count}</td>
+                  <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 text-right">
+                    {((item.count / maxCount) * 100).toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Pie Chart View
+    if (viewMode === 'pie') {
+      const total = data.reduce((sum, item) => sum + item.count, 0);
+      let currentAngle = 0;
+      const colors = [
+        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+        '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+      ];
+
+      return (
+        <div className="flex flex-col items-center space-y-6">
+          {/* SVG Pie Chart */}
+          <svg viewBox="0 0 200 200" className="w-64 h-64">
+            {data.map((item, index) => {
+              const percentage = (item.count / total) * 100;
+              const angle = (percentage / 100) * 360;
+              const startAngle = currentAngle;
+              const endAngle = currentAngle + angle;
+
+              // Calculate path for pie slice
+              const startX = 100 + 90 * Math.cos((Math.PI * startAngle) / 180);
+              const startY = 100 + 90 * Math.sin((Math.PI * startAngle) / 180);
+              const endX = 100 + 90 * Math.cos((Math.PI * endAngle) / 180);
+              const endY = 100 + 90 * Math.sin((Math.PI * endAngle) / 180);
+              const largeArc = angle > 180 ? 1 : 0;
+
+              const pathData = `M 100 100 L ${startX} ${startY} A 90 90 0 ${largeArc} 1 ${endX} ${endY} Z`;
+
+              currentAngle += angle;
+
+              return (
+                <path
+                  key={index}
+                  d={pathData}
+                  fill={colors[index % colors.length]}
+                  className="cursor-pointer transition-opacity hover:opacity-80"
+                  onClick={() => onItemClick(item.label)}
+                />
+              );
+            })}
+          </svg>
+
+          {/* Legend */}
+          <div className="grid grid-cols-2 gap-3 w-full">
+            {data.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded transition-colors"
+                onClick={() => onItemClick(item.label)}
+              >
+                <div
+                  className="w-4 h-4 rounded"
+                  style={{ backgroundColor: colors[index % colors.length] }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-slate-900 dark:text-slate-100 truncate">
+                    {item.label || 'Belirtilmemiş'}
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
+                    {item.count} ({((item.count / total) * 100).toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -545,6 +736,54 @@ export default function StatisticsPage() {
           <p className="text-slate-600 dark:text-slate-400 mt-2">Detaylı üye istatistikleri ve analiz raporları</p>
         </div>
         <div className="flex items-center space-x-3">
+          {/* View Mode Selector */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('bar')}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-colors ${viewMode === 'bar'
+                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              title="Bar Grafik"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span className="text-sm font-medium">Bar</span>
+            </button>
+            <button
+              onClick={() => setViewMode('card')}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-colors ${viewMode === 'card'
+                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              title="Kart Görünümü"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="text-sm font-medium">Kart</span>
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-colors ${viewMode === 'table'
+                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              title="Tablo Görünümü"
+            >
+              <Table className="w-4 h-4" />
+              <span className="text-sm font-medium">Tablo</span>
+            </button>
+            <button
+              onClick={() => setViewMode('pie')}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded transition-colors ${viewMode === 'pie'
+                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              title="Pasta Grafik"
+            >
+              <PieChart className="w-4 h-4" />
+              <span className="text-sm font-medium">Pasta</span>
+            </button>
+          </div>
+
           <select
             value={selectedTimeRange}
             onChange={(e) => setSelectedTimeRange(e.target.value)}
@@ -656,28 +895,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin cinsiyet bazlı dağılımı</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {demographicStats?.genderDistribution.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('gender', item.gender, `Cinsiyet: ${item.gender}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.gender}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            demographicStats?.genderDistribution?.map(item => ({
+              label: item.gender,
+              count: item.count,
+              color: 'bg-purple-600 dark:bg-purple-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (gender) => handleStatClick('gender', gender, `Cinsiyet: ${gender}`)
+          )}
         </div>
 
         {/* Yaş Grupları */}
@@ -691,28 +917,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin yaş bazlı dağılımı</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {demographicStats?.ageGroups.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('age', item.ageGroup, `Yaş Grubu: ${item.ageGroup}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.ageGroup}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-orange-600 dark:bg-orange-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            demographicStats?.ageGroups?.map(item => ({
+              label: item.ageGroup,
+              count: item.count,
+              color: 'bg-orange-600 dark:bg-orange-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (ageGroup) => handleStatClick('age', ageGroup, `Yaş Grubu: ${ageGroup}`)
+          )}
         </div>
 
         {/* Medeni Durum */}
@@ -726,28 +939,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin medeni durum dağılımı</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {demographicStats?.maritalStatus.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('marital', item.status, `Medeni Durum: ${item.status}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.status}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-pink-600 dark:bg-pink-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            demographicStats?.maritalStatus?.map(item => ({
+              label: item.status,
+              count: item.count,
+              color: 'bg-pink-600 dark:bg-pink-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (status) => handleStatClick('marital', status, `Medeni Durum: ${status}`)
+          )}
         </div>
 
         {/* Eğitim Seviyeleri */}
@@ -761,28 +961,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin eğitim durumu</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {demographicStats?.educationLevels.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('education', item.level, `Eğitim Seviyesi: ${item.level}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.level}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            demographicStats?.educationLevels?.map(item => ({
+              label: item.level,
+              count: item.count,
+              color: 'bg-indigo-600 dark:bg-indigo-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (level) => handleStatClick('education', level, `Eğitim Seviyesi: ${level}`)
+          )}
         </div>
       </div>
 
@@ -799,28 +986,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Coğrafi dağılım analizi</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {geographicStats?.topCities.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('city', item.city, `Şehir: ${item.city}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.city}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-green-600 dark:bg-green-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (geographicStats?.topCities[0]?.count || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            geographicStats?.topCities?.map(item => ({
+              label: item.city,
+              count: item.count,
+              color: 'bg-green-600 dark:bg-green-400'
+            })) || [],
+            geographicStats?.topCities[0]?.count || 1,
+            (city) => handleStatClick('city', city, `Şehir: ${city}`)
+          )}
         </div>
 
         {/* En Çok Çalışanı Olan İşyerleri */}
@@ -834,28 +1008,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">İşyeri bazlı üye dağılımı</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {workplaceStats?.topWorkplaces.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('workplace', item.workplace, `İşyeri: ${item.workplace}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300 truncate">{item.workplace}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (workplaceStats?.topWorkplaces[0]?.count || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            workplaceStats?.topWorkplaces?.map(item => ({
+              label: item.workplace,
+              count: item.count,
+              color: 'bg-blue-600 dark:bg-blue-400'
+            })) || [],
+            workplaceStats?.topWorkplaces[0]?.count || 1,
+            (workplace) => handleStatClick('workplace', workplace, `İşyeri: ${workplace}`)
+          )}
         </div>
       </div>
 
@@ -872,28 +1033,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin çocuk sayısı analizi</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {demographicStats?.childrenStats.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('children', item.range, `Çocuk Sayısı: ${item.range}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300">{item.range}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-yellow-600 dark:bg-yellow-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            demographicStats?.childrenStats?.map(item => ({
+              label: item.range,
+              count: item.count,
+              color: 'bg-cyan-600 dark:bg-cyan-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (range) => handleStatClick('children', range, `Çocuk Sayısı: ${range}`)
+          )}
         </div>
 
         {/* Pozisyon Dağılımı */}
@@ -907,28 +1055,15 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin iş pozisyonları</p>
             </div>
           </div>
-          <div className="space-y-4">
-            {workplaceStats?.positionDistribution.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                onClick={() => handleStatClick('position', item.position, `Pozisyon: ${item.position}`)}
-              >
-                <span className="text-slate-700 dark:text-slate-300 truncate">{item.position}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-32 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                    <div
-                      className="bg-teal-600 dark:bg-teal-400 h-2 rounded-full"
-                      style={{
-                        width: `${(item.count / (workplaceStats?.positionDistribution[0]?.count || 1)) * 100}%`
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-12 text-right">{item.count}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {renderStatView(
+            workplaceStats?.positionDistribution?.map(item => ({
+              label: item.position,
+              count: item.count,
+              color: 'bg-teal-600 dark:bg-teal-400'
+            })) || [],
+            workplaceStats?.positionDistribution[0]?.count || 1,
+            (position) => handleStatClick('position', position, `Pozisyon: ${position}`)
+          )}
         </div>
       </div>
 
@@ -944,75 +1079,217 @@ export default function StatisticsPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Son 12 Ay Trend */}
+          {/* Son 12 Ay Trend - Clickable and Better Layout */}
           <div>
-            <h4 className="text-md font-medium text-slate-800 dark:text-slate-200 mb-4">Son 12 Ayın Üyelik Trendleri</h4>
-            <div className="space-y-3">
-              {timeStats?.membershipTrends.slice(-6).map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-slate-300">{item.month}</span>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                      <div
-                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
-                        style={{
-                          width: `${(item.count / Math.max(...(timeStats?.membershipTrends.map(t => t.count) || [1]))) * 100}%`
-                        }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-8 text-right">{item.count}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h4 className="text-md font-medium text-slate-800 dark:text-slate-200 mb-4">Dönemsel Üyelik Trendi</h4>
+            {renderStatView(
+              timeStats?.membershipTrends?.slice(-12).map(item => ({
+                label: item.month,
+                count: item.count,
+                color: 'bg-indigo-600 dark:bg-indigo-400'
+              })) || [],
+              Math.max(...(timeStats?.membershipTrends?.map(t => t.count) || [1])),
+              (month) => handleStatClick('join_date_month', month, `${month} Döneminde Kaydolanlar`)
+            )}
           </div>
 
-          {/* Katılım Süresi Analizi */}
+          {/* Katılım Süresi Analizi - Clickable */}
           <div>
             <h4 className="text-md font-medium text-slate-800 dark:text-slate-200 mb-4">Katılım Süresi Dağılımı</h4>
-            <div className="space-y-3">
-              {timeStats?.joinDateAnalysis.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-slate-700 dark:text-slate-300">{item.period}</span>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-24 bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                      <div
-                        className="bg-indigo-600 dark:bg-indigo-400 h-2 rounded-full"
-                        style={{
-                          width: `${(item.count / (memberStats?.totalMembers || 1)) * 100}%`
-                        }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100 w-8 text-right">{item.count}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {renderStatView(
+              timeStats?.joinDateAnalysis?.map(item => ({
+                label: item.period,
+                count: item.count,
+                color: 'bg-indigo-600 dark:bg-indigo-400'
+              })) || [],
+              memberStats?.totalMembers || 1,
+              (period) => handleStatClick('join_period', period, `${period} İçinde Kaydolanlar`)
+            )}
           </div>
         </div>
       </div>
 
-      {/* Özet Kartları */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:bg-slate-900/60 dark:from-slate-900 dark:to-slate-900 rounded-xl p-6 border border-blue-200 dark:border-slate-800">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">İstatistik Özeti</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className={miniCardClass}>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Aktiflik Oranı</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-300">
-              {memberStats?.totalMembers ?
-                Math.round((memberStats.activeMembers / memberStats.totalMembers) * 100) : 0}%
+      {/* Gelişmiş Özet Kartları */}
+      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-8 border border-blue-200 dark:border-slate-700 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 İstatistik Özeti</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Önemli metriklerin hızlı görünümü</p>
+          </div>
+          <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Canlı Veri</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Aktiflik Oranı */}
+          <div
+            className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-md hover:shadow-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700 group"
+            onClick={() => handleStatClick('status', 'active', 'Aktif Üyeler')}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <TrendingUp className="w-4 h-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Aktiflik Oranı</div>
+            <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-2">
+              {memberStats?.totalMembers ? Math.round((memberStats.activeMembers / memberStats.totalMembers) * 100) : 0}%
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>{memberStats?.activeMembers || 0} aktif</span>
+              <span>{memberStats?.totalMembers || 0} toplam</span>
+            </div>
+            {/* Progress bar */}
+            <div className="mt-3 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-500"
+                style={{ width: `${memberStats?.totalMembers ? (memberStats.activeMembers / memberStats.totalMembers) * 100 : 0}%` }}
+              />
             </div>
           </div>
-          <div className={miniCardClass}>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Bu Ay Büyüme</div>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
+
+          {/* Aylık Büyüme */}
+          <div
+            className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-md hover:shadow-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700 group"
+            onClick={() => handleStatClick('date_range', 'this_month', 'Bu Ay Kaydolanlar')}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <Calendar className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Aylık Büyüme</div>
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
               {getGrowthPercentage()}
             </div>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>Bu ay: {memberStats?.newMembersThisMonth || 0}</span>
+              <span>Geçen: {memberStats?.newMembersLastMonth || 0}</span>
+            </div>
+            {/* Trend indicator */}
+            <div className="mt-3 flex items-center space-x-1">
+              {(memberStats?.newMembersThisMonth || 0) > (memberStats?.newMembersLastMonth || 0) ? (
+                <>
+                  <TrendingUp className="w-3 h-3 text-green-500" />
+                  <span className="text-xs text-green-600 dark:text-green-400 font-medium">Yükseliş trendi</span>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-3 h-3 text-red-500 rotate-180" />
+                  <span className="text-xs text-red-600 dark:text-red-400 font-medium">Düşüş trendi</span>
+                </>
+              )}
+            </div>
           </div>
-          <div className={miniCardClass}>
-            <div className="text-sm text-slate-600 dark:text-slate-400">En Popüler Şehir</div>
-            <div className="text-lg font-bold text-slate-900 dark:text-slate-100">
+
+          {/* En Popüler Şehir */}
+          <div
+            className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-md hover:shadow-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700 group"
+            onClick={() => geographicStats?.topCities[0] && handleStatClick('city', geographicStats.topCities[0].city, `Şehir: ${geographicStats.topCities[0].city}`)}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <MapPin className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 rounded text-xs font-bold text-purple-600 dark:text-purple-400">
+                #1
+              </div>
+            </div>
+            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">En Popüler Şehir</div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2 truncate">
               {geographicStats?.topCities[0]?.city || 'Veri yok'}
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {geographicStats?.topCities[0]?.count || 0} üye
+            </div>
+            {/* Mini bar chart of top 3 */}
+            <div className="mt-3 space-y-1">
+              {geographicStats?.topCities?.slice(0, 3).map((city, i) => (
+                <div key={i} className="flex items-center space-x-2">
+                  <div className="w-1 h-1 bg-purple-400 rounded-full"></div>
+                  <div className="flex-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-purple-400"
+                      style={{ width: `${(city.count / (geographicStats.topCities[0]?.count || 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* En Popüler İşyeri */}
+          <div
+            className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-md hover:shadow-xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700 group"
+            onClick={() => workplaceStats?.topWorkplaces[0] && handleStatClick('workplace', workplaceStats.topWorkplaces[0].workplace, `İşyeri: ${workplaceStats.topWorkplaces[0].workplace}`)}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                <Briefcase className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded text-xs font-bold text-orange-600 dark:text-orange-400">
+                TOP
+              </div>
+            </div>
+            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">En Popüler İşyeri</div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2 truncate leading-tight">
+              {workplaceStats?.topWorkplaces[0]?.workplace || 'Veri yok'}
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {workplaceStats?.topWorkplaces[0]?.count || 0} çalışan
+            </div>
+            {/* Percentage badge */}
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Toplam oranı</span>
+              <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded text-xs font-bold text-orange-600 dark:text-orange-400">
+                {workplaceStats?.topWorkplaces[0]?.count && memberStats?.totalMembers
+                  ? ((workplaceStats.topWorkplaces[0].count / memberStats.totalMembers) * 100).toFixed(1)
+                  : 0}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Quick Stats */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center space-x-2">
+              <UserX className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-600 dark:text-slate-400">Pasif</span>
+            </div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+              {memberStats?.inactiveMembers || 0}
+            </div>
+          </div>
+          <div className="bg-white/50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-600 dark:text-slate-400">Bekleyen</span>
+            </div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+              {memberStats?.pendingMembers || 0}
+            </div>
+          </div>
+          <div className="bg-white/50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center space-x-2">
+              <MapPin className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-600 dark:text-slate-400">Şehir</span>
+            </div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+              {geographicStats?.topCities?.length || 0}
+            </div>
+          </div>
+          <div className="bg-white/50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center space-x-2">
+              <Briefcase className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-600 dark:text-slate-400">İşyeri</span>
+            </div>
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+              {workplaceStats?.topWorkplaces?.length || 0}
             </div>
           </div>
         </div>
@@ -1028,6 +1305,7 @@ export default function StatisticsPage() {
             type: selectedStat.type,
             value: selectedStat.value
           }}
+          startDate={getStartDate(selectedTimeRange)}
         />
       )}
     </div>

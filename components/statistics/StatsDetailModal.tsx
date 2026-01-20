@@ -13,9 +13,10 @@ interface StatsDetailModalProps {
         value: any;
         label?: string;
     };
+    startDate?: string | null;
 }
 
-export default function StatsDetailModal({ isOpen, onClose, title, filter }: StatsDetailModalProps) {
+export default function StatsDetailModal({ isOpen, onClose, title, filter, startDate }: StatsDetailModalProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -25,12 +26,18 @@ export default function StatsDetailModal({ isOpen, onClose, title, filter }: Sta
         if (isOpen && filter) {
             loadMembers();
         }
-    }, [isOpen, filter]);
+    }, [isOpen, filter, startDate]);
 
     const loadMembers = async () => {
         try {
             setLoading(true);
             let query = supabase.from('members').select('*');
+
+            // Apply date filter if exists (and not overridden by specific date filters)
+            if (startDate && !['date_range', 'join_date_month', 'join_period'].includes(filter.type)) {
+                query = query.gte('created_at', startDate);
+            }
+
 
             // Apply filters based on type
             switch (filter.type) {
@@ -101,6 +108,113 @@ export default function StatsDetailModal({ isOpen, onClose, title, filter }: Sta
                         const end = new Date();
                         end.setDate(0);
                         query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+                    }
+                    break;
+
+                case 'join_date_month':
+                    // format: "Kas 2025" or similar locale string from page.tsx (short month name)
+                    // We need to parse this local specific string back to date range.
+                    // This relies on Turkish locale month names.
+                    const monthMap: { [key: string]: number } = {
+                        'Oca': 0, 'Şub': 1, 'Mar': 2, 'Nis': 3, 'May': 4, 'Haz': 5,
+                        'Tem': 6, 'Ağu': 7, 'Eyl': 8, 'Eki': 9, 'Kas': 10, 'Ara': 11,
+                        'Jan': 0, 'Feb': 1, 'Apr': 3, 'Jun': 5, // English fallbacks (non-duplicates)
+                        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                    };
+
+                    try {
+                        const parts = filter.value.split(' ');
+                        const monthName = parts[0];
+                        const year = parseInt(parts[1]);
+                        const monthIndex = monthMap[monthName];
+
+                        if (monthIndex !== undefined && !isNaN(year)) {
+                            const start = new Date(year, monthIndex, 1);
+                            const end = new Date(year, monthIndex + 1, 0, 23, 59, 59); // Last day of month
+                            // Adjust for timezone if needed, but ISO string usually ok for comparison
+                            // Use explicit UTC if needed or just local midnight
+                            // Supabase stores as timestamptz usually.
+
+                            // Let's ensure strict ISO range
+                            const startStr = new Date(year, monthIndex, 1, 0, 0, 0).toISOString();
+                            // End date: start of next month? Or end of this month?
+                            // easier: start of next month and use lt
+                            const nextMonth = new Date(year, monthIndex + 1, 1, 0, 0, 0).toISOString();
+
+                            query = query.gte('created_at', startStr).lt('created_at', nextMonth);
+                        }
+                    } catch (e) {
+                        console.error("Date parse error", e);
+                    }
+                    break;
+
+                case 'join_period':
+                    const now = new Date();
+                    if (filter.value === 'Bu ay') {
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                        query = query.gte('created_at', start.toISOString());
+                    }
+                    else if (filter.value === 'Son 3 ay') {
+                        const start = new Date(now.getFullYear(), now.getMonth() - 3, 1); // Approx logic from page.tsx
+                        // Replicating page.tsx logic: (now - join) < 3 months. 
+                        // Actually page.tsx uses detailed diff calculation. 
+                        // Let's approximate: >= 3 months ago.
+
+                        // Strict alignment with page.tsx:
+                        // if (diffMonths < 1) -> This month
+                        // else if (diffMonths < 3) -> Last 3 months (excluding this month? or including?)
+                        // page.tsx logic: 
+                        // diffMonths < 1 ('Bu ay')
+                        // diffMonths < 3 ('Son 3 ay') -> This means 1 <= diff < 3.
+                        // So it captures "1 to 3 months ago".
+
+                        // To properly filter, we need range.
+                        // "Bu ay": >= start of this month
+                        // "Son 3 ay": >= start of 3 months ago AND < start of this month (if exclusives)
+                        // BUT typically "Last 3 months" chart includes this month? 
+                        // Looking at page.tsx logic:
+                        // It uses `if ... else if ...` so they are exclusive buckets.
+                        // "Bu ay" bucket takes diff < 1.
+                        // "Son 3 ay" bucket takes diff < 3 (so 1..2 months ago).
+
+                        const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                        const threeMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1); // 2 months back covers diff 1,2
+
+                        // Wait, logic in page.tsx:
+                        // (now.year - join.year)*12 + (now.month - join.month)
+                        // created_at: 2026-01-15, now: 2026-01-20 -> diff = 0. "Bu ay".
+                        // created_at: 2025-12-15 -> diff = 1. "Son 3 ay" (since 1 < 3).
+                        // created_at: 2025-11-15 -> diff = 2. "Son 3 ay".
+                        // created_at: 2025-10-15 -> diff = 3. "Son 6 ay".
+
+                        const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1); // Wait, diff=3 is > 2.
+
+                        // Let's just construct ranges based on 'diffMonths' logic
+                        // "Son 3 ay" (diff 1 or 2): start = 2 months ago (start of month), end = start of this month.
+                        // e.g. Now=Jan. Diff=1 (Dec), Diff=2 (Nov). 
+                        // So Nov 1st <= date < Jan 1st.
+
+                        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+                        if (filter.value === 'Son 3 ay') { // 1 <= diff < 3 => 2 months ago, 1 month ago
+                            const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+                            query = query.gte('created_at', start.toISOString()).lt('created_at', startOfThisMonth.toISOString());
+                        }
+                        else if (filter.value === 'Son 6 ay') { // 3 <= diff < 6 => 3,4,5 months ago
+                            const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+                            const end = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+                            query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+                        }
+                        else if (filter.value === 'Son 1 yıl') { // 6 <= diff < 12
+                            const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+                            const end = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+                            query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+                        }
+                        else if (filter.value === '1 yıldan fazla') { // diff >= 12
+                            const end = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+                            query = query.lt('created_at', end.toISOString());
+                        }
                     }
                     break;
             }
