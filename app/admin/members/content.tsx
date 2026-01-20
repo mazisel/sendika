@@ -508,6 +508,16 @@ export default function AdminMembersContent() {
                 <option value="inactive">Pasif</option>
               </select>
 
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-40 px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800"
+              >
+                <option value="all">Tüm Tarihler</option>
+                <option value="this_month">Bu Ay</option>
+                <option value="last_month">Geçen Ay</option>
+              </select>
+
               <div className="flex items-center gap-2">
                 <button onClick={() => setIsCompact(!isCompact)} className="p-2 bg-gray-100 dark:bg-slate-800 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700">
                   {isCompact ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}

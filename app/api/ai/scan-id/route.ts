@@ -27,12 +27,12 @@ export async function POST(request: Request) {
         const buffer = Buffer.from(bytes);
 
         // Model configuration
-        // Using gemini-3-flash-preview as requested
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+        // Using gemini-2.0-flash as observed in available models list
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
         const prompt = `
             Analyze this Turkish Identity Card (Kimlik Kartı) image.
-            Extract the following information and return ONLY a JSON object with these keys:
+            Extract the following information and return ONLY a valid JSON object with these keys:
             - first_name (string, extract Ad)
             - last_name (string, extract Soyad)
             - tc_identity (string, extract TC Kimlik No/TR Identity No)
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
             2. For gender, if 'E' return 'male', if 'K' return 'female'.
             3. Return only pure JSON, no markdown formatting like \`\`\`json.
             4. If a field is not visible or cannot be read, leave it as null.
+            5. Do NOT include any explanations or extra text.
         `;
 
         const imagePart = {
@@ -57,8 +58,14 @@ export async function POST(request: Request) {
         const response = await result.response;
         const text = response.text();
 
+        console.log('AI Raw Response:', text); // Debug log
+
         // Clean up text if it contains markdown code blocks
         const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        if (!cleanedText) {
+            throw new Error('AI returned empty response');
+        }
 
         try {
             const data = JSON.parse(cleanedText);

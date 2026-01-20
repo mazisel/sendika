@@ -31,6 +31,7 @@ import {
   Target,
   Globe
 } from 'lucide-react';
+import CityMembersModal from '@/components/dashboard/CityMembersModal';
 
 interface DashboardStats {
   totalNews: number;
@@ -68,6 +69,7 @@ export default function AdminDashboard() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [cityStats, setCityStats] = useState<CityStats[]>([]);
   const [cityStatsLoading, setCityStatsLoading] = useState(true);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -670,7 +672,17 @@ export default function AdminDashboard() {
         totalRegistered={stats?.totalMembers || 0}
         totalOnlineApplications={stats?.pendingMembers || 0}
         isLoading={cityStatsLoading}
+        onCityClick={(city) => setSelectedCity(city)}
       />
+
+      {/* City Members Modal */}
+      {selectedCity && (
+        <CityMembersModal
+          city={selectedCity}
+          isOpen={true}
+          onClose={() => setSelectedCity(null)}
+        />
+      )}
 
       {/* Recent Activity */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

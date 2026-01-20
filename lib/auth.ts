@@ -164,44 +164,32 @@ export class AdminAuth {
     region?: number;
   }): Promise<AuthResponse> {
     try {
-      // Önce Supabase Auth'da kullanıcı oluştur
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return { success: false, error: 'Oturum bulunamadı' };
+      }
+
+      // Call API endpoint
+      const response = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(userData)
       });
 
-      if (authError || !authData.user) {
-        return { success: false, error: 'Kullanıcı oluşturulamadı: ' + authError?.message };
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: result.error || 'Kullanıcı oluşturulurken bir hata oluştu' };
       }
 
-      // Admin tablosuna kullanıcı bilgilerini ekle
-      const { data: adminUser, error: adminError } = await supabase
-        .from('admin_users')
-        .insert([
-          {
-            id: authData.user.id, // Supabase Auth user ID'sini kullan
-            email: userData.email,
-            full_name: userData.full_name,
-            role: userData.role || 'admin',
-            role_type: userData.role_type || 'general_manager',
-            role_id: userData.role_id || null,
-            city: userData.city,
-            region: userData.region ?? null
-          }
-        ])
-        .select()
-        .single();
-
-      if (adminError) {
-        // Auth'dan kullanıcıyı sil
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        return { success: false, error: 'Admin kullanıcı kaydı oluşturulamadı' };
-      }
-
-      return { success: true, user: adminUser };
+      return { success: true, user: result.user };
     } catch (error) {
       console.error('Create user error:', error);
-      return { success: false, error: 'Kullanıcı oluşturma işlemi başarısız' };
+      return { success: false, error: 'Kullanıcı oluşturma işlemi sırasında bağlantı hatası' };
     }
   }
 

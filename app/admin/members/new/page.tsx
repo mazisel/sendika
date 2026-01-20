@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
 import { cityOptions } from '@/lib/cities';
+import { getDistrictsByCity } from '@/lib/districts';
 import { AdminUser, DefinitionType, GeneralDefinition } from '@/lib/types';
 import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2 } from 'lucide-react';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -171,6 +172,20 @@ export default function NewMemberPage() {
 
     return cityOptions.map(option => option.name);
   }, [branchRegions, currentUser]);
+
+  const currentDistricts = useMemo(() => {
+    return formData.city ? getDistrictsByCity(formData.city) : [];
+  }, [formData.city]);
+
+  // Şehir değiştiğinde ilçe seçimi geçersizse sıfırla
+  useEffect(() => {
+    if (formData.city && formData.district) {
+      const validDistricts = getDistrictsByCity(formData.city);
+      if (!validDistricts.includes(formData.district)) {
+        setFormData(prev => ({ ...prev, district: '' }));
+      }
+    }
+  }, [formData.city]);
 
   const [documents, setDocuments] = useState<PendingDocument[]>([]);
   const [documentForm, setDocumentForm] = useState<{ name: string; type: string; file: File | null }>({
@@ -470,6 +485,19 @@ export default function NewMemberPage() {
     if (!formData.gender) newErrors.gender = 'Cinsiyet zorunludur';
     if (!formData.city.trim()) newErrors.city = 'İl zorunludur';
     if (!formData.district.trim()) newErrors.district = 'İlçe zorunludur';
+    if (!formData.father_name.trim()) newErrors.father_name = 'Baba adı zorunludur';
+    if (!formData.mother_name.trim()) newErrors.mother_name = 'Anne adı zorunludur';
+    if (!formData.birth_place.trim()) newErrors.birth_place = 'Doğum yeri zorunludur';
+    if (!formData.blood_group) newErrors.blood_group = 'Kan grubu zorunludur';
+    if (!formData.marital_status) newErrors.marital_status = 'Medeni durum zorunludur';
+    if (!formData.education_level) newErrors.education_level = 'Öğrenim durumu zorunludur';
+    if (!formData.institution.trim()) newErrors.institution = 'Kurum adı zorunludur';
+    if (!formData.workplace.trim()) newErrors.workplace = 'İş yeri zorunludur';
+    if (!formData.position.trim()) newErrors.position = 'Kadro unvanı zorunludur';
+    if (!formData.institution_register_no.trim()) newErrors.institution_register_no = 'Kurum sicil no zorunludur';
+    if (!formData.start_date) newErrors.start_date = 'İşe başlama tarihi zorunludur';
+    if (!formData.phone.trim()) newErrors.phone = 'Telefon zorunludur';
+
     if (canEditMembershipNumber) {
       if (!formData.membership_number.trim()) {
         newErrors.membership_number = 'Üye numarası zorunludur';
@@ -881,7 +909,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Baba Adı
+                Baba Adı <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -895,7 +923,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Anne Adı
+                Anne Adı <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -909,16 +937,19 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Doğum Yeri
+                Doğum Yeri <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 name="birth_place"
                 value={formData.birth_place}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Doğum yeri"
-              />
+              >
+                <option value="">Seçiniz</option>
+                {cityOptions.map(city => (
+                  <option key={city.code} value={city.name}>{city.name}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -961,7 +992,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kan Grubu
+                Kan Grubu <span className="text-red-500">*</span>
               </label>
               <select
                 name="blood_group"
@@ -983,7 +1014,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Eğitim Durumu
+                Eğitim Durumu <span className="text-red-500">*</span>
               </label>
               <select
                 name="education_level"
@@ -1004,7 +1035,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Medeni Durum
+                Medeni Durum <span className="text-red-500">*</span>
               </label>
               <select
                 name="marital_status"
@@ -1015,6 +1046,7 @@ export default function NewMemberPage() {
                 <option value="">Seçiniz</option>
                 <option value="Bekar">Bekar</option>
                 <option value="Evli">Evli</option>
+                <option value="Boşanmış">Boşanmış</option>
               </select>
             </div>
 
@@ -1049,7 +1081,7 @@ export default function NewMemberPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Telefon
+                Telefon <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
@@ -1059,6 +1091,7 @@ export default function NewMemberPage() {
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-slate-300'
                   }`}
                 placeholder="5XX XXX XX XX"
+                maxLength={10}
               />
               {errors.phone && (
                 <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
@@ -1108,15 +1141,19 @@ export default function NewMemberPage() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 İlçe <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.district ? 'border-red-500' : 'border-slate-300'
                   }`}
-                placeholder="İlçe giriniz"
-              />
+                disabled={!formData.city}
+              >
+                <option value="">İlçe Seçiniz</option>
+                {currentDistricts.map(dist => (
+                  <option key={dist} value={dist}>{dist}</option>
+                ))}
+              </select>
               {errors.district && (
                 <p className="mt-1 text-sm text-red-600">{errors.district}</p>
               )}
@@ -1153,7 +1190,7 @@ export default function NewMemberPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                İş Yeri (Çalıştığı Kurum)
+                İş Yeri (Çalıştığı Kurum) <span className="text-red-500">*</span>
               </label>
               <select
                 name="workplace"
@@ -1177,7 +1214,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kurum
+                Kurum <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1191,7 +1228,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kadro Unvanı (Pozisyon)
+                Kadro Unvanı (Pozisyon) <span className="text-red-500">*</span>
               </label>
               <select
                 name="position"
@@ -1215,7 +1252,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Kurum Sicil No
+                Kurum Sicil No <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1243,7 +1280,7 @@ export default function NewMemberPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                İşe Başlama Tarihi
+                İşe Başlama Tarihi <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"

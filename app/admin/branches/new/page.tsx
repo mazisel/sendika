@@ -116,6 +116,10 @@ export default function NewBranchPage() {
         throw new Error('Lütfen bir şehir seçiniz.')
       }
 
+      if (!payload.responsible_id) {
+        throw new Error('Lütfen şube sorumlusunu (Başkanı) seçiniz.')
+      }
+
       const { error } = await supabase
         .from('branches')
         .insert([payload])
@@ -133,7 +137,7 @@ export default function NewBranchPage() {
         userId: currentUser?.id
       });
 
-      router.push('/admin/branches')
+      router.push('/admin/branches?tab=branches')
     } catch (error: any) {
       setError('Şube eklenirken hata oluştu: ' + error.message)
     } finally {
@@ -173,7 +177,7 @@ export default function NewBranchPage() {
         <div className="mb-8">
           <div className="flex items-center mb-4">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/admin/branches?tab=branches')}
               className="flex items-center text-gray-600 hover:text-gray-900 mr-4 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <ArrowLeft className="w-5 h-5 mr-1" />
@@ -195,205 +199,180 @@ export default function NewBranchPage() {
         <div className="bg-white dark:bg-slate-900 shadow-lg rounded-lg border border-gray-200 dark:border-gray-800">
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Şehir Bilgileri */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-800 pb-2">
-                  Şehir Bilgileri
-                </h3>
-
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Şehir *
-                  </label>
-                  <select
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={(e) => handleCitySelect(e.target.value)}
-                    required
-                    disabled={currentUser?.role_type === 'branch_manager'}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Şehir seçiniz</option>
-                    {cityOptions.map((city) => (
-                      <option key={city.code} value={city.name}>
-                        {city.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="city_code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Plaka Kodu *
-                  </label>
-                  <input
-                    type="text"
-                    id="city_code"
-                    name="city_code"
-                    value={formData.city_code}
-                    readOnly
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400"
-                    placeholder="34"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="region_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Bölge
-                  </label>
-                  <select
-                    id="region_id"
-                    name="region_id"
-                    value={formData.region_id}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Bölge seçiniz</option>
-                    {regions.map((region) => (
-                      <option key={region.id} value={region.id}>
-                        {region.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Şube Sorumlusu (Member) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Şube Sorumlusu (Sistem Kullanıcısı - Üye Ara)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                      <Search className="w-5 h-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={memberSearch}
-                      onChange={(e) => setMemberSearch(e.target.value)}
-                      placeholder="Sorumlu aramak için Ad, Soyad veya TC girin..."
-                      className="pl-10 w-full rounded-lg border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500 transition-colors py-2.5"
-                    />
-                    {loadingMembers && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Results */}
-                  {memberSearch.length >= 2 && members.length > 0 && (
-                    <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-lg">
-                      {members.map((member) => (
-                        <div
-                          key={member.id}
-                          onClick={() => {
-                            setFormData({ ...formData, responsible_id: member.id });
-                            setMemberSearch(`${member.first_name} ${member.last_name}`);
-                            setMembers([]); // Close list
-                          }}
-                          className={`px-4 py-2 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 flex justify-between items-center ${formData.responsible_id === member.id ? 'bg-blue-50 dark:bg-slate-700' : ''}`}
-                        >
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {member.first_name} {member.last_name}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              TC: {member.tc_identity} - {member.city}
-                            </div>
-                          </div>
-                          {formData.responsible_id === member.id && <Check className="w-4 h-4 text-blue-600" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {formData.responsible_id && (
-                    <div className="mt-2 text-sm text-green-600 dark:text-green-400 flex items-center">
-                      <Check className="w-4 h-4 mr-1" />
-                      Seçilen: {memberSearch}
-                      <button type="button" onClick={() => { setFormData({ ...formData, responsible_id: '' }); setMemberSearch('') }} className="ml-2 text-red-500 hover:text-red-700 text-xs">Kaldır</button>
-                    </div>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Bu şubeden sorumlu olacak kişiyi seçin. (İsteğe bağlı)
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="branch_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Şube Adı *
-                  </label>
-                  <input
-                    type="text"
-                    id="branch_name"
-                    name="branch_name"
-                    value={formData.branch_name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    placeholder="İstanbul Şubesi"
-                  />
-                </div>
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Şehir *
+                </label>
+                <select
+                  id="city"
+                  name="city"
+                  value={formData.city}
+                  onChange={(e) => handleCitySelect(e.target.value)}
+                  required
+                  disabled={currentUser?.role_type === 'branch_manager'}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="">Şehir seçiniz</option>
+                  {cityOptions.map((city) => (
+                    <option key={city.code} value={city.name}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Başkan Bilgileri */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-800 pb-2">
-                  Şube Başkanı (İletişim)
-                </h3>
+              <div>
+                <label htmlFor="city_code" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Plaka Kodu *
+                </label>
+                <input
+                  type="text"
+                  id="city_code"
+                  name="city_code"
+                  value={formData.city_code}
+                  readOnly
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  placeholder="34"
+                />
+              </div>
 
-                <div>
-                  <label htmlFor="president_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Başkan Adı *
-                  </label>
+              <div>
+                <label htmlFor="region_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Bölge
+                </label>
+                <select
+                  id="region_id"
+                  name="region_id"
+                  value={formData.region_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="">Bölge seçiniz</option>
+                  {regions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Şube Sorumlusu (Member) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Şube Sorumlusu (Başkan) *
+                </label>
+                <div className="relative">
                   <input
                     type="text"
-                    id="president_name"
-                    name="president_name"
-                    value={formData.president_name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    placeholder="Ahmet Yılmaz"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Ad, Soyad veya TC ile ara..."
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pl-10"
                   />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </div>
+                  {loadingMembers && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label htmlFor="president_phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Telefon
-                  </label>
-                  <input
-                    type="tel"
-                    id="president_phone"
-                    name="president_phone"
-                    value={formData.president_phone}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    placeholder="0212 555 0123"
-                  />
-                </div>
+                {!formData.responsible_id ? (
+                  <p className="mt-1 text-xs text-slate-500">Şube başkanı olarak atanacak üyeyi seçiniz.</p>
+                ) : (
+                  <div className="mt-2 p-3 border border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-600 dark:text-green-400 font-bold mr-3">
+                        {formData.president_name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-900 dark:text-white">
+                          {formData.president_name}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-col">
+                          <span>{formData.president_phone}</span>
+                          <span>{formData.president_email}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          responsible_id: '',
+                          president_name: '',
+                          president_email: '',
+                          president_phone: ''
+                        });
+                        setMemberSearch('');
+                      }}
+                      className="text-red-500 hover:text-red-700 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Değiştir
+                    </button>
+                  </div>
+                )}
 
-                <div>
-                  <label htmlFor="president_email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    E-posta
-                  </label>
-                  <input
-                    type="email"
-                    id="president_email"
-                    name="president_email"
-                    value={formData.president_email}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    placeholder="ahmet@sendika.org.tr"
-                  />
-                </div>
+                {/* Results */}
+                {memberSearch.length >= 2 && members.length > 0 && !formData.responsible_id && (
+                  <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-lg z-10">
+                    {members.map((member) => (
+                      <div
+                        key={member.id}
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            responsible_id: member.id,
+                            president_name: `${member.first_name} ${member.last_name}`,
+                            president_email: member.email || '',
+                            president_phone: member.phone || ''
+                          });
+                          setMemberSearch('');
+                          setMembers([]);
+                        }}
+                        className="px-4 py-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="text-sm font-medium text-slate-900 dark:text-white">
+                              {member.first_name} {member.last_name}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              TC: {member.tc_identity} - {member.city}/{member.district}
+                            </div>
+                          </div>
+                          <Check className="w-4 h-4 text-slate-300 hover:text-blue-500" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="branch_name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Şube Adı *
+                </label>
+                <input
+                  type="text"
+                  id="branch_name"
+                  name="branch_name"
+                  value={formData.branch_name}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  placeholder="İstanbul Şubesi"
+                />
               </div>
             </div>
 
             {/* Adres */}
             <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="address" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Adres
               </label>
               <textarea
@@ -402,7 +381,7 @@ export default function NewBranchPage() {
                 value={formData.address}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 placeholder="Fatih Mahallesi, Atatürk Caddesi No:45, Fatih/İstanbul"
               />
             </div>
@@ -410,37 +389,41 @@ export default function NewBranchPage() {
             {/* Koordinatlar */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="coordinates_lat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  <MapPin className="w-4 h-4 inline mr-1" />
+                <label htmlFor="coordinates_lat" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Enlem (Latitude)
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  id="coordinates_lat"
-                  name="coordinates_lat"
-                  value={formData.coordinates_lat}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                  placeholder="41.0082"
-                />
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="number"
+                    step="any"
+                    id="coordinates_lat"
+                    name="coordinates_lat"
+                    value={formData.coordinates_lat}
+                    onChange={handleChange}
+                    className="no-spinner w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    placeholder="41.0082"
+                  />
+                </div>
               </div>
 
               <div>
-                <label htmlFor="coordinates_lng" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  <MapPin className="w-4 h-4 inline mr-1" />
+                <label htmlFor="coordinates_lng" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Boylam (Longitude)
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  id="coordinates_lng"
-                  name="coordinates_lng"
-                  value={formData.coordinates_lng}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                  placeholder="28.9784"
-                />
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="number"
+                    step="any"
+                    id="coordinates_lng"
+                    name="coordinates_lng"
+                    value={formData.coordinates_lng}
+                    onChange={handleChange}
+                    className="no-spinner w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    placeholder="28.9784"
+                  />
+                </div>
               </div>
             </div>
 
@@ -452,31 +435,38 @@ export default function NewBranchPage() {
                   name="is_active"
                   checked={formData.is_active}
                   onChange={handleChange}
-                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  className="rounded border-slate-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                 />
-                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Şube aktif</span>
+                <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">Şube aktif</span>
               </label>
             </div>
 
             {/* Butonlar */}
-            <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <a
-                href="/admin/branches"
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => router.push('/admin/branches?tab=branches')}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-700"
               >
                 İptal
-              </a>
+              </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Kaydediliyor...
+                  </>
                 ) : (
-                  <Save className="w-4 h-4 mr-2" />
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Kaydet
+                  </>
                 )}
-                {loading ? 'Kaydediliyor...' : 'Kaydet'}
               </button>
             </div>
           </form>

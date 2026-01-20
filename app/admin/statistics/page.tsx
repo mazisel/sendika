@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { exportRowsToExcel, exportRowsToCSV, exportRowsToPDF } from '@/lib/exportUtils';
 import {
   BarChart3,
   Users,
@@ -17,7 +18,8 @@ import {
   Baby,
   Filter,
   Download,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import StatsDetailModal from '@/components/statistics/StatsDetailModal';
@@ -85,15 +87,26 @@ export default function StatisticsPage() {
     loadStatistics();
   }, [selectedTimeRange]);
 
+  const getStartDate = (range: string) => {
+    const now = new Date();
+    if (range === 'week') now.setDate(now.getDate() - 7);
+    else if (range === 'month') now.setMonth(now.getMonth() - 1);
+    else if (range === 'year') now.setFullYear(now.getFullYear() - 1);
+    else return null; // 'all'
+    return now.toISOString();
+  };
+
   const loadStatistics = async () => {
     try {
       setLoading(true);
+      const startDate = getStartDate(selectedTimeRange);
+
       await Promise.all([
-        loadMemberStats(),
-        loadDemographicStats(),
-        loadGeographicStats(),
-        loadWorkplaceStats(),
-        loadTimeStats()
+        loadMemberStats(startDate),
+        loadDemographicStats(startDate),
+        loadGeographicStats(startDate),
+        loadWorkplaceStats(startDate),
+        loadTimeStats() // Time stats might be independent or always show trends
       ]);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
@@ -102,39 +115,54 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadMemberStats = async () => {
+  const loadMemberStats = async (startDate: string | null) => {
     try {
-      // Toplam üye sayısı
-      const { count: totalMembers } = await supabase
-        .from('members')
-        .select('*', { count: 'exact', head: true });
+      // Helper to applies date filter
+      const applyFilter = (query: any) => {
+        if (startDate) return query.gte('created_at', startDate);
+        return query;
+      };
+
+      // Toplam üye sayısı (Filtreye göre)
+      const totalMembersQuery = supabase.from('members').select('*', { count: 'exact', head: true });
+      const { count: totalMembers } = await applyFilter(totalMembersQuery);
 
       // Aktif üyeler
-      const { count: activeMembers } = await supabase
+      const activeMembersQuery = supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
         .eq('membership_status', 'active')
         .eq('is_active', true);
+      const { count: activeMembers } = await applyFilter(activeMembersQuery);
 
       // Bekleyen üyeler
-      const { count: pendingMembers } = await supabase
+      const pendingMembersQuery = supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
         .eq('membership_status', 'pending');
+      const { count: pendingMembers } = await applyFilter(pendingMembersQuery);
 
       // Pasif üyeler
-      const { count: inactiveMembers } = await supabase
+      const inactiveMembersQuery = supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
         .eq('membership_status', 'inactive');
+      const { count: inactiveMembers } = await applyFilter(inactiveMembersQuery);
 
       // Askıya alınan üyeler
-      const { count: suspendedMembers } = await supabase
+      const suspendedMembersQuery = supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
         .eq('membership_status', 'suspended');
+      const { count: suspendedMembers } = await applyFilter(suspendedMembersQuery);
 
-      // Bu ay yeni üyeler
+      // Bu ay yeni üyeler (Zaman filtresi yoksa bu ay, varsa filtrelenen aralıktaki yeni üyeler)
+      // Ancak "Bu Ay Yeni" kartı spesifik bir metrik, filtre seçilse bile "Bu Ay"ı göstermesi daha mantıklı olabilir
+      // YADA filtre seçildiğinde "Seçilen Dönemde Yeni" gibi davranmalı. 
+      // Kullanıcı "Son 1 Hafta" seçtiğinde, Total Members = Son 1 haftada katılanlar olur.
+      // "New Members This Month" ise bağlam dışı kalabilir. 
+      // Ancak mevcut UI korunsun, sadece Total/Active/Pending vs. filtrelensin.
+
       const thisMonth = new Date();
       thisMonth.setDate(1);
       const { count: newMembersThisMonth } = await supabase
@@ -142,12 +170,9 @@ export default function StatisticsPage() {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', thisMonth.toISOString());
 
-      // Geçen ay yeni üyeler
       const lastMonth = new Date();
       lastMonth.setMonth(lastMonth.getMonth() - 1);
       lastMonth.setDate(1);
-      const lastMonthEnd = new Date(thisMonth);
-      lastMonthEnd.setDate(0);
       const { count: newMembersLastMonth } = await supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
@@ -168,15 +193,22 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadDemographicStats = async () => {
+  const loadDemographicStats = async (startDate: string | null) => {
     try {
+      const applyFilter = (query: any) => {
+        if (startDate) return query.gte('created_at', startDate);
+        return query;
+      };
+
       // Cinsiyet dağılımı
-      const { data: genderData } = await supabase
+      let genderQuery = supabase
         .from('members')
         .select('gender')
         .not('gender', 'is', null);
 
-      const genderDistribution = genderData?.reduce((acc: any[], member) => {
+      const { data: genderData } = await applyFilter(genderQuery);
+
+      const genderDistribution = genderData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.gender === member.gender);
         if (existing) {
           existing.count++;
@@ -187,12 +219,14 @@ export default function StatisticsPage() {
       }, []) || [];
 
       // Yaş grupları
-      const { data: birthData } = await supabase
+      let birthQuery = supabase
         .from('members')
         .select('birth_date')
         .not('birth_date', 'is', null);
 
-      const ageGroups = birthData?.reduce((acc: any[], member) => {
+      const { data: birthData } = await applyFilter(birthQuery);
+
+      const ageGroups = birthData?.reduce((acc: any[], member: any) => {
         const age = new Date().getFullYear() - new Date(member.birth_date).getFullYear();
         let ageGroup = '';
         if (age < 25) ageGroup = '18-24';
@@ -212,12 +246,14 @@ export default function StatisticsPage() {
       }, []) || [];
 
       // Medeni durum
-      const { data: maritalData } = await supabase
+      let maritalQuery = supabase
         .from('members')
         .select('marital_status')
         .not('marital_status', 'is', null);
 
-      const maritalStatus = maritalData?.reduce((acc: any[], member) => {
+      const { data: maritalData } = await applyFilter(maritalQuery);
+
+      const maritalStatus = maritalData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.status === member.marital_status);
         if (existing) {
           existing.count++;
@@ -228,12 +264,14 @@ export default function StatisticsPage() {
       }, []) || [];
 
       // Eğitim seviyeleri
-      const { data: educationData } = await supabase
+      let educationQuery = supabase
         .from('members')
         .select('education_level')
         .not('education_level', 'is', null);
 
-      const educationLevels = educationData?.reduce((acc: any[], member) => {
+      const { data: educationData } = await applyFilter(educationQuery);
+
+      const educationLevels = educationData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.level === member.education_level);
         if (existing) {
           existing.count++;
@@ -244,12 +282,14 @@ export default function StatisticsPage() {
       }, []) || [];
 
       // Çocuk sayısı istatistikleri
-      const { data: childrenData } = await supabase
+      let childrenQuery = supabase
         .from('members')
         .select('children_count')
         .not('children_count', 'is', null);
 
-      const childrenStats = childrenData?.reduce((acc: any[], member) => {
+      const { data: childrenData } = await applyFilter(childrenQuery);
+
+      const childrenStats = childrenData?.reduce((acc: any[], member: any) => {
         let range = '';
         if (member.children_count === 0) range = 'Çocuksuz';
         else if (member.children_count === 1) range = '1 Çocuk';
@@ -277,15 +317,22 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadGeographicStats = async () => {
+  const loadGeographicStats = async (startDate: string | null) => {
     try {
+      const applyFilter = (query: any) => {
+        if (startDate) return query.gte('created_at', startDate);
+        return query;
+      };
+
       // Şehir dağılımı
-      const { data: cityData } = await supabase
+      let cityQuery = supabase
         .from('members')
         .select('city')
         .not('city', 'is', null);
 
-      const cityDistribution = cityData?.reduce((acc: any[], member) => {
+      const { data: cityData } = await applyFilter(cityQuery);
+
+      const cityDistribution = cityData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.city === member.city);
         if (existing) {
           existing.count++;
@@ -297,7 +344,7 @@ export default function StatisticsPage() {
 
       // En çok üyesi olan şehirler (ilk 10)
       const topCities = cityDistribution
-        .sort((a, b) => b.count - a.count)
+        .sort((a: any, b: any) => b.count - a.count)
         .slice(0, 10);
 
       setGeographicStats({
@@ -309,15 +356,22 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadWorkplaceStats = async () => {
+  const loadWorkplaceStats = async (startDate: string | null) => {
     try {
+      const applyFilter = (query: any) => {
+        if (startDate) return query.gte('created_at', startDate);
+        return query;
+      };
+
       // En çok çalışanı olan işyerleri
-      const { data: workplaceData } = await supabase
+      let workplaceQuery = supabase
         .from('members')
         .select('workplace')
         .not('workplace', 'is', null);
 
-      const topWorkplaces = workplaceData?.reduce((acc: any[], member) => {
+      const { data: workplaceData } = await applyFilter(workplaceQuery);
+
+      const topWorkplaces = workplaceData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.workplace === member.workplace);
         if (existing) {
           existing.count++;
@@ -330,12 +384,14 @@ export default function StatisticsPage() {
         .slice(0, 10) || [];
 
       // Pozisyon dağılımı
-      const { data: positionData } = await supabase
+      let positionQuery = supabase
         .from('members')
         .select('position')
         .not('position', 'is', null);
 
-      const positionDistribution = positionData?.reduce((acc: any[], member) => {
+      const { data: positionData } = await applyFilter(positionQuery);
+
+      const positionDistribution = positionData?.reduce((acc: any[], member: any) => {
         const existing = acc.find(item => item.position === member.position);
         if (existing) {
           existing.count++;
@@ -416,31 +472,50 @@ export default function StatisticsPage() {
     setRefreshing(false);
   };
 
-  const exportStatistics = () => {
-    // İstatistikleri CSV formatında export etme fonksiyonu
-    const csvData = [
-      ['İstatistik Türü', 'Değer', 'Sayı'],
-      ['Toplam Üye', '', memberStats?.totalMembers || 0],
-      ['Aktif Üye', '', memberStats?.activeMembers || 0],
-      ['Bekleyen Üye', '', memberStats?.pendingMembers || 0],
-      ['Pasif Üye', '', memberStats?.inactiveMembers || 0],
-      ['Askıya Alınan Üye', '', memberStats?.suspendedMembers || 0],
-      ['Bu Ay Yeni Üye', '', memberStats?.newMembersThisMonth || 0],
-      ['Geçen Ay Yeni Üye', '', memberStats?.newMembersLastMonth || 0]
-    ];
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
-    const csvContent = csvData.map(row => row.join(',')).join('\
-');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `uye_istatistikleri_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const prepareExportData = () => {
+    return [
+      ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR')],
+      ['Seçilen Aralık', selectedTimeRange],
+      [],
+      ['İstatistik Türü', 'Değer'],
+      ['Toplam Üye', memberStats?.totalMembers || 0],
+      ['Aktif Üye', memberStats?.activeMembers || 0],
+      ['Bekleyen Üye', memberStats?.pendingMembers || 0],
+      ['Pasif Üye', memberStats?.inactiveMembers || 0],
+      ['Askıya Alınan Üye', memberStats?.suspendedMembers || 0],
+      ['Bu Ay Yeni Üye', memberStats?.newMembersThisMonth || 0],
+      ['Geçen Ay Yeni Üye', memberStats?.newMembersLastMonth || 0],
+      [],
+      ['Cinsiyet Dağılımı'],
+      ...(demographicStats?.genderDistribution.map(d => [d.gender, d.count]) || []),
+      [],
+      ['En Çok Üyesi Olan Şehirler'],
+      ...(geographicStats?.topCities.map(c => [c.city, c.count]) || []),
+      [],
+      ['En Çok Çalışanı Olan İşyerleri'],
+      ...(workplaceStats?.topWorkplaces.map(w => [w.workplace, w.count]) || [])
+    ];
   };
+
+  const handleExport = async (format: 'csv' | 'xlsx' | 'pdf') => {
+    const data = prepareExportData();
+    const fileName = `uye_istatistikleri_${new Date().toISOString().split('T')[0]}`;
+
+    if (format === 'csv') exportRowsToCSV(data, fileName);
+    else if (format === 'xlsx') exportRowsToExcel(data, fileName, 'İstatistikler');
+    else if (format === 'pdf') await exportRowsToPDF(data, fileName, 'Üye İstatistikleri Raporu');
+
+    setShowExportMenu(false);
+  };
+
+  // Close dropdown when outside click
+  useEffect(() => {
+    const closeMenu = () => setShowExportMenu(false);
+    if (showExportMenu) document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, [showExportMenu]);
 
   const getGrowthPercentage = () => {
     if (!memberStats?.newMembersLastMonth || memberStats.newMembersLastMonth === 0) {
@@ -488,13 +563,31 @@ export default function StatisticsPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             <span>Yenile</span>
           </button>
-          <button
-            onClick={exportStatistics}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            <span>Dışa Aktar</span>
-          </button>
+
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Dışa Aktar</span>
+              <ChevronDown className="w-3 h-3 ml-1" />
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button onClick={() => handleExport('xlsx')} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors">
+                  Excel Olarak İndir
+                </button>
+                <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors">
+                  CSV Olarak İndir (Türkçe)
+                </button>
+                <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 transition-colors">
+                  PDF Olarak İndir
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

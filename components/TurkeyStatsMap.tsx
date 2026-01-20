@@ -20,6 +20,7 @@ interface TurkeyStatsMapProps {
     totalRegistered: number
     totalOnlineApplications: number
     isLoading?: boolean
+    onCityClick?: (city: string) => void
 }
 
 type ViewMode = 'active' | 'resigned' | 'registered' | 'online'
@@ -48,7 +49,8 @@ export default function TurkeyStatsMap({
     totalResigned,
     totalRegistered,
     totalOnlineApplications,
-    isLoading = false
+    isLoading = false,
+    onCityClick
 }: TurkeyStatsMapProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('active')
     const [hoveredCity, setHoveredCity] = useState<CityStats | null>(null)
@@ -58,7 +60,9 @@ export default function TurkeyStatsMap({
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
     const [position, setPosition] = useState({ x: 0, y: 0 })
     const mapRef = useRef<HTMLDivElement>(null)
+
     const mapContainerRef = useRef<HTMLDivElement>(null)
+    const hasDragged = useRef(false)
 
     // Renk datasını oluştur
     const colorData: { [key: string]: string } = {}
@@ -203,8 +207,34 @@ export default function TurkeyStatsMap({
             })
         }
 
+        const handleClick = (event: MouseEvent) => {
+            if (hasDragged.current) return
+
+            const target = event.target as SVGElement
+            if (target.tagName !== 'path') return
+
+            const parent = target.parentNode as SVGElement
+            const cityCode = parent?.getAttribute('data-plate') ||
+                parent?.getAttribute('id') ||
+                target.getAttribute('data-plate') ||
+                target.getAttribute('id')
+
+            if (cityCode) {
+                const numericCode = cityCode.replace(/\D/g, '')
+                const foundCity = cityStats.find(c =>
+                    c.city_code === cityCode ||
+                    c.city_code === numericCode ||
+                    c.city_code === String(parseInt(numericCode))
+                )
+                if (foundCity && onCityClick) {
+                    onCityClick(foundCity.city)
+                }
+            }
+        }
+
         container.addEventListener('mouseover', handleMouseOver as EventListener)
         container.addEventListener('mouseout', handleMouseOut as EventListener)
+        container.addEventListener('click', handleClick as EventListener)
 
         const rafId = requestAnimationFrame(setupStyles)
 
@@ -212,11 +242,12 @@ export default function TurkeyStatsMap({
             cancelAnimationFrame(rafId)
             container.removeEventListener('mouseover', handleMouseOver as EventListener)
             container.removeEventListener('mouseout', handleMouseOut as EventListener)
+            container.removeEventListener('click', handleClick as EventListener)
         }
-    }, [cityStats, viewMode])
+    }, [cityStats, viewMode, onCityClick])
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 50, 800))
-    const handleZoomOut = () => setZoom(prev => Math.max(prev - 50, 100))
+    const handleZoomOut = () => setZoom(prev => Math.max(prev - 50, 50))
     const handleZoomReset = () => {
         setZoom(100)
         setPosition({ x: 0, y: 0 })
@@ -334,10 +365,12 @@ export default function TurkeyStatsMap({
                 style={{ height: '550px' }}
                 onMouseDown={(e) => {
                     setIsDragging(true)
+                    hasDragged.current = false
                     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
                 }}
                 onMouseMove={(e) => {
                     if (isDragging) {
+                        hasDragged.current = true
                         const newX = e.clientX - dragStart.x
                         const newY = e.clientY - dragStart.y
                         setPosition({ x: newX, y: newY })
@@ -368,7 +401,7 @@ export default function TurkeyStatsMap({
                         top: '50%',
                         transform: `translate(-50%, -50%) translate3d(${position.x}px, ${position.y}px, 0)`,
                         width: `${zoom}%`,
-                        minWidth: '100%',
+
                         transition: isDragging ? 'none' : 'width 0.3s ease-out, transform 0.1s linear',
                         willChange: isDragging ? 'transform' : 'auto'
                     }}

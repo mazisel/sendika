@@ -20,8 +20,29 @@ export const exportToCSV = (data: Member[], fileName: string) => {
     saveAs(dataBlob, `${fileName}.csv`);
 };
 
-export const exportToPDF = (data: Member[], fileName: string) => {
+// Helper to load font
+const loadFont = async (doc: jsPDF) => {
+    try {
+        const response = await fetch('/fonts/Roboto-Regular.ttf');
+        if (!response.ok) throw new Error('Font yüklenemedi');
+        const buffer = await response.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+
+        doc.addFileToVFS('Roboto-Regular.ttf', base64);
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+        doc.setFont('Roboto');
+        return true;
+    } catch (error) {
+        console.error('Font yükleme hatası:', error);
+        return false;
+    }
+};
+
+export const exportToPDF = async (data: Member[], fileName: string) => {
     const doc = new jsPDF();
+
+    // Load custom font
+    await loadFont(doc);
 
     // Add a simple title
     doc.setFontSize(18);
@@ -39,7 +60,7 @@ export const exportToPDF = (data: Member[], fileName: string) => {
         body: tableData,
         startY: 35,
         styles: {
-            font: 'helvetica', // Standard font, might struggle with some TR chars without custom font
+            font: 'Roboto', // Use custom font
             fontSize: 9,
             cellPadding: 3,
         },
@@ -96,4 +117,56 @@ const formatDataForPDF = (data: Member[]) => {
         member.membership_status === 'active' ? 'Aktif' : member.membership_status === 'pending' ? 'Beklemede' : 'Pasif',
         member.phone
     ]);
+};
+
+export const exportRowsToExcel = (rows: any[][], fileName: string, sheetName: string = 'Sheet1') => {
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+    saveAs(dataBlob, `${fileName}.xlsx`);
+};
+
+export const exportRowsToCSV = (rows: any[][], fileName: string) => {
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+    const dataBlob = new Blob(['\uFEFF' + csvOutput], { type: 'text/csv;charset=utf-8' });
+    saveAs(dataBlob, `${fileName}.csv`);
+};
+
+export const exportRowsToPDF = async (rows: any[][], fileName: string, title: string) => {
+    const doc = new jsPDF();
+
+    // Load custom font
+    await loadFont(doc);
+
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
+
+    doc.setFontSize(10);
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+    doc.text(`Rapor Tarihi: ${dateStr}`, 14, 22);
+
+    autoTable(doc, {
+        head: [rows[0]],
+        body: rows.slice(1),
+        startY: 25,
+        styles: {
+            font: 'Roboto', // Use custom font
+            fontSize: 9,
+            cellPadding: 3,
+        },
+        headStyles: {
+            fillColor: [66, 133, 244], // Google Blue-ish
+            textColor: 255,
+            fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245],
+        },
+        theme: 'grid'
+    });
+
+    doc.save(`${fileName}.pdf`);
 };
