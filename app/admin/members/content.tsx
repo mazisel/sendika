@@ -53,6 +53,7 @@ export default function AdminMembersContent() {
   });
   const [bulkSearchResults, setBulkSearchResults] = useState<Member[] | null>(null);
   const [detailedSearchResults, setDetailedSearchResults] = useState<Member[] | null>(null);
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
 
   // UI State
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -166,7 +167,22 @@ export default function AdminMembersContent() {
     const user = AdminAuth.getCurrentUser();
     setCurrentUser(user);
     if (user) {
-      loadMembers();
+      loadMembers(1, user);
+
+      // Fetch regions for filter dropdown
+      const fetchRegions = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('regions')
+            .select('id, name')
+            .order('name');
+          if (error) throw error;
+          setRegions(data || []);
+        } catch (err) {
+          console.error('Bölgeler yüklenemedi:', err);
+        }
+      };
+      fetchRegions();
     }
   }, []);
 
@@ -203,7 +219,7 @@ export default function AdminMembersContent() {
     }
   }, [searchParams]);
 
-  const loadMembers = async (page = 1) => {
+  const loadMembers = async (page = 1, userToUse = currentUser) => {
     try {
       setLoading(true);
       const from = (page - 1) * pageSize;
@@ -211,11 +227,24 @@ export default function AdminMembersContent() {
 
       let query = supabase.from('members').select('*', { count: 'exact' });
 
+      // Permission Check
+      if (!userToUse || !PermissionManager.canViewMembers(userToUse)) {
+        console.warn('User does not have permission to view members', userToUse);
+        setDisplayedMembers([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+
       // Role Based Access Control
-      if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
-        query = query.eq('city', currentUser.city);
-      } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
-        query = query.eq('region', currentUser.region);
+      const isSuperAdmin = userToUse?.role === 'super_admin';
+
+      if (!isSuperAdmin) {
+        if (userToUse && userToUse.role_type === 'branch_manager' && userToUse.city) {
+          query = query.eq('city', userToUse.city);
+        } else if (userToUse && userToUse.role_type === 'regional_manager' && userToUse.region) {
+          query = query.eq('region', userToUse.region);
+        }
       }
 
       // Apply Status Filter
@@ -262,7 +291,7 @@ export default function AdminMembersContent() {
       setTotalCount(count || 0);
       setCurrentPage(page);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Üyeler yüklenirken hata:', error);
       alert('Üyeler yüklenirken bir hata oluştu.');
     } finally {
@@ -275,10 +304,22 @@ export default function AdminMembersContent() {
     try {
       setLoading(true);
       let query = supabase.from('members').select('*');
-      if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
-        query = query.eq('city', currentUser.city);
-      } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
-        query = query.eq('region', currentUser.region);
+
+      // Permission Check
+      if (!currentUser || !PermissionManager.canViewMembers(currentUser)) {
+        setAllMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      const isSuperAdmin = currentUser?.role === 'super_admin';
+
+      if (!isSuperAdmin) {
+        if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
+          query = query.eq('city', currentUser.city);
+        } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
+          query = query.eq('region', currentUser.region);
+        }
       }
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
@@ -296,34 +337,158 @@ export default function AdminMembersContent() {
     }
   }, [activeTab]);
 
-  const handleAdvancedSearch = () => {
+  const handleAdvancedSearch = async () => {
+    // Ensure members are loaded
+    if (allMembers.length === 0) {
+      await loadAllMembers();
+    }
+
+    // Clear previous results first
+    setDetailedSearchResults([]);
+
     let filtered = [...allMembers];
     const f = advancedFilters;
 
-    // Apply advanced filters similarly to the original logic
-    if (f.city) filtered = filtered.filter(m => m.city === f.city);
-    if (f.district) filtered = filtered.filter(m => m.district === f.district);
-    if (f.workplace) filtered = filtered.filter(m => m.workplace?.toLowerCase().includes(f.workplace.toLowerCase()));
-    if (f.position) filtered = filtered.filter(m => m.position?.toLowerCase().includes(f.position.toLowerCase()));
-    if (f.gender) filtered = filtered.filter(m => m.gender === f.gender);
-    if (f.education) filtered = filtered.filter(m => m.education_level === f.education);
-    if (f.region) filtered = filtered.filter(m => m.region?.toString() === f.region);
-    if (f.maritalStatus) filtered = filtered.filter(m => m.marital_status === f.maritalStatus);
-    if (f.tcIdentity) filtered = filtered.filter(m => m.tc_identity.includes(f.tcIdentity));
-    if (f.firstName) filtered = filtered.filter(m => m.first_name.toLowerCase().includes(f.firstName.toLowerCase()));
-    if (f.lastName) filtered = filtered.filter(m => m.last_name.toLowerCase().includes(f.lastName.toLowerCase()));
-    if (f.fatherName) filtered = filtered.filter(m => m.father_name?.toLowerCase().includes(f.fatherName.toLowerCase()));
-    if (f.motherName) filtered = filtered.filter(m => m.mother_name?.toLowerCase().includes(f.motherName.toLowerCase()));
-    if (f.birthPlace) filtered = filtered.filter(m => m.birth_place === f.birthPlace);
-    if (f.membershipNumber) filtered = filtered.filter(m => m.membership_number?.includes(f.membershipNumber));
-    if (f.institution) filtered = filtered.filter(m => m.institution?.toLowerCase().includes(f.institution.toLowerCase()));
-    if (f.institutionRegNo) filtered = filtered.filter(m => m.institution_register_no?.includes(f.institutionRegNo));
-    if (f.retirementRegNo) filtered = filtered.filter(m => m.retirement_register_no?.includes(f.retirementRegNo));
-    if (f.email) filtered = filtered.filter(m => m.email?.toLowerCase().includes(f.email.toLowerCase()));
-    if (f.phone) filtered = filtered.filter(m => m.phone?.includes(f.phone));
-    if (f.membershipStatus) filtered = filtered.filter(m => m.membership_status === f.membershipStatus);
+    // Debug: Log initial state
+    console.log('Starting advanced search with', filtered.length, 'members');
+    console.log('Filters:', f);
 
-    // Add other filters as needed...
+    // Apply advanced filters
+    if (f.city) {
+      filtered = filtered.filter(m => m.city === f.city);
+      console.log('After city filter:', filtered.length);
+    }
+    if (f.district) {
+      filtered = filtered.filter(m => m.district === f.district);
+      console.log('After district filter:', filtered.length);
+    }
+    if (f.workplace) {
+      filtered = filtered.filter(m => m.workplace?.toLowerCase().includes(f.workplace.toLowerCase()));
+      console.log('After workplace filter:', filtered.length);
+    }
+    if (f.position) {
+      filtered = filtered.filter(m => m.position?.toLowerCase().includes(f.position.toLowerCase()));
+      console.log('After position filter:', filtered.length);
+    }
+    if (f.gender) {
+      // Handle gender mapping: UI uses 'Erkek'/'Kadın', DB uses 'male'/'female'
+      const genderMap: Record<string, string> = { 'Erkek': 'male', 'Kadın': 'female' };
+      const dbGender = genderMap[f.gender] || f.gender;
+      filtered = filtered.filter(m => m.gender === dbGender);
+      console.log('After gender filter:', filtered.length, '(looking for', dbGender, ')');
+    }
+    if (f.education) {
+      filtered = filtered.filter(m => m.education_level === f.education);
+      console.log('After education filter:', filtered.length);
+    }
+    if (f.blood_group) {
+      filtered = filtered.filter(m => m.blood_group === f.blood_group);
+      console.log('After blood_group filter:', filtered.length);
+    }
+    if (f.region) {
+      filtered = filtered.filter(m => m.region === f.region);
+      console.log('After region filter:', filtered.length);
+    }
+    if (f.maritalStatus) {
+      filtered = filtered.filter(m => m.marital_status === f.maritalStatus);
+      console.log('After maritalStatus filter:', filtered.length);
+    }
+    if (f.tcIdentity) {
+      filtered = filtered.filter(m => m.tc_identity.includes(f.tcIdentity));
+      console.log('After tcIdentity filter:', filtered.length);
+    }
+    if (f.firstName) {
+      filtered = filtered.filter(m => m.first_name.toLowerCase().includes(f.firstName.toLowerCase()));
+      console.log('After firstName filter:', filtered.length);
+    }
+    if (f.lastName) {
+      filtered = filtered.filter(m => m.last_name.toLowerCase().includes(f.lastName.toLowerCase()));
+      console.log('After lastName filter:', filtered.length);
+    }
+    if (f.fatherName) {
+      filtered = filtered.filter(m => m.father_name?.toLowerCase().includes(f.fatherName.toLowerCase()));
+      console.log('After fatherName filter:', filtered.length);
+    }
+    if (f.motherName) {
+      filtered = filtered.filter(m => m.mother_name?.toLowerCase().includes(f.motherName.toLowerCase()));
+      console.log('After motherName filter:', filtered.length);
+    }
+    if (f.birthPlace) {
+      filtered = filtered.filter(m => m.birth_place === f.birthPlace);
+      console.log('After birthPlace filter:', filtered.length);
+    }
+    if (f.membershipNumber) {
+      filtered = filtered.filter(m => m.membership_number?.toLowerCase().includes(f.membershipNumber.toLowerCase()));
+      console.log('After membershipNumber filter:', filtered.length);
+    }
+    if (f.institution) {
+      filtered = filtered.filter(m => m.institution?.toLowerCase().includes(f.institution.toLowerCase()));
+      console.log('After institution filter:', filtered.length);
+    }
+    if (f.institutionRegNo) {
+      filtered = filtered.filter(m => m.institution_register_no?.includes(f.institutionRegNo));
+      console.log('After institutionRegNo filter:', filtered.length);
+    }
+    if (f.retirementRegNo) {
+      filtered = filtered.filter(m => m.retirement_register_no?.includes(f.retirementRegNo));
+      console.log('After retirementRegNo filter:', filtered.length);
+    }
+    if (f.email) {
+      filtered = filtered.filter(m => m.email?.toLowerCase().includes(f.email.toLowerCase()));
+      console.log('After email filter:', filtered.length);
+    }
+    if (f.phone) {
+      filtered = filtered.filter(m => m.phone?.includes(f.phone));
+      console.log('After phone filter:', filtered.length);
+    }
+    if (f.membershipStatus) {
+      console.log('Filtering by membershipStatus:', f.membershipStatus);
+      console.log('Sample member status values:', filtered.slice(0, 3).map(m => m.membership_status));
+      filtered = filtered.filter(m => m.membership_status === f.membershipStatus);
+      console.log('After membershipStatus filter:', filtered.length);
+    }
+
+    // Membership date range
+    if (f.membershipStartDate) {
+      filtered = filtered.filter(m => m.membership_date && m.membership_date >= f.membershipStartDate);
+      console.log('After membershipStartDate filter:', filtered.length);
+    }
+    if (f.membershipEndDate) {
+      filtered = filtered.filter(m => m.membership_date && m.membership_date <= f.membershipEndDate);
+      console.log('After membershipEndDate filter:', filtered.length);
+    }
+
+    // Resignation filters
+    if (f.resignationReason) {
+      filtered = filtered.filter(m => m.resignation_reason === f.resignationReason);
+      console.log('After resignationReason filter:', filtered.length);
+    }
+    if (f.resignationStartDate) {
+      filtered = filtered.filter(m => m.resignation_date && m.resignation_date >= f.resignationStartDate);
+      console.log('After resignationStartDate filter:', filtered.length);
+    }
+    if (f.resignationEndDate) {
+      filtered = filtered.filter(m => m.resignation_date && m.resignation_date <= f.resignationEndDate);
+      console.log('After resignationEndDate filter:', filtered.length);
+    }
+
+    // Due status
+    if (f.dueStatus) {
+      filtered = filtered.filter(m => m.due_status === f.dueStatus);
+      console.log('After dueStatus filter:', filtered.length);
+    }
+
+    // Work city and district
+    if (f.workCity) {
+      filtered = filtered.filter(m => m.city === f.workCity);
+      console.log('After workCity filter:', filtered.length);
+    }
+    if (f.workDistrict) {
+      filtered = filtered.filter(m => m.district === f.workDistrict);
+      console.log('After workDistrict filter:', filtered.length);
+    }
+
+    // Age range filter
     if (f.minAge || f.maxAge) {
       filtered = filtered.filter(m => {
         if (!m.birth_date) return false;
@@ -336,12 +501,16 @@ export default function AdminMembersContent() {
         if (f.maxAge && age > parseInt(f.maxAge)) return false;
         return true;
       });
+      console.log('After age filter:', filtered.length);
+    }
+
+    // Birth date filter
+    if (f.birthDate) {
+      filtered = filtered.filter(m => m.birth_date === f.birthDate);
+      console.log('After birthDate filter:', filtered.length);
     }
 
     setDetailedSearchResults(filtered);
-    // Remove automatic tab switch
-    // setDisplayedMembers(filtered);
-    // setActiveTab('list'); 
     alert(`${filtered.length} kayıt bulundu.`);
   };
 
@@ -457,8 +626,28 @@ export default function AdminMembersContent() {
     setSelectedMemberIds(newSelected);
   };
 
+
+
+  if (!currentUser || !PermissionManager.canViewMembers(currentUser)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 m-6">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full mb-4">
+          <UserX className="w-12 h-12 text-red-500 dark:text-red-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Yetkisiz Erişim</h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md">
+          Bu sayfayı görüntülemek için yeterli izniniz bulunmamaktadır. Lütfen yöneticinizle iletişime geçin.
+        </p>
+
+
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 text-slate-900 dark:text-slate-100">
+
+
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -468,9 +657,11 @@ export default function AdminMembersContent() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => router.push('/admin/members/new')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-            <Plus className="w-4 h-4" /> Yeni Üye
-          </button>
+          {PermissionManager.canManageMembers(currentUser) && (
+            <button onClick={() => router.push('/admin/members/new')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+              <Plus className="w-4 h-4" /> Yeni Üye
+            </button>
+          )}
         </div>
       </div>
 
@@ -774,7 +965,7 @@ export default function AdminMembersContent() {
             setFilters={setAdvancedFilters}
             onSearch={handleAdvancedSearch}
             onClear={handleClearAdvancedFilters}
-
+            regions={regions}
             results={detailedSearchResults}
             onRowClick={(member) => { setSelectedMember(member); setShowDetails(true); }}
             onConditionalSearch={(conditions) => {

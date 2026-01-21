@@ -1058,7 +1058,7 @@ export default function EditMemberPage() {
                 <option value="İlkokul">İlkokul</option>
                 <option value="Ortaokul">Ortaokul</option>
                 <option value="Lise">Lise</option>
-                <option value="Önlisans">Önlisans</option>
+                <option value="Ön Lisans">Ön Lisans</option>
                 <option value="Lisans">Lisans</option>
                 <option value="Yüksek Lisans">Yüksek Lisans</option>
                 <option value="Doktora">Doktora</option>

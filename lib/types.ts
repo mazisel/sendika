@@ -30,6 +30,8 @@ export interface Member {
   workplace: string;
   position: string;
   membership_status: 'pending' | 'active' | 'inactive' | 'suspended' | 'resigned';
+  membership_date?: string | null;
+  due_status?: 'paid' | 'unpaid' | 'partial' | null;
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relation: string;
@@ -90,6 +92,7 @@ export interface Role {
   created_at: string;
   updated_at: string;
   permissions?: Permission[];
+  role_type?: 'general_manager' | 'regional_manager' | 'branch_manager' | null;
 }
 
 export interface RolePermission {

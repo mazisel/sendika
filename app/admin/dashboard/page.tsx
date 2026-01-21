@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { PermissionManager } from '@/lib/permissions';
 import TurkeyStatsMap from '@/components/TurkeyStatsMap';
 import {
   Users,
@@ -32,6 +33,7 @@ import {
   Globe
 } from 'lucide-react';
 import CityMembersModal from '@/components/dashboard/CityMembersModal';
+import StatsDetailModal, { StatsType } from '@/components/dashboard/StatsDetailModal';
 
 interface DashboardStats {
   totalNews: number;
@@ -70,6 +72,7 @@ export default function AdminDashboard() {
   const [cityStats, setCityStats] = useState<CityStats[]>([]);
   const [cityStatsLoading, setCityStatsLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedStatsType, setSelectedStatsType] = useState<StatsType | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -80,16 +83,16 @@ export default function AdminDashboard() {
     }
     setUser(currentUser);
     setLoading(false);
-    loadDashboardStats();
-    loadCityStats();
+    loadDashboardStats(currentUser);
+    loadCityStats(currentUser);
   }, [router]);
 
-  const loadCityStats = async () => {
+  const loadCityStats = async (userToUse: AdminUser | null = user) => {
     try {
       setCityStatsLoading(true);
 
       // Tüm illerin listesi (81 il)
-      const turkishCities = [
+      const allTurkishCities = [
         { city: 'Adana', city_code: '01' },
         { city: 'Adıyaman', city_code: '02' },
         { city: 'Afyonkarahisar', city_code: '03' },
@@ -173,6 +176,26 @@ export default function AdminDashboard() {
         { city: 'Düzce', city_code: '81' }
       ];
 
+      // Filter cities based on role
+      let turkishCities = [...allTurkishCities];
+
+      if (userToUse?.role === 'super_admin') {
+        // No filter
+      } else if (userToUse?.role_type === 'branch_manager' && userToUse?.city) {
+        turkishCities = allTurkishCities.filter(c => c.city === userToUse.city);
+      } else if (userToUse?.role_type === 'regional_manager' && userToUse?.region) {
+        // Fetch cities for this region from branches table
+        const { data: regionBranches } = await supabase
+          .from('branches')
+          .select('city')
+          .eq('region', userToUse.region);
+
+        if (regionBranches) {
+          const validCities = new Set(regionBranches.map(b => b.city));
+          turkishCities = allTurkishCities.filter(c => validCities.has(c.city));
+        }
+      }
+
       // Try RPC first
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('get_city_stats');
@@ -248,34 +271,67 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadDashboardStats = async () => {
+
+
+  const loadDashboardStats = async (userToUse: AdminUser | null = user) => {
     try {
       setStatsLoading(true);
+
+      if (!userToUse) return;
 
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      // Execute all counts in parallel
+      // Base query builder
+      const getBaseMemberQuery = () => {
+        let q = supabase.from('members').select('*', { count: 'exact', head: true });
+
+        // Super admin always sees everything
+        if (userToUse?.role === 'super_admin') {
+          return q;
+        }
+
+        if (userToUse?.role_type === 'branch_manager' && userToUse?.city) {
+          q = q.eq('city', userToUse.city);
+        } else if (userToUse?.role_type === 'regional_manager' && userToUse?.region) {
+          q = q.eq('region', userToUse.region);
+        }
+        return q;
+      };
+
+      // Define permission checks
+      const canViewMembers = PermissionManager.canViewMembers(userToUse);
+      const canManageNews = PermissionManager.canManageNews(userToUse);
+      const canManageAnnouncements = PermissionManager.canManageAnnouncements(userToUse);
+      const canViewUsers = PermissionManager.canViewUsers(userToUse);
+      const canManageSliders = PermissionManager.canManageSliders(userToUse);
+      const canManageBranches = PermissionManager.canManageBranches(userToUse);
+      const canManageCategories = PermissionManager.canManageCategories(userToUse);
+      const canManageManagement = PermissionManager.canManageManagement(userToUse);
+
+      // Execute queries conditionally
+      const promises = [
+        canManageNews ? supabase.from('news').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canManageAnnouncements ? supabase.from('announcements').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery() : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery().eq('membership_status', 'active') : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery().eq('membership_status', 'pending') : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery().in('membership_status', ['inactive', 'suspended']) : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery().gte('created_at', firstDayOfMonth) : Promise.resolve({ count: 0, error: null }),
+        canViewMembers ? getBaseMemberQuery().in('membership_status', ['inactive', 'suspended', 'resigned']).gte('resignation_date', firstDayOfMonth) : Promise.resolve({ count: 0, error: null }),
+        canViewUsers ? supabase.from('admin_users').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canManageSliders ? supabase.from('sliders').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canManageBranches ? supabase.from('branches').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canManageCategories ? supabase.from('categories').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null }),
+        canManageManagement ? supabase.from('management').select('*', { count: 'exact', head: true }) : Promise.resolve({ count: 0, error: null })
+      ];
+
       const [
         newsRes, announcementsRes, membersRes,
         activeMembersRes, pendingMembersRes, suspendedMembersRes,
         newMembersRes, resignedResult, adminUsersRes,
         slidersRes, branchesRes, categoriesRes, managementRes
-      ] = await Promise.all([
-        supabase.from('news').select('*', { count: 'exact', head: true }),
-        supabase.from('announcements').select('*', { count: 'exact', head: true }),
-        supabase.from('members').select('*', { count: 'exact', head: true }),
-        supabase.from('members').select('*', { count: 'exact', head: true }).eq('membership_status', 'active'),
-        supabase.from('members').select('*', { count: 'exact', head: true }).eq('membership_status', 'pending'),
-        supabase.from('members').select('*', { count: 'exact', head: true }).in('membership_status', ['inactive', 'suspended']),
-        supabase.from('members').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth),
-        supabase.from('members').select('*', { count: 'exact', head: true }).in('membership_status', ['inactive', 'suspended', 'resigned']).gte('resignation_date', firstDayOfMonth), // Assuming resignation_date exists or fallback to updated_at in types
-        supabase.from('admin_users').select('*', { count: 'exact', head: true }),
-        supabase.from('sliders').select('*', { count: 'exact', head: true }),
-        supabase.from('branches').select('*', { count: 'exact', head: true }),
-        supabase.from('categories').select('*', { count: 'exact', head: true }),
-        supabase.from('management').select('*', { count: 'exact', head: true })
-      ]);
+      ] = await Promise.all(promises);
 
       const statsData: DashboardStats = {
         totalNews: newsRes.count || 0,
@@ -286,9 +342,9 @@ export default function AdminDashboard() {
         totalBranches: branchesRes.count || 0,
         totalCategories: categoriesRes.count || 0,
         totalManagement: managementRes.count || 0,
-        recentNews: 0, // Bu değer ayrıca hesaplanmalı veya count'a dahil edilmeli (logic eksikti, eski kodda da 0 atamışım ama bir yerde kullanılıyor mu? Evet, recentNews change'de var. Count olarak değil, son eklenenler. Şimdilik 0.)
-        recentMembers: newMembersRes.count || 0, // Bu ay eklenenler aynı zamanda recentMembers olarak kullanılabilir
-        activeHeaderAnnouncements: 0, // Ayrı sorgu gerekir veya logic. Şimdilik 0 veya eski mantık. Eski kodda activeHeaderAnnouncements sorgusu yoktu, 0 dönüyordu.
+        recentNews: 0,
+        recentMembers: newMembersRes.count || 0,
+        activeHeaderAnnouncements: 0,
         pendingMembers: pendingMembersRes.count || 0,
         activeMembers: activeMembersRes.count || 0,
         newMembersThisMonth: newMembersRes.count || 0,
@@ -296,14 +352,9 @@ export default function AdminDashboard() {
         suspendedMembers: suspendedMembersRes.count || 0
       };
 
-      // Optional: Get recent news count if needed (e.g. this month)
-      // newsRes sadece total news.
-      // activeHeaderAnnouncements için logic ekleyebiliriz ama orijinal parallelization'a sadık kaldım.
-
       setStats(statsData);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
-      // Hata durumunda varsayılan değerler
       setStats({
         totalNews: 0, totalAnnouncements: 0, totalMembers: 0,
         totalAdminUsers: 0, totalSliders: 0, totalBranches: 0,
@@ -369,28 +420,51 @@ export default function AdminDashboard() {
       color: 'orange',
       href: '/admin/members?status=pending'
     }
-  ];
+  ].filter(item => {
+    switch (item.title) {
+      case 'Toplam Haber': return PermissionManager.canManageNews(user);
+      case 'Aktif Duyuru': return PermissionManager.canManageAnnouncements(user);
+      case 'Toplam Üye': return PermissionManager.canViewMembers(user);
+      case 'Bekleyen Üye': return PermissionManager.canViewMembers(user);
+      default: return true;
+    }
+  });
 
   const detailedStats = [
     {
       title: 'İçerik İstatistikleri',
       items: [
-        { label: 'Toplam Haber', value: statsLoading ? '-' : stats?.totalNews || 0, icon: FileText, color: 'blue' },
-        { label: 'Toplam Duyuru', value: statsLoading ? '-' : stats?.totalAnnouncements || 0, icon: Megaphone, color: 'green' },
-        { label: 'Slider Görseli', value: statsLoading ? '-' : stats?.totalSliders || 0, icon: Image, color: 'indigo' },
-        { label: 'Kategori', value: statsLoading ? '-' : stats?.totalCategories || 0, icon: Tags, color: 'cyan' }
+        { label: 'Toplam Haber', value: statsLoading ? '-' : stats?.totalNews || 0, icon: FileText, color: 'blue', type: 'news' as StatsType },
+        { label: 'Toplam Duyuru', value: statsLoading ? '-' : stats?.totalAnnouncements || 0, icon: Megaphone, color: 'green', type: 'announcements' as StatsType },
+        { label: 'Slider Görseli', value: statsLoading ? '-' : stats?.totalSliders || 0, icon: Image, color: 'indigo', type: 'sliders' as StatsType },
+        { label: 'Kategori', value: statsLoading ? '-' : stats?.totalCategories || 0, icon: Tags, color: 'cyan', type: 'categories' as StatsType }
       ]
     },
     {
       title: 'Organizasyon İstatistikleri',
       items: [
-        { label: 'Toplam Üye', value: statsLoading ? '-' : stats?.totalMembers || 0, icon: Users, color: 'purple' },
-        { label: 'Yönetim Kadrosu', value: statsLoading ? '-' : stats?.totalManagement || 0, icon: Building2, color: 'teal' },
-        { label: 'Şube Sayısı', value: statsLoading ? '-' : stats?.totalBranches || 0, icon: MapPin, color: 'pink' },
-        { label: 'Admin Kullanıcı', value: statsLoading ? '-' : stats?.totalAdminUsers || 0, icon: UserPlus, color: 'red' }
+        { label: 'Toplam Üye', value: statsLoading ? '-' : stats?.totalMembers || 0, icon: Users, color: 'purple', type: 'members' as StatsType },
+        { label: 'Yönetim Kadrosu', value: statsLoading ? '-' : stats?.totalManagement || 0, icon: Building2, color: 'teal', type: 'management' as StatsType },
+        { label: 'Şube Sayısı', value: statsLoading ? '-' : stats?.totalBranches || 0, icon: MapPin, color: 'pink', type: 'branches' as StatsType },
+        { label: 'Admin Kullanıcı', value: statsLoading ? '-' : stats?.totalAdminUsers || 0, icon: UserPlus, color: 'red', type: 'admin_users' as StatsType }
       ]
     }
-  ];
+  ].map(section => ({
+    ...section,
+    items: section.items.filter(item => {
+      switch (item.label) {
+        case 'Toplam Haber': return PermissionManager.canManageNews(user);
+        case 'Toplam Duyuru': return PermissionManager.canManageAnnouncements(user);
+        case 'Slider Görseli': return PermissionManager.canManageSliders(user);
+        case 'Kategori': return PermissionManager.canManageCategories(user);
+        case 'Toplam Üye': return PermissionManager.canViewMembers(user);
+        case 'Yönetim Kadrosu': return PermissionManager.canManageManagement(user);
+        case 'Şube Sayısı': return PermissionManager.canManageBranches(user);
+        case 'Admin Kullanıcı': return PermissionManager.canViewUsers(user);
+        default: return true;
+      }
+    })
+  })).filter(section => section.items.length > 0);
 
   const recentActivity = [
     {
@@ -421,7 +495,15 @@ export default function AdminDashboard() {
       color: 'teal',
       description: 'Yönetim üyeleri'
     }
-  ];
+  ].filter(item => {
+    switch (item.title) {
+      case 'Son 30 Günde Eklenen Haberler': return PermissionManager.canManageNews(user);
+      case 'Aktif Başlık Duyuruları': return PermissionManager.canManageAnnouncements(user);
+      case 'Toplam Şube': return PermissionManager.canManageBranches(user);
+      case 'Yönetim Kadrosu': return PermissionManager.canManageManagement(user);
+      default: return true;
+    }
+  });
 
   return (
     <div className="space-y-8">
@@ -449,107 +531,109 @@ export default function AdminDashboard() {
       </div>
 
       {/* Üye İstatistikleri - Hero Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Aktif Üye Sayısı */}
-        <Link href="/admin/members?status=active" className="block transform transition-transform hover:-translate-y-1">
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-100 text-sm font-medium">Aktif Üye Sayısı</p>
-                <p className="text-4xl font-bold mt-2">
-                  {statsLoading ? (
-                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                  ) : (
-                    stats?.activeMembers || 0
-                  )}
-                </p>
-                <p className="text-emerald-100 text-xs mt-2 flex items-center">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Onaylanmış üyeler
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3">
-                <Users className="w-8 h-8" />
+      {PermissionManager.canViewMembers(user) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Aktif Üye Sayısı */}
+          <Link href="/admin/members?status=active" className="block transform transition-transform hover:-translate-y-1">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-100 text-sm font-medium">Aktif Üye Sayısı</p>
+                  <p className="text-4xl font-bold mt-2">
+                    {statsLoading ? (
+                      <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                    ) : (
+                      stats?.activeMembers || 0
+                    )}
+                  </p>
+                  <p className="text-emerald-100 text-xs mt-2 flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Onaylanmış üyeler
+                  </p>
+                </div>
+                <div className="bg-white/20 rounded-full p-3">
+                  <Users className="w-8 h-8" />
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Bu Ay Yeni Üyeler */}
-        <Link href="/admin/members?date=this_month" className="block transform transition-transform hover:-translate-y-1">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium">Bu Ay Yeni Üyeler</p>
-                <p className="text-4xl font-bold mt-2">
-                  {statsLoading ? (
-                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                  ) : (
-                    stats?.newMembersThisMonth || 0
-                  )}
-                </p>
-                <p className="text-blue-100 text-xs mt-2 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  {new Date().toLocaleDateString('tr-TR', { month: 'long' })} ayı
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3">
-                <UserPlus className="w-8 h-8" />
+          {/* Bu Ay Yeni Üyeler */}
+          <Link href="/admin/members?date=this_month" className="block transform transition-transform hover:-translate-y-1">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Bu Ay Yeni Üyeler</p>
+                  <p className="text-4xl font-bold mt-2">
+                    {statsLoading ? (
+                      <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                    ) : (
+                      stats?.newMembersThisMonth || 0
+                    )}
+                  </p>
+                  <p className="text-blue-100 text-xs mt-2 flex items-center">
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                    {new Date().toLocaleDateString('tr-TR', { month: 'long' })} ayı
+                  </p>
+                </div>
+                <div className="bg-white/20 rounded-full p-3">
+                  <UserPlus className="w-8 h-8" />
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Bu Ay İstifalar */}
-        <Link href="/admin/members?status=resigned&date=this_month" className="block transform transition-transform hover:-translate-y-1">
-          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100 text-sm font-medium">Bu Ay İstifalar</p>
-                <p className="text-4xl font-bold mt-2">
-                  {statsLoading ? (
-                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                  ) : (
-                    stats?.resignedMembersThisMonth || 0
-                  )}
-                </p>
-                <p className="text-red-100 text-xs mt-2 flex items-center">
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  Ayrılan/Askıya alınan
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3">
-                <Activity className="w-8 h-8" />
+          {/* Bu Ay İstifalar */}
+          <Link href="/admin/members?status=resigned&date=this_month" className="block transform transition-transform hover:-translate-y-1">
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-red-100 text-sm font-medium">Bu Ay İstifalar</p>
+                  <p className="text-4xl font-bold mt-2">
+                    {statsLoading ? (
+                      <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                    ) : (
+                      stats?.resignedMembersThisMonth || 0
+                    )}
+                  </p>
+                  <p className="text-red-100 text-xs mt-2 flex items-center">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Ayrılan/Askıya alınan
+                  </p>
+                </div>
+                <div className="bg-white/20 rounded-full p-3">
+                  <Activity className="w-8 h-8" />
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Bekleyen Üyeler */}
-        <Link href="/admin/members?status=pending" className="block transform transition-transform hover:-translate-y-1">
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-amber-100 text-sm font-medium">Bekleyen Başvurular</p>
-                <p className="text-4xl font-bold mt-2">
-                  {statsLoading ? (
-                    <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
-                  ) : (
-                    stats?.pendingMembers || 0
-                  )}
-                </p>
-                <p className="text-amber-100 text-xs mt-2 flex items-center">
-                  <Clock className="w-3 h-3 mr-1" />
-                  Onay bekliyor
-                </p>
-              </div>
-              <div className="bg-white/20 rounded-full p-3">
-                <Clock className="w-8 h-8" />
+          {/* Bekleyen Üyeler */}
+          <Link href="/admin/members?status=pending" className="block transform transition-transform hover:-translate-y-1">
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow cursor-pointer h-full">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-amber-100 text-sm font-medium">Bekleyen Başvurular</p>
+                  <p className="text-4xl font-bold mt-2">
+                    {statsLoading ? (
+                      <span className="animate-pulse bg-white/20 rounded h-10 w-20 inline-block"></span>
+                    ) : (
+                      stats?.pendingMembers || 0
+                    )}
+                  </p>
+                  <p className="text-amber-100 text-xs mt-2 flex items-center">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Onay bekliyor
+                  </p>
+                </div>
+                <div className="bg-white/20 rounded-full p-3">
+                  <Clock className="w-8 h-8" />
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
-      </div>
+          </Link>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -592,24 +676,31 @@ export default function AdminDashboard() {
       {/* Detailed Statistics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {detailedStats.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div key={sectionIndex} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-slate-900">{section.title}</h3>
-              <PieChart className="w-5 h-5 text-slate-400" />
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{section.title}</h3>
+              <PieChart className="w-5 h-5 text-slate-400 dark:text-slate-500" />
             </div>
 
             <div className="space-y-4">
               {section.items.map((item, itemIndex) => {
                 const Icon = item.icon;
                 return (
-                  <div key={itemIndex} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                  <div
+                    key={itemIndex}
+                    onClick={() => item.type && setSelectedStatsType(item.type)}
+                    className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 rounded-xl hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group shadow-sm hover:shadow-md"
+                  >
                     <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg bg-${item.color}-100`}>
-                        <Icon className={`w-4 h-4 text-${item.color}-600`} />
+                      <div className={`p-2 rounded-lg bg-${item.color}-100 dark:bg-${item.color}-900/20 text-${item.color}-600 dark:text-${item.color}-400 group-hover:scale-110 transition-transform`}>
+                        <Icon className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{item.label}</span>
                     </div>
-                    <span className="text-lg font-bold text-slate-900">{item.value}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{item.value}</span>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-all" />
+                    </div>
                   </div>
                 );
               })}
@@ -619,15 +710,17 @@ export default function AdminDashboard() {
       </div>
 
       {/* Turkey Statistics Map */}
-      <TurkeyStatsMap
-        cityStats={cityStats}
-        totalActiveMembers={stats?.activeMembers || 0}
-        totalResigned={stats?.suspendedMembers || 0}
-        totalRegistered={stats?.totalMembers || 0}
-        totalOnlineApplications={stats?.pendingMembers || 0}
-        isLoading={cityStatsLoading}
-        onCityClick={(city) => setSelectedCity(city)}
-      />
+      {PermissionManager.canViewMembers(user) && (
+        <TurkeyStatsMap
+          cityStats={cityStats}
+          totalActiveMembers={stats?.activeMembers || 0}
+          totalResigned={stats?.suspendedMembers || 0}
+          totalRegistered={stats?.totalMembers || 0}
+          totalOnlineApplications={stats?.pendingMembers || 0}
+          isLoading={cityStatsLoading}
+          onCityClick={(city) => setSelectedCity(city)}
+        />
+      )}
 
       {/* City Members Modal */}
       {selectedCity && (
@@ -638,26 +731,33 @@ export default function AdminDashboard() {
         />
       )}
 
+      {/* Stats Detail Modal */}
+      <StatsDetailModal
+        type={selectedStatsType}
+        isOpen={!!selectedStatsType}
+        onClose={() => setSelectedStatsType(null)}
+      />
+
       {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-slate-900">Son Aktiviteler</h3>
-          <Activity className="w-5 h-5 text-slate-400" />
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Son Aktiviteler</h3>
+          <Activity className="w-5 h-5 text-slate-400 dark:text-slate-500" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {recentActivity.map((activity, index) => {
             const Icon = activity.icon;
             return (
-              <div key={index} className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+              <div key={index} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <div className="flex items-center justify-between mb-3">
-                  <div className={`p-2 rounded-lg bg-${activity.color}-100`}>
-                    <Icon className={`w-5 h-5 text-${activity.color}-600`} />
+                  <div className={`p-2 rounded-lg bg-${activity.color}-100 dark:bg-${activity.color}-900/20 text-${activity.color}-600 dark:text-${activity.color}-400`}>
+                    <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-2xl font-bold text-slate-900">{activity.value}</span>
+                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{activity.value}</span>
                 </div>
-                <h4 className="text-sm font-medium text-slate-900 mb-1">{activity.title}</h4>
-                <p className="text-xs text-slate-600">{activity.description}</p>
+                <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1">{activity.title}</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">{activity.description}</p>
               </div>
             );
           })}

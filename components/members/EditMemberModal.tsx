@@ -21,7 +21,48 @@ interface EditMemberModalProps {
     onSuccess: () => void;
 }
 
+// Helper for input fields (Moved outside to prevent re-render focus loss)
+const InputField = ({
+    label, name, formData, handleChange, type = 'text', required = false,
+    icon: Icon, className = '', options = null, disabled = false, ...rest
+}: any) => (
+    <div className={`space-y-1.5 ${className}`}>
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
+            {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {options ? (
+            <select
+                name={name}
+                value={(formData as any)[name] || ''}
+                onChange={handleChange}
+                disabled={disabled}
+                className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                {...rest}
+            >
+                <option value="">Seçiniz</option>
+                {options.map((opt: any) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+            </select>
+        ) : (
+            <input
+                type={type}
+                name={name}
+                value={(formData as any)[name] || ''}
+                onChange={handleChange}
+                required={required}
+                disabled={disabled}
+                className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                {...rest}
+            />
+        )}
+    </div>
+);
+
 export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: EditMemberModalProps) {
+
+
     const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'work' | 'membership'>('personal');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -155,44 +196,7 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
 
     if (!isOpen) return null;
 
-    // Helper for input fields
-    const InputField = ({
-        label, name, type = 'text', required = false,
-        icon: Icon, className = '', options = null, disabled = false, ...rest
-    }: any) => (
-        <div className={`space-y-1.5 ${className}`}>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
-                {label} {required && <span className="text-red-500">*</span>}
-            </label>
-            {options ? (
-                <select
-                    name={name}
-                    value={(formData as any)[name] || ''}
-                    onChange={handleChange}
-                    disabled={disabled}
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
-                    {...rest}
-                >
-                    <option value="">Seçiniz</option>
-                    {options.map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
-            ) : (
-                <input
-                    type={type}
-                    name={name}
-                    value={(formData as any)[name] || ''}
-                    onChange={handleChange}
-                    required={required}
-                    disabled={disabled}
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
-                    {...rest}
-                />
-            )}
-        </div>
-    );
+
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -260,31 +264,31 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                             {/* Personal Tab */}
                             {activeTab === 'personal' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <InputField label="Ad" name="first_name" required icon={User} />
-                                    <InputField label="Soyad" name="last_name" required icon={User} />
-                                    <InputField label="TC Kimlik No" name="tc_identity" required icon={Hash} />
-                                    <InputField label="Cinsiyet" name="gender" icon={Users} options={[
+                                    <InputField formData={formData} handleChange={handleChange} label="Ad" name="first_name" required icon={User} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Soyad" name="last_name" required icon={User} />
+                                    <InputField formData={formData} handleChange={handleChange} label="TC Kimlik No" name="tc_identity" required icon={Hash} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Cinsiyet" name="gender" icon={Users} options={[
                                         { value: 'Erkek', label: 'Erkek' },
                                         { value: 'Kadın', label: 'Kadın' }
                                     ]} />
-                                    <InputField label="Doğum Tarihi" name="birth_date" type="date" icon={Calendar} />
-                                    <InputField label="Doğum Yeri" name="birth_place" icon={MapPin} />
-                                    <InputField label="Baba Adı" name="father_name" icon={User} />
-                                    <InputField label="Anne Adı" name="mother_name" icon={User} />
-                                    <InputField label="Medeni Durum" name="marital_status" icon={Heart} options={[
+                                    <InputField formData={formData} handleChange={handleChange} label="Doğum Tarihi" name="birth_date" type="date" icon={Calendar} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Doğum Yeri" name="birth_place" icon={MapPin} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Baba Adı" name="father_name" icon={User} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Anne Adı" name="mother_name" icon={User} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Medeni Durum" name="marital_status" icon={Heart} options={[
                                         { value: 'Evli', label: 'Evli' },
                                         { value: 'Bekar', label: 'Bekar' }
                                     ]} />
-                                    <InputField label="Çocuk Sayısı" name="children_count" type="number" icon={Users} min="0" />
-                                    <InputField label="Eğitim Durumu" name="education_level" icon={GraduationCap} options={[
+                                    <InputField formData={formData} handleChange={handleChange} label="Çocuk Sayısı" name="children_count" type="number" icon={Users} min="0" />
+                                    <InputField formData={formData} handleChange={handleChange} label="Eğitim Durumu" name="education_level" icon={GraduationCap} options={[
                                         { value: 'İlköğretim', label: 'İlköğretim' },
                                         { value: 'Lise', label: 'Lise' },
-                                        { value: 'Önlisans', label: 'Önlisans' },
+                                        { value: 'Ön Lisans', label: 'Ön Lisans' },
                                         { value: 'Lisans', label: 'Lisans' },
                                         { value: 'Yüksek Lisans', label: 'Yüksek Lisans' },
                                         { value: 'Doktora', label: 'Doktora' },
                                     ]} />
-                                    <InputField
+                                    <InputField formData={formData} handleChange={handleChange}
                                         label="Kan Grubu"
                                         name="blood_group"
                                         icon={Activity}
@@ -306,13 +310,13 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                             {activeTab === 'contact' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <InputField label="Telefon" name="phone" type="tel" icon={Phone} />
-                                        <InputField label="E-Posta" name="email" type="email" icon={Mail} />
+                                        <InputField formData={formData} handleChange={handleChange} label="Telefon" name="phone" type="tel" icon={Phone} />
+                                        <InputField formData={formData} handleChange={handleChange} label="E-Posta" name="email" type="email" icon={Mail} />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <InputField label="İl" name="city" icon={MapPin} disabled={!canEditBranch} options={cities.map(c => ({ value: c.name, label: c.name }))} />
-                                        <InputField label="İlçe" name="district" icon={MapPin} />
+                                        <InputField formData={formData} handleChange={handleChange} label="İl" name="city" icon={MapPin} disabled={!canEditBranch} options={cities.map(c => ({ value: c.name, label: c.name }))} />
+                                        <InputField formData={formData} handleChange={handleChange} label="İlçe" name="district" icon={MapPin} />
                                     </div>
 
                                     <div className="col-span-2">
@@ -335,9 +339,9 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                             Acil Durum İletişim
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <InputField label="İlgili Kişi Adı" name="emergency_contact_name" icon={User} />
-                                            <InputField label="Yakınlık Derecesi" name="emergency_contact_relation" icon={Users} />
-                                            <InputField label="İletişim Telefonu" name="emergency_contact_phone" type="tel" icon={Phone} className="md:col-span-2" />
+                                            <InputField formData={formData} handleChange={handleChange} label="İlgili Kişi Adı" name="emergency_contact_name" icon={User} />
+                                            <InputField formData={formData} handleChange={handleChange} label="Yakınlık Derecesi" name="emergency_contact_relation" icon={Users} />
+                                            <InputField formData={formData} handleChange={handleChange} label="İletişim Telefonu" name="emergency_contact_phone" type="tel" icon={Phone} className="md:col-span-2" />
                                         </div>
                                     </div>
                                 </div>
@@ -346,21 +350,21 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                             {/* Work Tab */}
                             {activeTab === 'work' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <InputField label="Kurum Adı" name="institution" icon={Building2} className="md:col-span-2" />
-                                    <InputField
+                                    <InputField formData={formData} handleChange={handleChange} label="Kurum Adı" name="institution" icon={Building2} className="md:col-span-2" />
+                                    <InputField formData={formData} handleChange={handleChange}
                                         label="İş Yeri"
                                         name="workplace"
                                         icon={Briefcase}
                                         options={workplaces.map(w => ({ value: w.label, label: w.label }))}
                                     />
-                                    <InputField
+                                    <InputField formData={formData} handleChange={handleChange}
                                         label="Kadro Unvanı"
                                         name="position"
                                         icon={Briefcase}
                                         options={positions.map(p => ({ value: p.label, label: p.label }))}
                                     />
-                                    <InputField label="Kurum Sicil No" name="institution_register_no" icon={FileText} />
-                                    <InputField label="Emekli Sicil No" name="retirement_register_no" icon={FileText} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Kurum Sicil No" name="institution_register_no" icon={FileText} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Emekli Sicil No" name="retirement_register_no" icon={FileText} />
 
                                     {/* Branch and Region Selection */}
                                     {canEditBranch && (
@@ -410,10 +414,10 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                             {/* Membership Tab */}
                             {activeTab === 'membership' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <InputField label="Üye Numarası" name="membership_number" icon={Hash} />
-                                    <InputField label="Karar Numarası" name="decision_number" icon={FileText} />
-                                    <InputField label="Üyelik Karar Tarihi" name="decision_date" type="date" icon={Calendar} />
-                                    <InputField label="Üyelik Durumu" name="membership_status" icon={Activity} options={[
+                                    <InputField formData={formData} handleChange={handleChange} label="Üye Numarası" name="membership_number" icon={Hash} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Karar Numarası" name="decision_number" icon={FileText} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Üyelik Karar Tarihi" name="decision_date" type="date" icon={Calendar} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Üyelik Durumu" name="membership_status" icon={Activity} options={[
                                         { value: 'active', label: 'Aktif Üye' },
                                         { value: 'pending', label: 'Onay Bekliyor' },
                                         { value: 'inactive', label: 'Pasif' },

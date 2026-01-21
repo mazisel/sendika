@@ -5,6 +5,9 @@ import { Member } from '@/lib/types';
 import { cityOptions } from '@/lib/cities';
 import { getDistrictsByCity } from '@/lib/districts';
 
+// Sort cities alphabetically for dropdowns
+const sortedCityOptions = [...cityOptions].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
 export interface FilterState {
     city: string;
     district: string;
@@ -51,11 +54,12 @@ interface MemberFilterTabProps {
     results: Member[] | null;
     onRowClick: (member: Member) => void;
     onConditionalSearch?: (conditions: Condition[]) => void;
+    regions?: { id: string; name: string }[];
 }
 
 import ConditionBuilder, { Condition } from './ConditionBuilder';
 
-export default function MemberFilterTab({ filters, setFilters, onSearch, onClear, results, onRowClick, onConditionalSearch }: MemberFilterTabProps) {
+export default function MemberFilterTab({ filters, setFilters, onSearch, onClear, results, onRowClick, onConditionalSearch, regions = [] }: MemberFilterTabProps) {
     const [activeSearchTab, setActiveSearchTab] = React.useState('identity');
     const [conditions, setConditions] = React.useState<Condition[]>([
         { id: '1', field: 'city', operator: 'isEmpty', value: '' }
@@ -177,7 +181,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                 >
                                     <option value="">Tümünü Seç</option>
-                                    {cityOptions.map(city => (
+                                    {sortedCityOptions.map(city => (
                                         <option key={city.code} value={city.name}>{city.name}</option>
                                     ))}
                                 </select>
@@ -223,7 +227,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                     <option value="İlkokul">İlkokul</option>
                                     <option value="Ortaokul">Ortaokul</option>
                                     <option value="Lise">Lise</option>
-                                    <option value="Önlisans">Önlisans</option>
+                                    <option value="Ön Lisans">Ön Lisans</option>
                                     <option value="Lisans">Lisans</option>
                                     <option value="Yüksek Lisans">Yüksek Lisans</option>
                                     <option value="Doktora">Doktora</option>
@@ -250,6 +254,8 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                         onChange={(e) => updateFilter('minAge', e.target.value)}
                                         className="w-1/2 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                         placeholder="Min"
+                                        min="0"
+                                        max="120"
                                     />
                                     <input
                                         type="number"
@@ -257,6 +263,8 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                         onChange={(e) => updateFilter('maxAge', e.target.value)}
                                         className="w-1/2 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                         placeholder="Max"
+                                        min="0"
+                                        max="120"
                                     />
                                 </div>
                             </div>
@@ -269,15 +277,15 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Bölge / Şube</label>
+                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Bölge</label>
                                 <select
                                     value={filters.region}
                                     onChange={(e) => updateFilter('region', e.target.value)}
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                 >
-                                    <option value="">Bölge Şube seçiniz</option>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                                        <option key={i} value={i.toString()}>{i}. Bölge</option>
+                                    <option value="">Bölge seçiniz</option>
+                                    {regions.map(r => (
+                                        <option key={r.id} value={r.name}>{r.name}</option>
                                     ))}
                                 </select>
                             </div>
@@ -291,7 +299,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                 >
                                     <option value="">Tümünü Seç</option>
-                                    {cityOptions.map(city => (
+                                    {sortedCityOptions.map(city => (
                                         <option key={city.code} value={city.name}>{city.name}</option>
                                     ))}
                                 </select>
@@ -392,7 +400,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                 >
                                     <option value="">Tümünü Seç</option>
-                                    {cityOptions.map(city => (
+                                    {sortedCityOptions.map(city => (
                                         <option key={city.code} value={city.name}>{city.name}</option>
                                     ))}
                                 </select>
@@ -428,9 +436,10 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                 <input
                                     type="text"
                                     value={filters.phone}
-                                    onChange={(e) => updateFilter('phone', e.target.value)}
+                                    onChange={(e) => updateFilter('phone', e.target.value.replace(/\D/g, ''))}
                                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                                     placeholder="Telefon Numarası"
+                                    maxLength={10}
                                 />
                             </div>
                         </div>

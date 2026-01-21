@@ -102,7 +102,7 @@ const fieldLabels: Record<string, string> = {
   first_name: 'Ad',
   last_name: 'Soyad',
   tc_identity: 'TC Kimlik No',
-  birth_date: 'Doğum tarihi',
+  birth_date: 'Doğum Tarihi',
   gender: 'Cinsiyet',
   city: 'İl',
   district: 'İlçe',
@@ -114,20 +114,21 @@ const fieldLabels: Record<string, string> = {
   position: 'Kadro Unvanı',
   institution_register_no: 'Kurum Sicil No',
   retirement_register_no: 'Emekli Sicil No',
-  start_date: 'Başlangıç tarihi',
+  start_date: 'İşe Başlama Tarihi',
   father_name: 'Baba Adı',
   mother_name: 'Anne Adı',
   birth_place: 'Doğum Yeri',
   blood_group: 'Kan Grubu',
-  emergency_contact_name: 'Acil durum kişi adı',
-  emergency_contact_phone: 'Acil durum kişi telefonu',
-  emergency_contact_relation: 'Acil durum kişi ilişki',
-  education_level: 'Eğitim durumu',
-  marital_status: 'Medeni durumu',
-  children_count: 'Çocuk sayısı',
+  emergency_contact_name: 'Acil Durum Kişi Adı',
+  emergency_contact_phone: 'Acil Durum Kişi Telefonu',
+  emergency_contact_relation: 'Acil Durum Kişi Yakınlığı',
+  education_level: 'Eğitim Durumu',
+  marital_status: 'Medeni Durumu',
+  children_count: 'Çocuk Sayısı',
   notes: 'Notlar',
-  membership_number: 'Üye numarası',
-  membership_date: 'Üye kayıt tarihi',
+  membership_number: 'Üye Numarası',
+  membership_date: 'Üye Kayıt Tarihi',
+  decision_number: 'Karar No',
 };
 
 const documentTypeOptions = [
@@ -478,18 +479,33 @@ export default function NewMemberPage() {
 
   const extractColumnName = (text?: string | null): string | null => {
     if (!text) return null;
+    // Pattern 1: Key (column_name)
     const keyMatch = text.match(/Key \(([^)]+)\)/);
     if (keyMatch?.[1]) {
       return keyMatch[1].split(',')[0].trim();
     }
+    // Pattern 2: column "column_name"
     const columnMatch = text.match(/column \"?([a-z_]+)\"?/i);
     if (columnMatch?.[1]) {
       return columnMatch[1];
+    }
+    // Pattern 3: "column_name" = value
+    const valueMatch = text.match(/\"([a-z_]+)\"\s*=/i);
+    if (valueMatch?.[1]) {
+      return valueMatch[1];
+    }
+    // Pattern 4: invalid input for ... column_name
+    const inputMatch = text.match(/invalid input.*?\"([a-z_]+)\"/i);
+    if (inputMatch?.[1]) {
+      return inputMatch[1];
     }
     return null;
   };
 
   const handleInsertError = (error: PostgrestError) => {
+    // Debug logging for development
+    console.error('PostgrestError:', { code: error.code, message: error.message, details: error.details, hint: error.hint });
+
     const searchField = (content?: string | null) => {
       if (!content) return null;
       const lowered = content.toLowerCase();
@@ -504,6 +520,7 @@ export default function NewMemberPage() {
         const label = fieldLabels[field] || field;
         const message = `Bu ${label.toLowerCase()} ile kayıtlı bir üye zaten mevcut.`;
         setErrors(prev => ({ ...prev, [field]: message }));
+        scrollToField(field);
         return message;
       }
       return 'Girilen bilgilere sahip başka bir üye mevcut. Lütfen kontrol edin.';
@@ -514,6 +531,7 @@ export default function NewMemberPage() {
       if (column && fieldLabels[column]) {
         const message = `${fieldLabels[column]} alanı zorunludur.`;
         setErrors(prev => ({ ...prev, [column]: message }));
+        scrollToField(column);
         return message;
       }
       return 'Zorunlu alanlardan biri eksik görünüyor. Lütfen formu kontrol edin.';
@@ -524,6 +542,7 @@ export default function NewMemberPage() {
       if (column && fieldLabels[column]) {
         const message = `${fieldLabels[column]} için geçersiz bir değer girdiniz.`;
         setErrors(prev => ({ ...prev, [column]: message }));
+        scrollToField(column);
         return message;
       }
       return 'Bazı alanlarda geçersiz değerler var. Lütfen bilgileri kontrol edin.';
@@ -532,10 +551,13 @@ export default function NewMemberPage() {
     if (error.code === '22P02') {
       const column = extractColumnName(error.message) || extractColumnName(error.details);
       if (column && fieldLabels[column]) {
-        const message = `${fieldLabels[column]} alanındaki değer geçersiz. Lütfen kontrol edin.`;
+        const message = `${fieldLabels[column]} alanındaki değer geçersiz (tip hatası). Lütfen kontrol edin.`;
         setErrors(prev => ({ ...prev, [column]: message }));
+        scrollToField(column);
         return message;
       }
+      // If we can't determine the specific field, show a generic message
+      // The debug log will help identify the actual problem
       return 'Sayı veya tarih alanlarında geçersiz karakterler var. Lütfen girişleri kontrol edin.';
     }
 
@@ -624,7 +646,24 @@ export default function NewMemberPage() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (Object.keys(newErrors).length > 0) {
+      const firstErrorField = Object.keys(newErrors)[0];
+      scrollToField(firstErrorField);
+      return false;
+    }
+
+    return true;
+  };
+
+  const scrollToField = (fieldName: string) => {
+    const element = document.getElementsByName(fieldName)[0] || document.getElementById(fieldName);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+        element.focus();
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -904,7 +943,9 @@ export default function NewMemberPage() {
                   }`}
               />
               {errors.membership_date && (
-                <p className="mt-1 text-sm text-red-600">{errors.membership_date}</p>
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1 text-red-600">
+                  <AlertTriangle className="w-3 h-3" /> {errors.membership_date}
+                </p>
               )}
             </div>
 
@@ -959,7 +1000,7 @@ export default function NewMemberPage() {
                   >
                     <option value="">Bölge Seçiniz</option>
                     {regions.map(r => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
+                      <option key={r.id} value={r.name}>{r.name}</option>
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
@@ -1048,9 +1089,14 @@ export default function NewMemberPage() {
                 name="father_name"
                 value={formData.father_name}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.father_name ? 'border-red-500' : 'border-slate-300'}`}
                 placeholder="Baba adı"
               />
+              {errors.father_name && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.father_name}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1062,9 +1108,14 @@ export default function NewMemberPage() {
                 name="mother_name"
                 value={formData.mother_name}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.mother_name ? 'border-red-500' : 'border-slate-300'}`}
                 placeholder="Anne adı"
               />
+              {errors.mother_name && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.mother_name}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1152,17 +1203,22 @@ export default function NewMemberPage() {
                 name="education_level"
                 value={formData.education_level}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.education_level ? 'border-red-500' : 'border-slate-300'}`}
               >
                 <option value="">Seçiniz</option>
                 <option value="İlkokul">İlkokul</option>
                 <option value="Ortaokul">Ortaokul</option>
                 <option value="Lise">Lise</option>
-                <option value="Önlisans">Önlisans</option>
+                <option value="Ön Lisans">Ön Lisans</option>
                 <option value="Lisans">Lisans</option>
                 <option value="Yüksek Lisans">Yüksek Lisans</option>
                 <option value="Doktora">Doktora</option>
               </select>
+              {errors.education_level && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.education_level}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1173,13 +1229,18 @@ export default function NewMemberPage() {
                 name="marital_status"
                 value={formData.marital_status}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.marital_status ? 'border-red-500' : 'border-slate-300'}`}
               >
                 <option value="">Seçiniz</option>
                 <option value="Bekar">Bekar</option>
                 <option value="Evli">Evli</option>
                 <option value="Boşanmış">Boşanmış</option>
               </select>
+              {errors.marital_status && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.marital_status}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1192,8 +1253,13 @@ export default function NewMemberPage() {
                 value={formData.children_count}
                 onChange={handleInputChange}
                 min="0"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.children_count ? 'border-red-500' : 'border-slate-300'}`}
               />
+              {errors.children_count && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.children_count}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1328,13 +1394,18 @@ export default function NewMemberPage() {
                 name="workplace"
                 value={formData.workplace}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.workplace ? 'border-red-500' : 'border-slate-300'}`}
               >
                 <option value="">Seçiniz</option>
                 {definitionOptions.workplace.map(opt => (
                   <option key={opt.id} value={opt.label}>{opt.label}</option>
                 ))}
               </select>
+              {errors.workplace && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.workplace}
+                </p>
+              )}
               {canManageDefinitions && (
                 <div className="mt-1">
                   <a href="/admin/definitions?tab=workplace" target="_blank" className="text-xs text-blue-600 hover:underline">
@@ -1353,9 +1424,14 @@ export default function NewMemberPage() {
                 name="institution"
                 value={formData.institution}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.institution ? 'border-red-500' : 'border-slate-300'}`}
                 placeholder="Kurum adı"
               />
+              {errors.institution && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.institution}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1366,13 +1442,18 @@ export default function NewMemberPage() {
                 name="position"
                 value={formData.position}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.position ? 'border-red-500' : 'border-slate-300'}`}
               >
                 <option value="">Seçiniz</option>
                 {definitionOptions.position.map(opt => (
                   <option key={opt.id} value={opt.label}>{opt.label}</option>
                 ))}
               </select>
+              {errors.position && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.position}
+                </p>
+              )}
               {canManageDefinitions && (
                 <div className="mt-1">
                   <a href="/admin/definitions?tab=position" target="_blank" className="text-xs text-blue-600 hover:underline">
@@ -1391,9 +1472,14 @@ export default function NewMemberPage() {
                 name="institution_register_no"
                 value={formData.institution_register_no}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.institution_register_no ? 'border-red-500' : 'border-slate-300'}`}
                 placeholder="Sicil No"
               />
+              {errors.institution_register_no && (
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.institution_register_no}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1423,7 +1509,9 @@ export default function NewMemberPage() {
                   }`}
               />
               {errors.start_date && (
-                <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
+                <p className="mt-1 text-sm text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> {errors.start_date}
+                </p>
               )}
             </div>
           </div>

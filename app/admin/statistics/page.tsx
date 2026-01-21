@@ -25,6 +25,9 @@ import {
   PieChart
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { AdminAuth } from '@/lib/auth';
+import { AdminUser } from '@/lib/types';
+import { PermissionManager } from '@/lib/permissions';
 import StatsDetailModal from '@/components/statistics/StatsDetailModal';
 
 interface MemberStats {
@@ -61,6 +64,7 @@ interface TimeStats {
 }
 
 export default function StatisticsPage() {
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [memberStats, setMemberStats] = useState<MemberStats | null>(null);
   const [demographicStats, setDemographicStats] = useState<DemographicStats | null>(null);
@@ -88,7 +92,13 @@ export default function StatisticsPage() {
     'rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-4 transition-colors';
 
   useEffect(() => {
-    loadStatistics();
+    const currentUser = AdminAuth.getCurrentUser();
+    setUser(currentUser);
+    if (currentUser) {
+      loadStatistics(currentUser);
+    } else {
+      setLoading(false);
+    }
   }, [selectedTimeRange]);
 
   const getStartDate = (range: string) => {
@@ -100,18 +110,17 @@ export default function StatisticsPage() {
     return now.toISOString();
   };
 
-  const loadStatistics = async () => {
+  const loadStatistics = async (currentUser: AdminUser) => {
     try {
       setLoading(true);
       const startDate = getStartDate(selectedTimeRange);
 
       await Promise.all([
-        loadMemberStats(startDate),
-        loadDemographicStats(startDate),
-        loadGeographicStats(startDate),
-        loadWorkplaceStats(startDate),
-        loadWorkplaceStats(startDate),
-        loadTimeStats(startDate)
+        loadMemberStats(startDate, currentUser),
+        loadDemographicStats(startDate, currentUser),
+        loadGeographicStats(startDate, currentUser),
+        loadWorkplaceStats(startDate, currentUser),
+        loadTimeStats(startDate, currentUser)
       ]);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
@@ -120,12 +129,23 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadMemberStats = async (startDate: string | null) => {
+  const loadMemberStats = async (startDate: string | null, currentUser: AdminUser) => {
     try {
-      // Helper to applies date filter
+      if (!PermissionManager.canViewMembers(currentUser)) return;
+
+      // Helper to applies date filter AND scope filter
       const applyFilter = (query: any) => {
-        if (startDate) return query.gte('created_at', startDate);
-        return query;
+        let q = query;
+        if (startDate) q = q.gte('created_at', startDate);
+
+        // Scope filter
+        if (currentUser.role_type === 'branch_manager' && currentUser.city) {
+          q = q.eq('city', currentUser.city);
+        } else if (currentUser.role_type === 'regional_manager' && currentUser.region) {
+          q = q.eq('region', currentUser.region);
+        }
+
+        return q;
       };
 
       // Toplam üye sayısı (Filtreye göre)
@@ -198,11 +218,22 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadDemographicStats = async (startDate: string | null) => {
+  const loadDemographicStats = async (startDate: string | null, currentUser: AdminUser) => {
     try {
+      if (!PermissionManager.canViewMembers(currentUser)) return;
+
       const applyFilter = (query: any) => {
-        if (startDate) return query.gte('created_at', startDate);
-        return query;
+        let q = query;
+        if (startDate) q = q.gte('created_at', startDate);
+
+        // Scope filter
+        if (currentUser.role_type === 'branch_manager' && currentUser.city) {
+          q = q.eq('city', currentUser.city);
+        } else if (currentUser.role_type === 'regional_manager' && currentUser.region) {
+          q = q.eq('region', currentUser.region);
+        }
+
+        return q;
       };
 
       // Cinsiyet dağılımı
@@ -322,7 +353,7 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadGeographicStats = async (startDate: string | null) => {
+  const loadGeographicStats = async (startDate: string | null, currentUser: AdminUser) => {
     try {
       const applyFilter = (query: any) => {
         if (startDate) return query.gte('created_at', startDate);
@@ -361,11 +392,20 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadWorkplaceStats = async (startDate: string | null) => {
+  const loadWorkplaceStats = async (startDate: string | null, currentUser: AdminUser) => {
     try {
       const applyFilter = (query: any) => {
-        if (startDate) return query.gte('created_at', startDate);
-        return query;
+        let q = query;
+        if (startDate) q = q.gte('created_at', startDate);
+
+        // Scope filter
+        if (currentUser.role_type === 'branch_manager' && currentUser.city) {
+          q = q.eq('city', currentUser.city);
+        } else if (currentUser.role_type === 'regional_manager' && currentUser.region) {
+          q = q.eq('region', currentUser.region);
+        }
+
+        return q;
       };
 
       // En çok çalışanı olan işyerleri
@@ -417,12 +457,21 @@ export default function StatisticsPage() {
     }
   };
 
-  const loadTimeStats = async (startDate: string | null) => {
+  const loadTimeStats = async (startDate: string | null, currentUser: AdminUser) => {
     try {
+      if (!PermissionManager.canViewMembers(currentUser)) return;
+
       // Son 12 ayın üyelik trendleri
       let query = supabase
         .from('members')
         .select('created_at');
+
+      // Scope filter
+      if (currentUser.role_type === 'branch_manager' && currentUser.city) {
+        query = query.eq('city', currentUser.city);
+      } else if (currentUser.role_type === 'regional_manager' && currentUser.region) {
+        query = query.eq('region', currentUser.region);
+      }
 
       if (startDate) {
         query = query.gte('created_at', startDate);
@@ -487,8 +536,9 @@ export default function StatisticsPage() {
   };
 
   const handleRefresh = async () => {
+    if (!user) return;
     setRefreshing(true);
-    await loadStatistics();
+    await loadStatistics(user);
     setRefreshing(false);
   };
 
@@ -723,6 +773,20 @@ export default function StatisticsPage() {
           <RefreshCw className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
           <span className="text-lg text-slate-600 dark:text-slate-300">İstatistikler yükleniyor...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (!user || !PermissionManager.canViewMembers(user)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 m-6">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full mb-4">
+          <UserX className="w-12 h-12 text-red-500 dark:text-red-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Yetkisiz Erişim</h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md">
+          Bu sayfayı görüntülemek için yeterli izniniz bulunmamaktadır.
+        </p>
       </div>
     );
   }

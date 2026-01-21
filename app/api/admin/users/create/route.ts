@@ -24,12 +24,18 @@ export async function POST(request: Request) {
         // İsteyen kişi admin mi?
         const { data: adminUser, error: adminCheckError } = await supabaseAdmin
             .from('admin_users')
-            .select('role, permissions:role_id(permissions:role_permissions(permission:permissions(key)))')
+            .select('role')
             .eq('id', requester.id)
             .single();
 
         if (adminCheckError) {
-            return NextResponse.json({ error: 'Admin user not found' }, { status: 403 });
+            console.error('Admin check error details:', adminCheckError);
+            console.error('Requester ID:', requester.id);
+            // Check if error is specifically because user is not found vs syntax/relation error
+            if (adminCheckError.code === 'PGRST116') {
+                console.error('PGRST116: User not found in admin_users table');
+            }
+            return NextResponse.json({ error: 'Admin user not found', details: adminCheckError }, { status: 403 });
         }
 
         // Basit rol kontrolü (Super Admin veya User Management yetkisi)
@@ -49,6 +55,24 @@ export async function POST(request: Request) {
         if (!email || !password || !full_name) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+
+        // --- SCOPE ENFORCEMENT ---
+        // role_id'ye göre role_type'ı (scope) veritabanından çek.
+        // Frontend'den gelen role_type'a güvenme, buradan gelen değeri kullan.
+        let authoritativeRoleType = 'general_manager';
+
+        if (role_id) {
+            const { data: roleDef, error: roleError } = await supabaseAdmin
+                .from('roles')
+                .select('role_type')
+                .eq('id', role_id)
+                .single();
+
+            if (!roleError && roleDef) {
+                authoritativeRoleType = roleDef.role_type || 'general_manager';
+            }
+        }
+        // -------------------------
 
         // 2. Kullanıcı Oluşturma (Service Role ile - Auto Confirm)
         const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -77,10 +101,10 @@ export async function POST(request: Request) {
                     email,
                     full_name,
                     role: role || 'admin', // Backward compatibility if needed
-                    role_type: role_type || 'general_manager',
+                    role_type: authoritativeRoleType, // Enforced Scope
                     role_id: role_id || null, // RBAC role id
-                    city: city || null,
-                    region: region || null,
+                    city: authoritativeRoleType === 'branch_manager' ? city : null, // Only save city if scope is branch
+                    region: authoritativeRoleType === 'regional_manager' ? region : null, // Only save region if scope is region
                     phone: phone || null,
                     is_active: true
                 }

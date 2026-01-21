@@ -37,6 +37,7 @@ import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
 import { AdminUser } from '@/lib/types';
 import StickyMessageBanner from '@/components/StickyMessageBanner';
+import GlobalSearch from '@/components/GlobalSearch';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -134,22 +135,26 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         href: '/admin/dashboard',
         icon: Home,
         description: 'Genel bakış ve istatistikler'
-      },
-      {
+      }
+    ];
+
+    if (PermissionManager.canViewMembers(currentUser)) {
+      baseItems.push({
         title: 'İstatistikler',
         href: '/admin/statistics',
         icon: BarChart3,
         description: 'Detaylı üye istatistikleri ve analiz'
-      },
-      {
+      });
+
+      baseItems.push({
         title: 'Üyeler',
         href: '/admin/members',
         icon: Users,
-        description: currentUser.role_type === 'branch_manager'
+        description: currentUser.role_type === 'branch_manager' && currentUser.city
           ? `${currentUser.city} üyelerini yönet`
           : 'Sendika üyelerini yönet'
-      }
-    ];
+      });
+    }
 
     if (PermissionManager.canViewFinance(currentUser)) {
       baseItems.push({
@@ -237,12 +242,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       });
     }
 
-    siteManagementItems.push({
-      title: 'Site Ayarları',
-      href: '/admin/settings',
-      icon: Settings,
-      description: 'Site logosu ve renklerini yönet'
-    });
+    if (PermissionManager.hasPermission(currentUser, 'settings.manage')) {
+      siteManagementItems.push({
+        title: 'Site Ayarları',
+        href: '/admin/settings',
+        icon: Settings,
+        description: 'Site logosu ve renklerini yönet'
+      });
+    }
 
 
     if (PermissionManager.canManageDefinitions(currentUser)) {
@@ -257,7 +264,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Belge Yönetimi
     // Assuming a general permission check or specific ones. 
     // Using 'documents.view' based on migration.
-    if (PermissionManager.hasPermission(currentUser, 'documents.view')) {
+    if (PermissionManager.hasPermission(currentUser, 'documents.view') || PermissionManager.hasPermission(currentUser, 'decisions.view')) {
       baseItems.push({
         title: 'Belge Yönetimi',
         href: '/admin/documents/decisions', // Default entry point
@@ -491,10 +498,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {/* Mobile menu button */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 transition-colors"
+              className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 transition-colors mr-4"
             >
               <Menu className="w-6 h-6" />
             </button>
+
+            {/* Global Search */}
+            <GlobalSearch menuItems={menuItems} />
 
             {/* User menu */}
             <div className="flex items-center space-x-4 ml-auto">
@@ -574,9 +584,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Footer */}
         <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-            <div>© 2025 Sendika Admin Panel. Tüm hakları saklıdır.</div>
+            <div>© 2026 Sendikal. Tüm hakları saklıdır.</div>
             <div className="flex items-center space-x-4">
-              <span>v1.0.0</span>
+              <span>v1.0.1 - Kapalı Beta</span>
               <span>•</span>
               <span>Son güncelleme: {lastUpdated}</span>
             </div>

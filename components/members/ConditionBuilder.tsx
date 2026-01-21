@@ -53,7 +53,7 @@ const OPERATOR_OPTIONS = [
 const FIELD_VALUE_OPTIONS: Record<string, string[]> = {
     blood_group: ['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-', '0 Rh+', '0 Rh-'],
     gender: ['Erkek', 'Kadın'],
-    education_level: ['İlkokul', 'Ortaokul', 'Lise', 'Önlisans', 'Lisans', 'Yüksek Lisans', 'Doktora'],
+    education_level: ['İlkokul', 'Ortaokul', 'Lise', 'Ön Lisans', 'Lisans', 'Yüksek Lisans', 'Doktora'],
     marital_status: ['Evli', 'Bekar'],
     membership_status: ['active', 'pending', 'inactive', 'suspended', 'resigned'],
 };

@@ -27,12 +27,17 @@ export async function POST(request: Request) {
         const buffer = Buffer.from(bytes);
 
         // Model configuration
-        // Using gemini-1.5-flash for OCR efficiency and speed
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        // Using gemini-2.0-flash for high accuracy and JSON support
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-3-flash-preview',
+            generationConfig: {
+                responseMimeType: "application/json",
+            }
+        });
 
         const prompt = `
             Analyze this Turkish Identity Card (Kimlik Kartı) image.
-            Extract the following information and return ONLY a valid JSON object with these keys:
+            Extract the following information:
             - first_name (string, extract Ad)
             - last_name (string, extract Soyad)
             - tc_identity (string, extract TC Kimlik No/TR Identity No)
@@ -40,11 +45,8 @@ export async function POST(request: Request) {
             - gender (string, 'male' or 'female', extract Cinsiyet E/K)
 
             Rules:
-            1. Correct any OCR errors if possible (e.g. 0 vs O).
-            2. For gender, if 'E' return 'male', if 'K' return 'female'.
-            3. Return only pure JSON, no markdown formatting like \`\`\`json.
-            4. If a field is not visible or cannot be read, leave it as null.
-            5. Do NOT include any explanations or extra text.
+            1. For gender, if 'E' return 'male', if 'K' return 'female'.
+            2. If a field is not visible, use null.
         `;
 
         const imagePart = {
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
         // Handle Google API Rate Limiting (429)
         if (error.message?.includes('429') || error.message?.includes('Quota exceeded') || error.status === 429) {
             return NextResponse.json(
-                { error: 'AI servisi işlem limitine ulaştı. Lütfen 1 dakika bekleyip tekrar deneyin. (Google Gemini Free Tier Quota)' },
+                { error: 'AI servisi işlem limitine ulaştı. Lütfen 1 dakika bekleyip tekrar deneyin.' },
                 { status: 429 }
             );
         }

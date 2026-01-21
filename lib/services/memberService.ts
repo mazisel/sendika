@@ -31,11 +31,11 @@ export const MemberService = {
     async getDefinitions(type: string) {
         const { data, error } = await supabase
             .from('general_definitions')
-            .select('*')
-            .eq('definition_type', type)
+            .select('id, type, label, description, sort_order, is_active')
+            .eq('type', type)
             .eq('is_active', true)
             .order('sort_order', { ascending: true })
-            .order('name', { ascending: true })
+            .order('label', { ascending: true })
 
         if (error) throw error
         return data || []

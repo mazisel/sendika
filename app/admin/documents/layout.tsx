@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,6 +10,8 @@ import {
     PlusCircle,
     FileText
 } from 'lucide-react';
+import { AdminAuth } from '@/lib/auth';
+import { PermissionManager } from '@/lib/permissions';
 
 export default function DocumentsLayout({
     children,
@@ -17,33 +19,47 @@ export default function DocumentsLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const [user, setUser] = useState<any>(null);
 
-    const tabs = [
+    useEffect(() => {
+        const currentUser = AdminAuth.getCurrentUser();
+        setUser(currentUser);
+    }, []);
+
+    if (!user) return null;
+
+    const allTabs = [
         {
             name: 'Karar Defteri',
             href: '/admin/documents/decisions',
             icon: Book,
-            pattern: 'decisions'
+            pattern: 'decisions',
+            permission: 'decisions.view'
         },
         {
             name: 'Belge Oluştur',
             href: '/admin/documents/create',
             icon: PlusCircle,
-            pattern: 'create'
+            pattern: 'create',
+            permission: 'documents.create'
         },
         {
             name: 'Gelen Evrak',
             href: '/admin/documents/incoming',
             icon: FileInput,
-            pattern: 'incoming'
+            pattern: 'incoming',
+            permission: 'documents.view'
         },
         {
             name: 'Giden Evrak',
             href: '/admin/documents/outgoing',
             icon: FileOutput,
-            pattern: 'outgoing'
+            pattern: 'outgoing',
+            permission: 'documents.view'
         }
     ];
+
+    const tabs = allTabs.filter(tab => PermissionManager.hasPermission(user, tab.permission));
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900">

@@ -24,17 +24,32 @@ export default function NewUser() {
   // We will assume 'admin' role and 'general_manager' type for now, relying on permissions.
   // Exception: If needed, we can add a checkbox for specific "Scope" later, but request was to remove options.
 
+  const [branches, setBranches] = useState<{ id: string; city: string; branch_name: string }[]>([]);
+  const [roleType, setRoleType] = useState('general_manager');
+  const [selectedBranchCity, setSelectedBranchCity] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     loadRoles();
+    loadBranches();
   }, []);
 
   const loadRoles = async () => {
     const { data } = await supabase.from('roles').select('*').order('name');
     if (data) setAvailableRoles(data);
+  };
+
+  const loadBranches = async () => {
+    const { data } = await supabase
+      .from('branches')
+      .select('id, city, branch_name')
+      .eq('is_active', true)
+      .order('city');
+    if (data) setBranches(data);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,20 +76,32 @@ export default function NewUser() {
       return;
     }
 
+    // Role type specific validation
+    if (roleType === 'branch_manager' && !selectedBranchCity) {
+      setError('Şube yöneticisi için şube seçimi zorunludur');
+      setLoading(false);
+      return;
+    }
+
+    if (roleType === 'regional_manager' && !selectedRegion) {
+      setError('Bölge yöneticisi için bölge seçimi zorunludur');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Varsayılan olarak 'admin' ve 'general_manager' atıyoruz.
-      // Tüm yetki kontrolü artık role_id (RBAC) üzerinden yapılacak.
+      // Varsayılan olarak 'admin' rolünü atıyoruz (role sütunu için)
+      // Ancak detaylı yetkilendirme role_id ile (RBAC) ve role_type ile (Scope) yapılacak.
       const result = await AdminAuth.createUser({
         email,
         password,
         full_name: fullName,
         phone,
         role: 'admin',
-        role_type: 'general_manager',
+        role_type: roleType as any,
         role_id: selectedRoleId,
-        // Şube/Bölge ataması statik olarak kaldırıldı, ileride dinamik role eklenebilir
-        city: undefined,
-        region: undefined
+        city: roleType === 'branch_manager' ? selectedBranchCity : undefined,
+        region: roleType === 'regional_manager' ? Number(selectedRegion) : undefined
       });
 
       if (result.success) {
@@ -195,6 +222,10 @@ export default function NewUser() {
               <div className="p-4 bg-gray-50 rounded-lg space-y-4 border border-gray-200">
                 <h3 className="font-medium text-gray-900">Yetkilendirme</h3>
 
+                <div className="bg-blue-50 p-3 rounded-md mb-4 text-sm text-blue-700">
+                  <p>Kullanıcının yetki kapsamı seçilen rolden otomatik olarak belirlenir.</p>
+                </div>
+
                 <div>
                   <label htmlFor="customRole" className="block text-sm font-medium text-gray-700">
                     Kullanıcı Rolü *
@@ -202,7 +233,20 @@ export default function NewUser() {
                   <select
                     id="customRole"
                     value={selectedRoleId}
-                    onChange={(e) => setSelectedRoleId(e.target.value)}
+                    onChange={(e) => {
+                      const rId = e.target.value;
+                      setSelectedRoleId(rId);
+                      const role = availableRoles.find(r => r.id === rId);
+                      // Update roleType based on selected role definition
+                      if (role) {
+                        setRoleType(role.role_type || 'general_manager');
+                      } else {
+                        setRoleType('general_manager');
+                      }
+                      // Reset selections when role changes
+                      setSelectedBranchCity('');
+                      setSelectedRegion('');
+                    }}
                     required
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   >
@@ -214,12 +258,53 @@ export default function NewUser() {
                       </option>
                     ))}
                   </select>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Kullanıcının sisteme erişim yetkilerini belirleyen rol.
-                    <br />
-                    Not: Yeni roller "Tanımlamalar &gt; Rol Yönetimi" sayfasından oluşturulabilir.
-                  </div>
                 </div>
+
+                {roleType === 'branch_manager' && (
+                  <div>
+                    <label htmlFor="branchCity" className="block text-sm font-medium text-gray-700">
+                      Şube (İl) Seçimi *
+                    </label>
+                    <select
+                      id="branchCity"
+                      value={selectedBranchCity}
+                      onChange={(e) => setSelectedBranchCity(e.target.value)}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                    >
+                      <option value="">-- Şube Seçiniz --</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.city}>
+                          {b.city} - {b.branch_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {roleType === 'regional_manager' && (
+                  <div>
+                    <label htmlFor="regionSelect" className="block text-sm font-medium text-gray-700">
+                      Bölge Seçimi *
+                    </label>
+                    <select
+                      id="regionSelect"
+                      value={selectedRegion}
+                      onChange={(e) => setSelectedRegion(e.target.value)}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                    >
+                      <option value="">-- Bölge Seçiniz --</option>
+                      {regionOptions.map(r => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

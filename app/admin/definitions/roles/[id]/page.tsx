@@ -35,6 +35,7 @@ export default function EditRolePage({ params }: PageProps) {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
+        role_type: 'general_manager' // Default value
     });
     const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -97,9 +98,11 @@ export default function EditRolePage({ params }: PageProps) {
         }
 
         setRole(roleData);
+        setRole(roleData);
         setFormData({
             name: roleData.name,
-            description: roleData.description || ''
+            description: roleData.description || '',
+            role_type: roleData.role_type || 'general_manager'
         });
 
         // Role permissions
@@ -134,6 +137,7 @@ export default function EditRolePage({ params }: PageProps) {
                     .update({
                         name: formData.name.trim(),
                         description: formData.description.trim() || null,
+                        role_type: formData.role_type,
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', params.id);

@@ -49,6 +49,17 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [showAiModal, setShowAiModal] = useState(false);
 
+    // Stat Detail Popup State
+    const [showStatPopup, setShowStatPopup] = useState(false);
+    const [statPopupTitle, setStatPopupTitle] = useState('');
+    const [statPopupMembers, setStatPopupMembers] = useState<Member[]>([]);
+
+    const openStatPopup = (title: string, memberList: Member[]) => {
+        setStatPopupTitle(title);
+        setStatPopupMembers(memberList);
+        setShowStatPopup(true);
+    };
+
     const handleAnalyze = async () => {
         setIsAnalyzing(true);
         setShowAiModal(true);
@@ -123,8 +134,8 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
             active: filteredMembers.filter(m => m.membership_status === 'active').length,
             pending: filteredMembers.filter(m => m.membership_status === 'pending').length,
             resigned: filteredMembers.filter(m => m.membership_status === 'resigned').length,
-            male: filteredMembers.filter(m => m.gender === 'Erkek').length,
-            female: filteredMembers.filter(m => m.gender === 'Kadın').length,
+            male: filteredMembers.filter(m => m.gender === 'Erkek' || m.gender === 'male').length,
+            female: filteredMembers.filter(m => m.gender === 'Kadın' || m.gender === 'female').length,
         };
     }, [filteredMembers]);
 
@@ -252,8 +263,11 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
 
 
     // --- UI COMPONENTS ---
-    const StatCard = ({ title, value, sub, icon: Icon, color }: any) => (
-        <div className="bg-white dark:bg-slate-900/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-all hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-900/60 group">
+    const StatCard = ({ title, value, sub, icon: Icon, color, onClick }: any) => (
+        <div
+            onClick={onClick}
+            className={`bg-white dark:bg-slate-900/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-all hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-900/60 group ${onClick ? 'cursor-pointer' : ''}`}
+        >
             <div className="flex flex-col">
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{title}</p>
                 <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">{value}</div>
@@ -378,6 +392,64 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                             ) : (
                                 <div className="prose dark:prose-invert max-w-none prose-sm prose-headings:text-slate-800 dark:prose-headings:text-slate-100 prose-p:text-slate-600 dark:prose-p:text-slate-300">
                                     <ReactMarkdown>{aiAnalysis || ''}</ReactMarkdown>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Stat Detail Popup Modal */}
+            {showStatPopup && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col border border-slate-200 dark:border-slate-700">
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-semibold">
+                                <Users className="w-5 h-5" />
+                                <h3>{statPopupTitle} ({statPopupMembers.length} kişi)</h3>
+                            </div>
+                            <button onClick={() => setShowStatPopup(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                            {statPopupMembers.length === 0 ? (
+                                <div className="text-center py-8 text-slate-500">Bu kritere uygun üye bulunmuyor.</div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                                            <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Üye No</th>
+                                            <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Ad Soyad</th>
+                                            <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">TC Kimlik</th>
+                                            <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">İl</th>
+                                            <th className="text-left py-2 px-3 font-medium text-slate-600 dark:text-slate-400">Durum</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {statPopupMembers.slice(0, 100).map((member, idx) => (
+                                            <tr key={member.id} className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 ${idx % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/30'}`}>
+                                                <td className="py-2 px-3 font-mono text-xs">{member.membership_number}</td>
+                                                <td className="py-2 px-3 font-medium text-slate-900 dark:text-slate-100">{member.first_name} {member.last_name}</td>
+                                                <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{member.tc_identity}</td>
+                                                <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{member.city}</td>
+                                                <td className="py-2 px-3">
+                                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${member.membership_status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                        member.membership_status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                            member.membership_status === 'resigned' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                                'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                                                        }`}>
+                                                        {STATUS_LABELS[member.membership_status] || member.membership_status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                            {statPopupMembers.length > 100 && (
+                                <div className="text-center py-4 text-sm text-slate-500">
+                                    ... ve {statPopupMembers.length - 100} kişi daha (ilk 100 gösteriliyor)
                                 </div>
                             )}
                         </div>
@@ -519,12 +591,48 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                 <>
                     {/* Quick Stats Grid - Compact Version */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        <StatCard title="Toplam Üye" value={stats.total} icon={Users} color="text-blue-600 bg-blue-100" />
-                        <StatCard title="Aktif" value={stats.active} icon={Users} color="text-green-600 bg-green-100" />
-                        <StatCard title="Onay Bekleyen" value={stats.pending} icon={Users} color="text-yellow-600 bg-yellow-100" />
-                        <StatCard title="İstifa/Ayrılan" value={stats.resigned} icon={Users} color="text-red-600 bg-red-100" />
-                        <StatCard title="Erkek" value={stats.male} icon={Users} color="text-indigo-600 bg-indigo-100" />
-                        <StatCard title="Kadın" value={stats.female} icon={Users} color="text-pink-600 bg-pink-100" />
+                        <StatCard
+                            title="Toplam Üye"
+                            value={stats.total}
+                            icon={Users}
+                            color="text-blue-600 bg-blue-100"
+                            onClick={() => openStatPopup('Tüm Üyeler', filteredMembers)}
+                        />
+                        <StatCard
+                            title="Aktif"
+                            value={stats.active}
+                            icon={Users}
+                            color="text-green-600 bg-green-100"
+                            onClick={() => openStatPopup('Aktif Üyeler', filteredMembers.filter(m => m.membership_status === 'active'))}
+                        />
+                        <StatCard
+                            title="Onay Bekleyen"
+                            value={stats.pending}
+                            icon={Users}
+                            color="text-yellow-600 bg-yellow-100"
+                            onClick={() => openStatPopup('Onay Bekleyen Üyeler', filteredMembers.filter(m => m.membership_status === 'pending'))}
+                        />
+                        <StatCard
+                            title="İstifa/Ayrılan"
+                            value={stats.resigned}
+                            icon={Users}
+                            color="text-red-600 bg-red-100"
+                            onClick={() => openStatPopup('İstifa Eden Üyeler', filteredMembers.filter(m => m.membership_status === 'resigned'))}
+                        />
+                        <StatCard
+                            title="Erkek"
+                            value={stats.male}
+                            icon={Users}
+                            color="text-indigo-600 bg-indigo-100"
+                            onClick={() => openStatPopup('Erkek Üyeler', filteredMembers.filter(m => m.gender === 'male' || m.gender === 'Erkek'))}
+                        />
+                        <StatCard
+                            title="Kadın"
+                            value={stats.female}
+                            icon={Users}
+                            color="text-pink-600 bg-pink-100"
+                            onClick={() => openStatPopup('Kadın Üyeler', filteredMembers.filter(m => m.gender === 'female' || m.gender === 'Kadın'))}
+                        />
                     </div>
 
                     {subTab === 'general' && (
@@ -539,6 +647,13 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                         outerRadius={100}
                                         paddingAngle={5}
                                         dataKey="value"
+                                        className="cursor-pointer icon-hover-scale"
+                                        onClick={(data) => {
+                                            const label = data.name;
+                                            // STATUS_LABELS values are the names. We need to match member's status label.
+                                            const filtered = filteredMembers.filter(m => (STATUS_LABELS[m.membership_status] || m.membership_status) === label);
+                                            openStatPopup(`${label} Listesi`, filtered);
+                                        }}
                                     >
                                         {statusData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={STATUS_COLORS[Object.keys(STATUS_LABELS).find(k => STATUS_LABELS[k] === entry.name) as keyof typeof STATUS_COLORS] || COLORS[index % COLORS.length]} />
@@ -555,9 +670,21 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                     <XAxis type="number" hide />
                                     <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                                     <RechartsTooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="value" name="Kişi Sayısı" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20}>
+                                    <Bar
+                                        dataKey="value"
+                                        name="Kişi Sayısı"
+                                        fill="#8884d8"
+                                        radius={[0, 4, 4, 0]}
+                                        barSize={20}
+                                        className="cursor-pointer"
+                                        onClick={(data) => {
+                                            const label = data.name;
+                                            const filtered = filteredMembers.filter(m => m.education_level === label);
+                                            openStatPopup(`${label} Eğitim Seviyesi`, filtered);
+                                        }}
+                                    >
                                         {educationData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity" />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -572,6 +699,19 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                         innerRadius={0}
                                         outerRadius={100}
                                         dataKey="value"
+                                        className="cursor-pointer icon-hover-scale"
+                                        onClick={(data) => {
+                                            const label = data.name;
+                                            let filtered: Member[] = [];
+                                            if (label === 'Erkek') {
+                                                filtered = filteredMembers.filter(m => m.gender === 'male' || m.gender === 'Erkek');
+                                            } else if (label === 'Kadın') {
+                                                filtered = filteredMembers.filter(m => m.gender === 'female' || m.gender === 'Kadın');
+                                            } else {
+                                                filtered = filteredMembers.filter(m => m.gender === label);
+                                            }
+                                            openStatPopup(`${label} Üyeler`, filtered);
+                                        }}
                                     >
                                         {genderData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.name === 'Erkek' ? '#3b82f6' : '#ec4899'} />
@@ -592,7 +732,18 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                     <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <YAxis axisLine={false} tickLine={false} />
                                     <RechartsTooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="value" name="Üye Sayısı" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                    <Bar
+                                        dataKey="value"
+                                        name="Üye Sayısı"
+                                        fill="#3b82f6"
+                                        radius={[4, 4, 0, 0]}
+                                        className="cursor-pointer"
+                                        onClick={(data) => {
+                                            const city = data.name;
+                                            const filtered = filteredMembers.filter(m => m.city === city);
+                                            openStatPopup(`${city} Üye Listesi`, filtered);
+                                        }}
+                                    />
                                 </BarChart>
                             </ChartCard>
 
@@ -608,6 +759,16 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                             fill="#82ca9d"
                                             dataKey="value"
                                             label
+                                            className="cursor-pointer icon-hover-scale"
+                                            onClick={(data) => {
+                                                const label = data.name;
+                                                const filtered = filteredMembers.filter(m => {
+                                                    const r = m.region ? String(m.region) : 'Bilinmiyor';
+                                                    const mapped = r === 'Bilinmiyor' ? 'Tanımsız' : `${r}. Bölge`;
+                                                    return mapped === label;
+                                                });
+                                                openStatPopup(`${label} Listesi`, filtered);
+                                            }}
                                         >
                                             {regionData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -624,7 +785,19 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                         <XAxis type="number" hide />
                                         <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                                         <RechartsTooltip content={<CustomTooltip />} />
-                                        <Bar dataKey="value" name="Kişi Sayısı" fill="#ffc658" radius={[0, 4, 4, 0]} barSize={15} />
+                                        <Bar
+                                            dataKey="value"
+                                            name="Kişi Sayısı"
+                                            fill="#ffc658"
+                                            radius={[0, 4, 4, 0]}
+                                            barSize={15}
+                                            className="cursor-pointer"
+                                            onClick={(data) => {
+                                                const label = data.name;
+                                                const filtered = filteredMembers.filter(m => m.district === label);
+                                                openStatPopup(`${label} İlçesi Üyeleri`, filtered);
+                                            }}
+                                        />
                                     </BarChart>
                                 </ChartCard>
                             </div>
@@ -639,7 +812,19 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                     <XAxis type="number" hide />
                                     <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                                     <RechartsTooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="value" name="Üye Sayısı" fill="#82ca9d" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar
+                                        dataKey="value"
+                                        name="Üye Sayısı"
+                                        fill="#82ca9d"
+                                        radius={[0, 4, 4, 0]}
+                                        barSize={20}
+                                        className="cursor-pointer"
+                                        onClick={(data) => {
+                                            const label = data.name;
+                                            const filtered = filteredMembers.filter(m => m.institution === label);
+                                            openStatPopup(`${label} Kurumu Üyeleri`, filtered);
+                                        }}
+                                    />
                                 </BarChart>
                             </ChartCard>
 
@@ -649,7 +834,19 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                     <XAxis type="number" hide />
                                     <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                                     <RechartsTooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="value" name="Üye Sayısı" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar
+                                        dataKey="value"
+                                        name="Üye Sayısı"
+                                        fill="#8884d8"
+                                        radius={[0, 4, 4, 0]}
+                                        barSize={20}
+                                        className="cursor-pointer"
+                                        onClick={(data) => {
+                                            const label = data.name;
+                                            const filtered = filteredMembers.filter(m => m.workplace === label);
+                                            openStatPopup(`${label} İş Yeri Üyeleri`, filtered);
+                                        }}
+                                    />
                                 </BarChart>
                             </ChartCard>
                         </div>
@@ -669,7 +866,28 @@ export default function MemberDistributionTab({ members }: MemberDistributionTab
                                     <YAxis axisLine={false} tickLine={false} />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.5} />
                                     <RechartsTooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="Yeni Üye" stroke="#8884d8" fillOpacity={1} fill="url(#colorMonthly)" />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="Yeni Üye"
+                                        stroke="#8884d8"
+                                        fillOpacity={1}
+                                        fill="url(#colorMonthly)"
+                                        className="cursor-pointer"
+                                        activeDot={{
+                                            onClick: (props: any, event: any) => {
+                                                const payload = props.payload;
+                                                if (!payload) return;
+
+                                                const label = payload.name; // YYYY-MM
+                                                const filtered = filteredMembers.filter(m => {
+                                                    const d = new Date(m.created_at);
+                                                    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                                    return k === label;
+                                                });
+                                                openStatPopup(`${label} Dönemi Yeni Üyeler`, filtered);
+                                            }
+                                        }}
+                                    />
                                 </AreaChart>
                             </ChartCard>
 

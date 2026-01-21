@@ -5,8 +5,12 @@ import { supabase } from '@/lib/supabase'
 import { Save, Upload, Loader2, Image as ImageIcon, MessageSquare, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { Logger } from '@/lib/logger'
+import { AdminAuth } from '@/lib/auth'
+import { AdminUser } from '@/lib/types'
+import { PermissionManager } from '@/lib/permissions'
 
 export default function SettingsPage() {
+    const [user, setUser] = useState<AdminUser | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [settings, setSettings] = useState({
@@ -23,7 +27,14 @@ export default function SettingsPage() {
     const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
     useEffect(() => {
-        fetchSettings()
+        const currentUser = AdminAuth.getCurrentUser()
+        setUser(currentUser)
+
+        if (currentUser && PermissionManager.hasPermission(currentUser, 'settings.manage')) {
+            fetchSettings()
+        } else {
+            setLoading(false)
+        }
     }, [])
 
     const fetchSettings = async () => {
@@ -53,7 +64,7 @@ export default function SettingsPage() {
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
-        if (!file) return
+        if (!file || !user || !PermissionManager.hasPermission(user, 'settings.manage')) return
 
         // Dosya kontrolü
         if (file.size > 2 * 1024 * 1024) {
@@ -93,6 +104,10 @@ export default function SettingsPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!user || !PermissionManager.hasPermission(user, 'settings.manage')) {
+            toast.error('Bu işlem için yetkiniz yok')
+            return
+        }
         setSaving(true)
 
         console.log('Saving settings with state:', settings)
@@ -166,6 +181,20 @@ export default function SettingsPage() {
         return (
             <div className="flex items-center justify-center p-8">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+            </div>
+        )
+    }
+
+    if (!user || !PermissionManager.hasPermission(user, 'settings.manage')) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 bg-white rounded-lg shadow-sm border border-gray-200 m-6">
+                <div className="p-4 bg-red-50 rounded-full mb-4">
+                    <XCircle className="w-12 h-12 text-red-500" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Yetkisiz Erişim</h2>
+                <p className="text-gray-600 max-w-md">
+                    Bu sayfayı görüntülemek için yeterli izniniz bulunmamaktadır.
+                </p>
             </div>
         )
     }

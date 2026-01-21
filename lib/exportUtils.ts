@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { saveAs } from 'file-saver';
 import { Member } from './types';
+import { customFontBase64 } from './customFont';
 
 export const exportToExcel = (data: Member[], fileName: string) => {
     const worksheet = XLSX.utils.json_to_sheet(formatDataForExport(data));
@@ -21,21 +22,14 @@ export const exportToCSV = (data: Member[], fileName: string) => {
 };
 
 // Helper to load font
-const loadFont = async (doc: jsPDF) => {
+const loadFont = (doc: jsPDF) => {
     try {
-        const response = await fetch('/fonts/Roboto-Regular.ttf');
-        if (!response.ok) {
-            console.warn('Font yüklenemedi, standart font kullanılacak');
-            return false;
-        }
-        const buffer = await response.arrayBuffer();
-        const base64 = btoa(
-            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-        );
-
-        doc.addFileToVFS('Roboto-Regular.ttf', base64);
-        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-        doc.setFont('Roboto');
+        doc.addFileToVFS('NotoSans-Regular.ttf', customFontBase64);
+        doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
+        doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'bold');
+        doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'italic');
+        doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'bolditalic');
+        doc.setFont('NotoSans');
         return true;
     } catch (error) {
         console.error('Font yükleme hatası:', error);
@@ -71,7 +65,7 @@ export const exportToPDF = async (data: Member[], fileName: string) => {
             body: tableData,
             startY: 35,
             styles: {
-                font: fontLoaded ? 'Roboto' : 'helvetica',
+                font: fontLoaded ? 'NotoSans' : 'helvetica',
                 fontSize: 9,
                 cellPadding: 3,
             },
@@ -191,7 +185,7 @@ export const exportRowsToPDF = async (rows: any[][], fileName: string, title: st
             body: rows.slice(1),
             startY: 25,
             styles: {
-                font: fontLoaded ? 'Roboto' : 'helvetica',
+                font: fontLoaded ? 'NotoSans' : 'helvetica',
                 fontSize: 9,
                 cellPadding: 3,
             },
