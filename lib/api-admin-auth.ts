@@ -40,6 +40,12 @@ const decodeJwtPayload = (token: string): { sub?: string; email?: string; exp?: 
 export async function getAuthenticatedAdmin(request: NextRequest): Promise<AdminAuthResult> {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY eksik!');
+      return { status: 500, error: 'Sunucu yapılandırma hatası: Service Role Key eksik.' };
+    }
+
     const {
       data: { user }
     } = await supabase.auth.getUser();
@@ -116,7 +122,7 @@ export async function getAuthenticatedAdmin(request: NextRequest): Promise<Admin
 
     if (adminErrorById) {
       console.error('Admin kullanıcı doğrulaması başarısız (id sorgusu):', adminErrorById);
-      return { status: 500, error: 'Admin yetkisi doğrulanamadı.' };
+      return { status: 500, error: `Admin yetkisi doğrulanamadı (ID: ${adminErrorById.message}).` };
     }
 
     let adminRecord = adminUserById;
@@ -131,7 +137,7 @@ export async function getAuthenticatedAdmin(request: NextRequest): Promise<Admin
 
       if (adminErrorByEmail) {
         console.error('Admin kullanıcı doğrulaması başarısız (email sorgusu):', adminErrorByEmail);
-        return { status: 500, error: 'Admin yetkisi doğrulanamadı.' };
+        return { status: 500, error: `Admin yetkisi doğrulanamadı (Email: ${adminErrorByEmail.message}).` };
       }
 
       adminRecord = adminUserByEmail ?? null;
