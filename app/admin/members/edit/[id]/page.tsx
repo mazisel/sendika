@@ -837,7 +837,7 @@ export default function EditMemberPage() {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">Şube Seçiniz (Otomatik Doldur)</option>
+                    <option value="">Şube Seçini</option>
                     {branches.length > 0 ? (
                       branches.map(branch => (
                         <option key={branch.id} value={branch.id}>

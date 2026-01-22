@@ -7,12 +7,13 @@ import {
     Calendar, Building2, BadgeCheck, Activity,
     FileText, Hash, GraduationCap, Heart, Users,
     Upload, Trash2, Download, AlertCircle, Folder, Edit,
-    MessageSquare, Key, Send, RefreshCw, Copy, Check
+    MessageSquare, Key, Send, RefreshCw, Copy, Check, Eye
 } from 'lucide-react';
 import { formatDateSafe, formatDateTimeSafe } from '@/lib/dateUtils';
 import { MemberService, MemberDocument } from '@/lib/services/memberService';
 import { AdminAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
 
 interface MemberDetailModalProps {
     member: Member;
@@ -33,6 +34,7 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
     const [generatingPassword, setGeneratingPassword] = useState(false);
     const [actionSuccess, setActionSuccess] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [previewDoc, setPreviewDoc] = useState<{ url: string, name: string } | null>(null);
     const currentUser = AdminAuth.getCurrentUser();
 
     // Load documents when 'files' tab is active
@@ -76,17 +78,16 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
             await MemberService.createDocumentRecord({
                 member_id: member.id,
                 document_type: 'personnel_file',
-                file_name: file.name,
+                document_name: file.name,
                 file_url: publicUrl,
                 file_size: file.size,
-                mime_type: file.type,
                 uploaded_by: currentUser?.id
             });
 
             loadDocuments();
         } catch (err) {
             console.error('Upload error:', err);
-            setFileError('Dosya yüklenirken hata oluştu.');
+            setFileError(err instanceof Error ? err.message : 'Dosya yüklenirken hata oluştu.');
         } finally {
             setUploading(false);
             e.target.value = '';
@@ -382,7 +383,14 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                                             label="Üyelik Durumu"
                                             value={
                                                 <div className="flex items-center justify-between">
-                                                    <span>{member.membership_status === 'active' ? 'Aktif' : member.membership_status}</span>
+                                                    <span>
+                                                        {member.membership_status === 'active' ? 'Aktif' :
+                                                            member.membership_status === 'pending' ? 'Beklemede' :
+                                                                member.membership_status === 'inactive' ? 'Pasif' :
+                                                                    member.membership_status === 'suspended' ? 'Askıda' :
+                                                                        member.membership_status === 'resigned' ? 'İstifa Etti' :
+                                                                            member.membership_status}
+                                                    </span>
                                                     {member.is_active ? (
                                                         <span className="flex items-center gap-1 text-green-600 text-xs">
                                                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -449,41 +457,69 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                                             </div>
                                         ) : (
                                             <div className="grid gap-3">
-                                                {documents.map((doc) => (
-                                                    <div key={doc.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg group hover:shadow-sm transition-all">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
-                                                                <FileText className="w-5 h-5" />
+                                                {documents.map((doc) => {
+                                                    const docTypeLabels: Record<string, string> = {
+                                                        resignation_petition: 'İstifa Dilekçesi',
+                                                        personnel_file: 'Özlük Belgesi',
+                                                        kimlik: 'Kimlik Belgesi',
+                                                        diploma: 'Diploma',
+                                                        sertifika: 'Sertifika',
+                                                        cv: 'Özgeçmiş',
+                                                        referans: 'Referans Mektubu',
+                                                        saglik: 'Sağlık Raporu',
+                                                        adli_sicil: 'Adli Sicil Belgesi',
+                                                        diger: 'Diğer'
+                                                    };
+
+                                                    return (
+                                                        <div key={doc.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg group hover:shadow-sm transition-all">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                                                                    <FileText className="w-5 h-5" />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-baseline gap-2">
+                                                                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-[150px] sm:max-w-xs">
+                                                                            {doc.document_name}
+                                                                        </p>
+                                                                        {doc.document_type && (
+                                                                            <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded uppercase">
+                                                                                {docTypeLabels[doc.document_type] || doc.document_type}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-500">
+                                                                        {formatDateTimeSafe(doc.uploaded_at)} • {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate max-w-[200px] sm:max-w-xs">
-                                                                    {doc.file_name}
-                                                                </p>
-                                                                <p className="text-xs text-slate-500">
-                                                                    {formatDateTimeSafe(doc.created_at)} • {(doc.file_size / 1024 / 1024).toFixed(2)} MB
-                                                                </p>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => setPreviewDoc({ url: doc.file_url, name: doc.document_name })}
+                                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                                    title="Görüntüle"
+                                                                >
+                                                                    <Eye className="w-4 h-4" />
+                                                                </button>
+                                                                <a
+                                                                    href={doc.file_url}
+                                                                    download={doc.document_name}
+                                                                    className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                                    title="İndir"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </a>
+                                                                <button
+                                                                    onClick={() => handleDelete(doc)}
+                                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                                    title="Sil"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <a
-                                                                href={doc.file_url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                                title="İndir / Görüntüle"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </a>
-                                                            <button
-                                                                onClick={() => handleDelete(doc)}
-                                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                                title="Sil"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -680,6 +716,15 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                     </div>
                 </div>
             </div>
+
+            {previewDoc && (
+                <DocumentPreviewModal
+                    isOpen={!!previewDoc}
+                    onClose={() => setPreviewDoc(null)}
+                    fileUrl={previewDoc.url}
+                    fileName={previewDoc.name}
+                />
+            )}
         </div>
     );
 }

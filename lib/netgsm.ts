@@ -496,9 +496,10 @@ export const SmsAutomationService = {
         const { data, error } = await supabase
             .from('sms_automations')
             .select(`
+                *,
                 template:sms_templates(id, name, content)
             `)
-            .order('name', { ascending: true })
+            .order('created_at', { ascending: false })
 
         if (error) throw error
         return data

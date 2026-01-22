@@ -21,6 +21,19 @@ interface AdminAuthResult {
   error?: string;
 }
 
+const decodeJwtPayload = (token: string): { sub?: string; email?: string; exp?: number } | null => {
+  try {
+    const payloadSegment = token.split('.')[1];
+    if (!payloadSegment) return null;
+    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+};
+
 /**
  * API istekleri için Supabase oturumunu ve admin yetkisini doğrular.
  */
@@ -60,7 +73,21 @@ export async function getAuthenticatedAdmin(request: NextRequest): Promise<Admin
           } = await supabaseWithToken.auth.getUser(token);
 
           if (tokenError) {
-            console.error('Supabase access token doğrulanamadı:', tokenError);
+            if (tokenError.name === 'AuthSessionMissingError') {
+              const decoded = decodeJwtPayload(token);
+              const isExpired = decoded?.exp ? decoded.exp * 1000 < Date.now() : true;
+              if (decoded?.sub && !isExpired) {
+                authenticatedUser = {
+                  id: decoded.sub,
+                  email: decoded.email ?? ''
+                } as typeof authenticatedUser;
+                accessToken = token ?? undefined;
+              }
+            }
+
+            if (!authenticatedUser) {
+              console.error('Supabase access token doğrulanamadı:', tokenError);
+            }
           } else {
             authenticatedUser = tokenData.user ?? null;
             accessToken = token ?? undefined;

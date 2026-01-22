@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import { X, AlertTriangle, FileUp, Mail, MessageSquare } from 'lucide-react'
+import { X, AlertTriangle, FileUp, Mail, MessageSquare, Check } from 'lucide-react'
 import { MemberService } from '@/lib/services/memberService'
 import { AdminAuth } from '@/lib/auth'
 
@@ -19,6 +19,8 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
     const [resignationDate, setResignationDate] = useState(new Date().toISOString().split('T')[0])
     const [sendSms, setSendSms] = useState(false)
     const [sendEmail, setSendEmail] = useState(false)
+    const [isSuccess, setIsSuccess] = useState(false)
+    const maxFileSizeBytes = 10 * 1024 * 1024
 
     const currentUser = AdminAuth.getCurrentUser()
     const fullName = `${member.first_name} ${member.last_name}`
@@ -34,6 +36,20 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
         { value: 'Ölüm', label: 'Ölüm' },
         { value: 'Ücretsiz İzin (Pasif Üye)', label: 'Ücretsiz İzin (Pasif Üye)' },
     ]
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0]
+        if (!selectedFile) return
+
+        if (selectedFile.size > maxFileSizeBytes) {
+            setError('Dosya boyutu 10MB\'dan büyük olamaz.')
+            e.target.value = ''
+            return
+        }
+
+        setError(null)
+        setFile(selectedFile)
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -71,14 +87,40 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                 sendSms,
                 sendEmail
             )
-            onSuccess()
-            onClose()
+            setIsSuccess(true)
         } catch (err) {
             console.error('Resignation error:', err)
-            setError('İşlem sırasında bir hata oluştu.')
+            setError(err instanceof Error ? err.message : 'İşlem sırasında bir hata oluştu.')
         } finally {
             setLoading(false)
         }
+    }
+
+    if (isSuccess) {
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div className="relative mx-auto p-8 border border-green-200 dark:border-green-900 w-full max-w-md shadow-xl dark:shadow-slate-900/40 rounded-lg bg-white dark:bg-slate-900 text-center">
+                    <div className="flex justify-center mb-4">
+                        <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
+                            <Check className="w-12 h-12 text-green-600 dark:text-green-500" />
+                        </div>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">İşlem Başarılı</h3>
+                    <p className="text-gray-600 dark:text-slate-400 mb-6">
+                        <strong>{fullName}</strong> isimli üyenin istifa işlemi tamamlanmış ve statüsü <strong>İstifa (Pasif)</strong> olarak güncellenmiştir.
+                    </p>
+                    <button
+                        onClick={() => {
+                            onSuccess()
+                            onClose()
+                        }}
+                        className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                        Tamam
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -95,7 +137,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                 </div>
 
                 <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-md text-sm">
-                    Bu işlem <strong>{fullName}</strong> isimli üyeyi <strong>İstifa (Resigned)</strong> durumuna getirecek ve istifa dilekçesini sisteme kaydedecektir.
+                    Bu işlem <strong>{fullName}</strong> isimli üyeyi <strong>İstifa</strong> durumuna getirecek ve istifa dilekçesini sisteme kaydedecektir.
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -161,7 +203,7 @@ export default function ResignationModal({ member, onClose, onSuccess }: Resigna
                                                 className="relative cursor-pointer bg-white dark:bg-transparent rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none"
                                             >
                                                 <span>Dosya Yükle</span>
-                                                <input id="petition-upload" name="petition-upload" type="file" className="sr-only" onChange={(e) => e.target.files && setFile(e.target.files[0])} accept=".pdf,.jpg,.jpeg,.png" />
+                                                <input id="petition-upload" name="petition-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
                                             </label>
                                             <p className="pl-1">veya sürükle</p>
                                         </div>

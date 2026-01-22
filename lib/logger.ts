@@ -41,11 +41,17 @@ export class Logger {
             // const supabase = createClientComponentClient();
 
             let userId = options.userId;
+            let accessToken: string | undefined;
 
             // If userId is not provided, try to get it from the session
             if (!userId) {
                 const { data: { session } } = await supabase.auth.getSession();
                 userId = session?.user?.id;
+                accessToken = session?.access_token;
+            } else {
+                // Get the access token for authorization header
+                const { data: { session } } = await supabase.auth.getSession();
+                accessToken = session?.access_token;
             }
 
             if (!userId) {
@@ -53,12 +59,19 @@ export class Logger {
                 return;
             }
 
+            // Build headers with optional Authorization
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
             // Call the API route for enhanced logging (IP, Geo, etc.)
             await fetch('/api/audit-log', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     userId,
                     action: options.action,

@@ -22,13 +22,15 @@ import {
   ChevronDown,
   LayoutGrid,
   Table,
-  PieChart
+  PieChart,
+  UserMinus // Icon for resigned members
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
 import { PermissionManager } from '@/lib/permissions';
 import StatsDetailModal from '@/components/statistics/StatsDetailModal';
+import { CardSkeleton, ChartSkeleton, Skeleton } from '@/components/common/Skeleton';
 
 interface MemberStats {
   totalMembers: number;
@@ -38,6 +40,11 @@ interface MemberStats {
   suspendedMembers: number;
   newMembersThisMonth: number;
   newMembersLastMonth: number;
+  resignedMembers: number;
+}
+
+interface ResignationStats {
+  resignationReasons: { reason: string; count: number }[];
 }
 
 interface DemographicStats {
@@ -71,6 +78,7 @@ export default function StatisticsPage() {
   const [geographicStats, setGeographicStats] = useState<GeographicStats | null>(null);
   const [workplaceStats, setWorkplaceStats] = useState<WorkplaceStats | null>(null);
   const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
+  const [resignationStats, setResignationStats] = useState<ResignationStats | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'bar' | 'card' | 'table' | 'pie'>('bar');
@@ -87,7 +95,7 @@ export default function StatisticsPage() {
   };
 
   const cardClass =
-    'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-6 transition-all duration-300 block hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer transform hover:-translate-y-1';
+    'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-4 transition-all duration-300 block hover:border-blue-500 dark:hover:border-blue-400 cursor-pointer transform hover:-translate-y-1';
   const miniCardClass =
     'rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-slate-900/40 p-4 transition-colors';
 
@@ -120,7 +128,8 @@ export default function StatisticsPage() {
         loadDemographicStats(startDate, currentUser),
         loadGeographicStats(startDate, currentUser),
         loadWorkplaceStats(startDate, currentUser),
-        loadTimeStats(startDate, currentUser)
+        loadTimeStats(startDate, currentUser),
+        loadResignationStats(startDate, currentUser)
       ]);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
@@ -211,8 +220,19 @@ export default function StatisticsPage() {
         inactiveMembers: inactiveMembers || 0,
         suspendedMembers: suspendedMembers || 0,
         newMembersThisMonth: newMembersThisMonth || 0,
-        newMembersLastMonth: newMembersLastMonth || 0
+        newMembersLastMonth: newMembersLastMonth || 0,
+        resignedMembers: 0 // Will be populated below if query succeeds
       });
+
+      // İstifa eden üyeler (Resigned)
+      const resignedMembersQuery = supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true })
+        .eq('membership_status', 'resigned');
+      const { count: resignedMembers } = await applyFilter(resignedMembersQuery);
+
+      setMemberStats(prev => prev ? ({ ...prev, resignedMembers: resignedMembers || 0 }) : null);
+
     } catch (error) {
       console.error('Üye istatistikleri yüklenirken hata:', error);
     }
@@ -535,6 +555,55 @@ export default function StatisticsPage() {
     }
   };
 
+  const loadResignationStats = async (startDate: string | null, currentUser: AdminUser) => {
+    try {
+      if (!PermissionManager.canViewMembers(currentUser)) return;
+
+      const applyFilter = (query: any) => {
+        let q = query;
+        // İstifa tarihine göre filtrele
+        if (startDate) q = q.gte('resignation_date', startDate);
+
+        // Scope filter
+        if (currentUser.role_type === 'branch_manager' && currentUser.city) {
+          q = q.eq('city', currentUser.city);
+        } else if (currentUser.role_type === 'regional_manager' && currentUser.region) {
+          q = q.eq('region', currentUser.region);
+        }
+
+        return q;
+      };
+
+      // İstifa nedenleri
+      let query = supabase
+        .from('members')
+        .select('resignation_reason')
+        .eq('membership_status', 'resigned')
+        .not('resignation_reason', 'is', null);
+
+      const { data: resignationData } = await applyFilter(query);
+
+      const resignationReasons = resignationData?.reduce((acc: any[], member: any) => {
+        const reason = member.resignation_reason || 'Diğer';
+        const existing = acc.find(item => item.reason === reason);
+        if (existing) {
+          existing.count++;
+        } else {
+          acc.push({ reason, count: 1 });
+        }
+        return acc;
+      }, [])
+        .sort((a: any, b: any) => b.count - a.count) || [];
+
+      setResignationStats({
+        resignationReasons
+      });
+
+    } catch (error) {
+      console.error('İstifa istatistikleri yüklenirken hata:', error);
+    }
+  };
+
   const handleRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
@@ -555,11 +624,15 @@ export default function StatisticsPage() {
       ['Bekleyen Üye', memberStats?.pendingMembers || 0],
       ['Pasif Üye', memberStats?.inactiveMembers || 0],
       ['Askıya Alınan Üye', memberStats?.suspendedMembers || 0],
+      ['İstifa Eden Üye', memberStats?.resignedMembers || 0],
       ['Bu Ay Yeni Üye', memberStats?.newMembersThisMonth || 0],
       ['Geçen Ay Yeni Üye', memberStats?.newMembersLastMonth || 0],
       [],
       ['Cinsiyet Dağılımı'],
       ...(demographicStats?.genderDistribution.map(d => [d.gender, d.count]) || []),
+      [],
+      ['İstifa Nedenleri'],
+      ...(resignationStats?.resignationReasons.map(r => [r.reason, r.count]) || []),
       [],
       ['En Çok Üyesi Olan Şehirler'],
       ...(geographicStats?.topCities.map(c => [c.city, c.count]) || []),
@@ -768,10 +841,41 @@ export default function StatisticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center space-x-3">
-          <RefreshCw className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
-          <span className="text-lg text-slate-600 dark:text-slate-300">İstatistikler yükleniyor...</span>
+      <div className="space-y-8 text-slate-900 dark:text-slate-100">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton variant="text" width={200} height={32} className="mb-2" />
+            <Skeleton variant="text" width={300} height={20} />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton width={100} height={40} />
+            <Skeleton width={120} height={40} />
+            <Skeleton width={100} height={40} />
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          {[...Array(5)].map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+
+        {/* Charts Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-4">
+              <div className="flex items-center gap-4 mb-4">
+                <Skeleton variant="circular" width={40} height={40} />
+                <div>
+                  <Skeleton variant="text" width={150} height={24} />
+                  <Skeleton variant="text" width={100} height={16} />
+                </div>
+              </div>
+              <ChartSkeleton />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -895,7 +999,7 @@ export default function StatisticsPage() {
       </div>
 
       {/* Genel İstatistikler */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
         <Link href="/admin/members" className={cardClass}>
           <div className="flex items-center justify-between">
             <div>
@@ -941,6 +1045,17 @@ export default function StatisticsPage() {
             </div>
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+        </Link>
+        <Link href="/admin/members?status=resigned" className={cardClass}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">İstifa Eden</p>
+              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{memberStats?.resignedMembers || 0}</p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-lg flex items-center justify-center">
+              <UserMinus className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
           </div>
         </Link>
@@ -1035,6 +1150,29 @@ export default function StatisticsPage() {
             (level) => handleStatClick('education', level, `Eğitim Seviyesi: ${level}`)
           )}
         </div>
+
+
+        {/* İstifa Nedenleri */}
+        <div className={cardClass}>
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-500/20 rounded-lg flex items-center justify-center">
+              <UserMinus className="w-5 h-5 text-red-600 dark:text-red-300" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">İstifa Nedenleri</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin istifa gerekçeleri</p>
+            </div>
+          </div>
+          {renderStatView(
+            resignationStats?.resignationReasons?.map(item => ({
+              label: item.reason,
+              count: item.count,
+              color: 'bg-red-600 dark:bg-red-400'
+            })) || [],
+            memberStats?.totalMembers || 1,
+            (reason) => handleStatClick('resignation_reason', reason, `İstifa Nedeni: ${reason}`)
+          )}
+        </div>
       </div>
 
       {/* Coğrafi ve İş İstatistikleri */}
@@ -1050,19 +1188,21 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Coğrafi dağılım analizi</p>
             </div>
           </div>
-          {renderStatView(
-            geographicStats?.topCities?.map(item => ({
-              label: item.city,
-              count: item.count,
-              color: 'bg-green-600 dark:bg-green-400'
-            })) || [],
-            geographicStats?.topCities[0]?.count || 1,
-            (city) => handleStatClick('city', city, `Şehir: ${city}`)
-          )}
-        </div>
+          {
+            renderStatView(
+              geographicStats?.topCities?.map(item => ({
+                label: item.city,
+                count: item.count,
+                color: 'bg-green-600 dark:bg-green-400'
+              })) || [],
+              geographicStats?.topCities[0]?.count || 1,
+              (city) => handleStatClick('city', city, `Şehir: ${city}`)
+            )
+          }
+        </div >
 
         {/* En Çok Çalışanı Olan İşyerleri */}
-        <div className={cardClass}>
+        < div className={cardClass} >
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-blue-600 dark:text-blue-300" />
@@ -1072,22 +1212,24 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">İşyeri bazlı üye dağılımı</p>
             </div>
           </div>
-          {renderStatView(
-            workplaceStats?.topWorkplaces?.map(item => ({
-              label: item.workplace,
-              count: item.count,
-              color: 'bg-blue-600 dark:bg-blue-400'
-            })) || [],
-            workplaceStats?.topWorkplaces[0]?.count || 1,
-            (workplace) => handleStatClick('workplace', workplace, `İşyeri: ${workplace}`)
-          )}
-        </div>
-      </div>
+          {
+            renderStatView(
+              workplaceStats?.topWorkplaces?.map(item => ({
+                label: item.workplace,
+                count: item.count,
+                color: 'bg-blue-600 dark:bg-blue-400'
+              })) || [],
+              workplaceStats?.topWorkplaces[0]?.count || 1,
+              (workplace) => handleStatClick('workplace', workplace, `İşyeri: ${workplace}`)
+            )
+          }
+        </div >
+      </div >
 
       {/* Çocuk Sayısı ve Pozisyon İstatistikleri */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      < div className="grid grid-cols-1 lg:grid-cols-2 gap-8" >
         {/* Çocuk Sayısı İstatistikleri */}
-        <div className={cardClass}>
+        < div className={cardClass} >
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-500/20 rounded-lg flex items-center justify-center">
               <Baby className="w-5 h-5 text-yellow-600 dark:text-yellow-300" />
@@ -1097,19 +1239,21 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin çocuk sayısı analizi</p>
             </div>
           </div>
-          {renderStatView(
-            demographicStats?.childrenStats?.map(item => ({
-              label: item.range,
-              count: item.count,
-              color: 'bg-cyan-600 dark:bg-cyan-400'
-            })) || [],
-            memberStats?.totalMembers || 1,
-            (range) => handleStatClick('children', range, `Çocuk Sayısı: ${range}`)
-          )}
-        </div>
+          {
+            renderStatView(
+              demographicStats?.childrenStats?.map(item => ({
+                label: item.range,
+                count: item.count,
+                color: 'bg-cyan-600 dark:bg-cyan-400'
+              })) || [],
+              memberStats?.totalMembers || 1,
+              (range) => handleStatClick('children', range, `Çocuk Sayısı: ${range}`)
+            )
+          }
+        </div >
 
         {/* Pozisyon Dağılımı */}
-        <div className={cardClass}>
+        < div className={cardClass} >
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-teal-100 dark:bg-teal-500/20 rounded-lg flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-teal-600 dark:text-teal-300" />
@@ -1119,20 +1263,22 @@ export default function StatisticsPage() {
               <p className="text-sm text-slate-600 dark:text-slate-400">Üyelerin iş pozisyonları</p>
             </div>
           </div>
-          {renderStatView(
-            workplaceStats?.positionDistribution?.map(item => ({
-              label: item.position,
-              count: item.count,
-              color: 'bg-teal-600 dark:bg-teal-400'
-            })) || [],
-            workplaceStats?.positionDistribution[0]?.count || 1,
-            (position) => handleStatClick('position', position, `Pozisyon: ${position}`)
-          )}
-        </div>
-      </div>
+          {
+            renderStatView(
+              workplaceStats?.positionDistribution?.map(item => ({
+                label: item.position,
+                count: item.count,
+                color: 'bg-teal-600 dark:bg-teal-400'
+              })) || [],
+              workplaceStats?.positionDistribution[0]?.count || 1,
+              (position) => handleStatClick('position', position, `Pozisyon: ${position}`)
+            )
+          }
+        </div >
+      </div >
 
       {/* Zaman Bazlı İstatistikler */}
-      <div className={cardClass}>
+      < div className={cardClass} >
         <div className="flex items-center space-x-3 mb-6">
           <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
             <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
@@ -1171,10 +1317,10 @@ export default function StatisticsPage() {
             )}
           </div>
         </div>
-      </div>
+      </div >
 
       {/* Gelişmiş Özet Kartları */}
-      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-8 border border-blue-200 dark:border-slate-700 shadow-lg">
+      < div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 rounded-2xl p-8 border border-blue-200 dark:border-slate-700 shadow-lg" >
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 İstatistik Özeti</h3>
@@ -1357,21 +1503,23 @@ export default function StatisticsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </div >
 
       {/* Detail Modal */}
-      {selectedStat && (
-        <StatsDetailModal
-          isOpen={!!selectedStat}
-          onClose={() => setSelectedStat(null)}
-          title={selectedStat.title}
-          filter={{
-            type: selectedStat.type,
-            value: selectedStat.value
-          }}
-          startDate={getStartDate(selectedTimeRange)}
-        />
-      )}
-    </div>
+      {
+        selectedStat && (
+          <StatsDetailModal
+            isOpen={!!selectedStat}
+            onClose={() => setSelectedStat(null)}
+            title={selectedStat.title}
+            filter={{
+              type: selectedStat.type,
+              value: selectedStat.value
+            }}
+            startDate={getStartDate(selectedTimeRange)}
+          />
+        )
+      }
+    </div >
   );
 }

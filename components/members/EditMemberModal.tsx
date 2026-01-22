@@ -85,8 +85,8 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
         if (member) {
             setFormData({
                 ...member,
-                birth_date: member.birth_date ? member.birth_date.split('T')[0] : '',
-                decision_date: member.decision_date ? member.decision_date.split('T')[0] : '',
+                birth_date: member.birth_date ? member.birth_date.split('T')[0] : null as any,
+                decision_date: member.decision_date ? member.decision_date.split('T')[0] : null as any,
             });
             // Try to find branch from city if possible, but member doesn't store branch_id directly usually.
             // We'll rely on city matching if we want to pre-select, or just leave empty if not explicit.
@@ -168,11 +168,17 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
         } else if (name === 'region') {
             setFormData(prev => ({ ...prev, region: value || null }));
         } else {
+            let newValue: any = value;
+
+            if (value === '') {
+                newValue = null;
+            } else if (type === 'number') {
+                newValue = Math.max(0, parseInt(value));
+            }
+
             setFormData(prev => ({
                 ...prev,
-                [name]: type === 'number'
-                    ? (value === '' ? null : Math.max(0, parseInt(value)))
-                    : value
+                [name]: newValue
             }));
         }
     };
@@ -183,7 +189,14 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
         setError(null);
 
         try {
-            await MemberService.updateMember(member.id, formData);
+            // Sanitize data: convert empty strings to null
+            const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
+                // @ts-ignore
+                acc[key] = value === '' ? null : value;
+                return acc;
+            }, {} as Partial<Member>);
+
+            await MemberService.updateMember(member.id, cleanedData);
             onSuccess();
             onClose();
         } catch (err) {
@@ -380,7 +393,7 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                                     onChange={handleChange}
                                                     className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                                                 >
-                                                    <option value="">Şube Seçiniz (Otomatik Doldur)</option>
+                                                    <option value="">Şube Seçiniz</option>
                                                     {branches.map(b => (
                                                         <option key={b.id} value={b.id}>
                                                             {b.branch_name} ({b.city})
@@ -422,7 +435,6 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                         { value: 'pending', label: 'Onay Bekliyor' },
                                         { value: 'inactive', label: 'Pasif' },
                                         { value: 'suspended', label: 'Askıda' },
-                                        { value: 'resigned', label: 'İstifa' },
                                     ]} />
 
                                     <div className="md:col-span-2 pt-4 border-t border-slate-200 dark:border-slate-700">

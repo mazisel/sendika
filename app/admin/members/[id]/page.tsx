@@ -5,7 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
+import { MemberService } from '@/lib/services/memberService';
 import { ArrowLeft, Upload, FileText, Download, Trash2, Eye, X, Check, UserCheck, UserX, Clock } from 'lucide-react';
+import DocumentPreviewModal from '@/components/common/DocumentPreviewModal';
 
 interface Member {
   id: string;
@@ -57,6 +59,7 @@ export default function MemberDetailPage() {
   const [documentName, setDocumentName] = useState('');
   const [documentType, setDocumentType] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string, name: string } | null>(null);
 
   useEffect(() => {
     loadMemberData();
@@ -106,17 +109,18 @@ export default function MemberDetailPage() {
       return;
     }
 
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      alert('Dosya boyutu 10MB\'dan büyük olamaz.');
+      return;
+    }
+
     setUploading(true);
     try {
       // Dosyayı storage'a yükle
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${memberId}/${Date.now()}.${fileExt}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('member-documents')
-        .upload(fileName, selectedFile);
-
-      if (uploadError) throw uploadError;
+      await MemberService.uploadDocument(selectedFile, fileName);
 
       // Storage URL'ini al
       const { data: { publicUrl } } = supabase.storage
@@ -156,9 +160,20 @@ export default function MemberDetailPage() {
     try {
       // Storage'dan dosyayı sil
       const filePath = fileUrl.split('/').slice(-2).join('/');
-      await supabase.storage
-        .from('member-documents')
-        .remove([filePath]);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      const response = await fetch('/api/members/documents', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify({ path: filePath })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Delete failed');
+      }
 
       // Veritabanından soft delete
       const { error } = await supabase
@@ -201,7 +216,8 @@ export default function MemberDetailPage() {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'Beklemede' },
       active: { color: 'bg-green-100 text-green-800', icon: UserCheck, text: 'Aktif' },
       inactive: { color: 'bg-gray-100 text-gray-800', icon: UserX, text: 'Pasif' },
-      suspended: { color: 'bg-red-100 text-red-800', icon: X, text: 'Askıda' }
+      suspended: { color: 'bg-orange-100 text-orange-800', icon: X, text: 'Askıda' },
+      resigned: { color: 'bg-red-100 text-red-800', icon: X, text: 'İstifa' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -433,44 +449,59 @@ export default function MemberDetailPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{doc.document_name}</h4>
-                      <p className="text-xs text-gray-500">
-                        {doc.document_type} • {formatFileSize(doc.file_size)} • {new Date(doc.uploaded_at).toLocaleDateString('tr-TR')}
-                      </p>
+                {documents.map((doc) => {
+                  const docTypeLabels: Record<string, string> = {
+                    resignation_petition: 'İstifa Dilekçesi',
+                    personnel_file: 'Özlük Belgesi',
+                    kimlik: 'Kimlik Belgesi',
+                    diploma: 'Diploma',
+                    sertifika: 'Sertifika',
+                    cv: 'Özgeçmiş',
+                    referans: 'Referans Mektubu',
+                    saglik: 'Sağlık Raporu',
+                    adli_sicil: 'Adli Sicil Belgesi',
+                    diger: 'Diğer'
+                  };
+
+                  return (
+                    <div key={doc.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{doc.document_name}</h4>
+                        <p className="text-xs text-gray-500">
+                          {docTypeLabels[doc.document_type] || doc.document_type} • {formatFileSize(doc.file_size)} • {new Date(doc.uploaded_at).toLocaleDateString('tr-TR')}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setPreviewDoc({ url: doc.file_url, name: doc.document_name })}
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                          title="Görüntüle"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = doc.file_url;
+                            link.download = doc.document_name;
+                            link.click();
+                          }}
+                          className="p-1 text-green-600 hover:text-green-800"
+                          title="İndir"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteDocument(doc.id, doc.file_url)}
+                          className="p-1 text-red-600 hover:text-red-800"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => window.open(doc.file_url, '_blank')}
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                        title="Görüntüle"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = doc.file_url;
-                          link.download = doc.document_name;
-                          link.click();
-                        }}
-                        className="p-1 text-green-600 hover:text-green-800"
-                        title="İndir"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteDocument(doc.id, doc.file_url)}
-                        className="p-1 text-red-600 hover:text-red-800"
-                        title="Sil"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -559,6 +590,15 @@ export default function MemberDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          isOpen={!!previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          fileUrl={previewDoc.url}
+          fileName={previewDoc.name}
+        />
       )}
     </div>
   );

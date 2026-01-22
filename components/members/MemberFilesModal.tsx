@@ -77,7 +77,7 @@ export default function MemberFilesModal({ member, onClose }: MemberFilesModalPr
 
         } catch (err) {
             console.error('Upload error:', err)
-            setError('Dosya yüklenirken hata oluştu.')
+            setError(err instanceof Error ? err.message : 'Dosya yüklenirken hata oluştu.')
         } finally {
             setUploading(false)
             // Clear input

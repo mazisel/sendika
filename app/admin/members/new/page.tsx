@@ -6,10 +6,11 @@ import { Logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
+import { MemberService } from '@/lib/services/memberService';
 import { cityOptions } from '@/lib/cities';
 import { getDistrictsByCity } from '@/lib/districts';
 import { AdminUser, DefinitionType, GeneralDefinition } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2, Activity, FileText } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2, Activity, FileText, Lock, Unlock } from 'lucide-react';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 interface FormData {
@@ -158,11 +159,7 @@ export default function NewMemberPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [branchRegions, setBranchRegions] = useState<Record<string, string>>({}); // Not widely used anymore, we use branches array lookup
-  // Actually, let's keep it but it might be unused. 
-  // Wait, line 154: const [branchRegions, setBranchRegions] = useState<Record<string, number>>({});
-  // We should probably just remove it or verify usage. It is used in allowedCities useMemo later.
-  // Let's change type to string.
+  const [branchRegions, setBranchRegions] = useState<Record<string, string>>({});
   const [cityRegion, setCityRegion] = useState<string | null>(null);
   const [branchesLoading, setBranchesLoading] = useState(true);
   const canEditMembershipNumber = currentUser ? PermissionManager.canEditRestrictedFields(currentUser) : false;
@@ -244,6 +241,44 @@ export default function NewMemberPage() {
     fetchRegionsData();
   }, []);
 
+  const [isLockOpen, setIsLockOpen] = useState(false);
+
+  // Auto-generate membership number
+  useEffect(() => {
+    const fetchNextNumber = async () => {
+      if (formData.membership_number) return;
+
+      try {
+        const { data } = await supabase
+          .from('members')
+          .select('membership_number')
+          .not('membership_number', 'is', null)
+          .neq('membership_number', '')
+          .order('created_at', { ascending: false })
+          .limit(200);
+
+        if (data && data.length > 0) {
+          const numbers = data
+            .map(m => parseInt(m.membership_number))
+            .filter(n => !isNaN(n));
+
+          if (numbers.length > 0) {
+            const maxNum = Math.max(...numbers);
+            setFormData(prev => ({ ...prev, membership_number: String(maxNum + 1) }));
+          } else {
+            setFormData(prev => ({ ...prev, membership_number: '1' }));
+          }
+        } else {
+          setFormData(prev => ({ ...prev, membership_number: '1' }));
+        }
+      } catch (error) {
+        console.error('Error fetching next member number:', error);
+      }
+    };
+
+    fetchNextNumber();
+  }, []);
+
   useEffect(() => {
     const fetchBranches = async () => {
       try {
@@ -273,9 +308,7 @@ export default function NewMemberPage() {
           }
         });
         // We'll use mapping to auto-select region based on city from branch
-        // Update branchRegions type implies changing state definition too
-        // For now, let's just store it in a ref or specialized state if needed, 
-        // OR simply rely on the 'branches' array for lookups.
+        setBranchRegions(mapping);
 
       } catch (error) {
         console.error('Şube bilgileri alınamadı:', error);
@@ -405,6 +438,12 @@ export default function NewMemberPage() {
   };
 
   const handleDocumentFileChange = (file: File | null) => {
+    if (file && file.size > 10 * 1024 * 1024) {
+      setDocumentError('Dosya boyutu 10MB\'dan büyük olamaz.');
+      setDocumentForm(prev => ({ ...prev, file: null }));
+      return;
+    }
+
     setDocumentForm(prev => ({ ...prev, file }));
     if (documentError) {
       setDocumentError('');
@@ -447,13 +486,7 @@ export default function NewMemberPage() {
       const fileExt = doc.file.name.includes('.') ? doc.file.name.split('.').pop() : '';
       const storagePath = `${memberId}/${Date.now()}_${doc.id}${fileExt ? `.${fileExt}` : ''}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('member-documents')
-        .upload(storagePath, doc.file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
+      await MemberService.uploadDocument(doc.file, storagePath);
 
       const { data: publicUrlData } = supabase.storage
         .from('member-documents')
@@ -556,9 +589,9 @@ export default function NewMemberPage() {
         scrollToField(column);
         return message;
       }
-      // If we can't determine the specific field, show a generic message
+      // If we can't determine the specific field, show a generic message with details
       // The debug log will help identify the actual problem
-      return 'Sayı veya tarih alanlarında geçersiz karakterler var. Lütfen girişleri kontrol edin.';
+      return `Sayı veya tarih alanlarında geçersiz karakterler var. (${error.details || error.message})`;
     }
 
     return error.details || error.message || 'Üye eklenirken beklenmedik bir hata oluştu.';
@@ -693,7 +726,7 @@ export default function NewMemberPage() {
         institution: formData.institution.trim(),
         institution_register_no: formData.institution_register_no.trim(),
         retirement_register_no: formData.retirement_register_no.trim(),
-        start_date: formData.start_date ? formData.start_date : null,
+        start_date: formData.start_date || null, // start_date boş ise null gönder
 
         father_name: formData.father_name.trim(),
         mother_name: formData.mother_name.trim(),
@@ -705,7 +738,7 @@ export default function NewMemberPage() {
         emergency_contact_relation: formData.emergency_contact_relation.trim(),
         education_level: formData.education_level.trim(),
         marital_status: formData.marital_status.trim(),
-        children_count: formData.children_count,
+        children_count: Number(formData.children_count) || 0, // Ensure valid integer
         notes: formData.notes.trim(),
         membership_number: canEditMembershipNumber ? formData.membership_number.trim() : null,
         membership_date: formData.membership_date ? formData.membership_date : null,
@@ -713,7 +746,7 @@ export default function NewMemberPage() {
 
         membership_status: 'active',
         is_active: true,
-        region: formData.region || cityRegion
+        region: formData.region ? Number(formData.region) : (typeof cityRegion === 'number' ? cityRegion : null)
       };
 
       const { data, error } = await supabase
@@ -903,31 +936,38 @@ export default function NewMemberPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Üye Numarası {canEditMembershipNumber && <span className="text-red-500">*</span>}
+                Üye Numarası <span className="text-red-500">*</span>
               </label>
-              {canEditMembershipNumber ? (
-                <>
-                  <input
-                    type="text"
-                    name="membership_number"
-                    value={formData.membership_number}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.membership_number ? 'border-red-500' : 'border-slate-300'
-                      }`}
-                    placeholder="Örn: UYE-000123"
-                  />
-                  {errors.membership_number && (
-                    <p className="mt-1 text-sm text-red-600">{errors.membership_number}</p>
-                  )}
-                  <p className="mt-1 text-xs text-slate-500">
-                    Bu numara üyeye giriş ve diğer işlemler için kullanılacaktır. Benzersiz olmalıdır.
-                  </p>
-                </>
-              ) : (
-                <div className="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-500">
-                  Otomatik Oluşturulacak
-                </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="membership_number"
+                  value={formData.membership_number}
+                  onChange={handleInputChange}
+                  readOnly={!isLockOpen}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.membership_number ? 'border-red-500' : 'border-slate-300'
+                    } ${!isLockOpen ? 'bg-slate-100 text-slate-500' : ''}`}
+                  placeholder="Otomatik atanır"
+                />
+                {canEditMembershipNumber && (
+                  <button
+                    type="button"
+                    onClick={() => setIsLockOpen(!isLockOpen)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
+                    title={isLockOpen ? "Kilitle" : "Düzenlemek için kilidi aç"}
+                  >
+                    {isLockOpen ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              {errors.membership_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.membership_number}</p>
               )}
+              <p className="mt-1 text-xs text-slate-500">
+                {isLockOpen
+                  ? 'Dikkat: Numarayı manuel olarak düzenliyorsunuz. Benzersiz olmalıdır.'
+                  : `Son üye numarasına göre otomatik belirlenmiştir. ${canEditMembershipNumber ? 'Değiştirmek için kilit ikonuna basınız.' : ''}`}
+              </p>
             </div>
 
             <div>
@@ -977,7 +1017,7 @@ export default function NewMemberPage() {
                     disabled={branchesLoading}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">Şube Seçiniz (Otomatik Doldur)</option>
+                    <option value="">Şube Seçiniz</option>
                     {branches.map(branch => (
                       <option key={branch.id} value={branch.id}>
                         {branch.branch_name} ({branch.city})
@@ -985,7 +1025,7 @@ export default function NewMemberPage() {
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
-                    Şube seçildiğinde İl ve Bölge bilgileri otomatik doldurulur.
+                    Şube seçildiğinde İl ve Bölge bilgileri otomatik gelir.
                   </p>
                 </div>
                 <div>
@@ -1000,11 +1040,11 @@ export default function NewMemberPage() {
                   >
                     <option value="">Bölge Seçiniz</option>
                     {regions.map(r => (
-                      <option key={r.id} value={r.name}>{r.name}</option>
+                      <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-slate-500">
-                    İl seçimine göre otomatik gelir, gerekirse değiştirebilirsiniz.
+                    İl veya şube seçimine göre otomatik gelir, gerekirse değiştirebilirsiniz.
                   </p>
                 </div>
               </>
@@ -1368,6 +1408,64 @@ export default function NewMemberPage() {
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Açık adres giriniz"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Acil Durum Bilgileri */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <Heart className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Acil Durum Bilgileri</h3>
+              <p className="text-sm text-slate-600">Acil durumlarda ulaşılacak kişi bilgileri</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Adı Soyadı
+              </label>
+              <input
+                type="text"
+                name="emergency_contact_name"
+                value={formData.emergency_contact_name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ad Soyad"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Telefon
+              </label>
+              <input
+                type="tel"
+                name="emergency_contact_phone"
+                value={formData.emergency_contact_phone}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="5XX XXX XX XX"
+                maxLength={10}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Yakınlık Derecesi
+              </label>
+              <input
+                type="text"
+                name="emergency_contact_relation"
+                value={formData.emergency_contact_relation}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Örn: Eşi, Babası, Kardeşi"
               />
             </div>
           </div>

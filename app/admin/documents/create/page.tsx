@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import {
     ArrowLeft, Send, Save, Eye, FileText,
     Bold, Italic, AlignLeft, AlignCenter, AlignRight,
     Plus, Trash2, Calendar, GripVertical, Upload, X, Copy,
     ZoomIn, ZoomOut, RotateCcw, Monitor, Link2, Unlink2,
-    Search, Users, Table, User, Check
+    Search, Users, Table, User, Check, Archive, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentService } from '@/lib/services/documentService';
@@ -38,15 +38,28 @@ interface DocFormData {
     signers: Signer[];
     type: 'outgoing' | 'internal';
     sender_unit: string; // "Genel Merkez" vs
+    decision_number?: string; // Karar No
     textAlign: 'left' | 'center' | 'right' | 'justify';
     receiverTextAlign: 'left' | 'center' | 'right' | 'justify';
     logoUrl?: string; // Sol Logo (default/backward compat)
     rightLogoUrl?: string; // Sağ Logo
+    // Header Bilgileri
+    headerTitle?: string; // "T.C."
+    headerOrgName?: string; // "SENDİKA YÖNETİM SİSTEMİ"
     // Footer Bilgileri
     footerOrgName?: string;
     footerAddress?: string;
     footerContact?: string;
     footerPhone?: string;
+    // Görünürlük Ayarları
+    showHeader?: boolean;
+    showDate?: boolean;
+    showSayi?: boolean;
+    showKonu?: boolean;
+    showKararNo?: boolean;
+    showReceiver?: boolean;
+    showSignatures?: boolean;
+    showFooter?: boolean;
 }
 
 // Mention komutları
@@ -64,7 +77,15 @@ const MENTION_COMMANDS: MentionCommand[] = [
 
 export default function AdvancedDocumentCreator() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const templateId = searchParams.get('template');
+
     const [loading, setLoading] = useState(false);
+    const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+    const [templateName, setTemplateName] = useState('');
+    const [templateDescription, setTemplateDescription] = useState('');
+    const [templateIsPublic, setTemplateIsPublic] = useState(false);
+    const [savingTemplate, setSavingTemplate] = useState(false);
     const [previewMode, setPreviewMode] = useState(false); // Mobile toggle
     const [currentUser, setCurrentUser] = useState<any>(null); // AdminUser tipini tam import edemediğimiz için any bırakıyoruz veya Member ile değiştiriyoruz
     const [availableSigners, setAvailableSigners] = useState<any[]>([]); // İmzası olan yetkililer
@@ -476,7 +497,8 @@ export default function AdvancedDocumentCreator() {
         defaultValues: {
             type: 'outgoing',
             sender_unit: DEFAULT_HEADER.subUnit,
-            // Header bilgileri formda olmadığı için defaultValues'dan kaldırıldı
+            headerTitle: DEFAULT_HEADER.title,
+            headerOrgName: DEFAULT_HEADER.orgName,
             footerOrgName: DEFAULT_HEADER.orgName,
             footerAddress: 'Genel Merkez Binası, Ankara',
             footerContact: 'Genel Sekreterlik',
@@ -486,7 +508,16 @@ export default function AdvancedDocumentCreator() {
             textAlign: 'justify',
             receiverTextAlign: 'left',
             logoUrl: '',
-            rightLogoUrl: ''
+            rightLogoUrl: '',
+            // Görünürlük varsayılanları
+            showHeader: true,
+            showDate: true,
+            showSayi: true,
+            showKonu: true,
+            showKararNo: true,
+            showReceiver: true,
+            showSignatures: true,
+            showFooter: true
         }
     });
 
@@ -498,6 +529,122 @@ export default function AdvancedDocumentCreator() {
         control,
         name: "signers"
     });
+
+    // Template yükleme (form hook'ları tanımlandıktan sonra)
+    useEffect(() => {
+        const loadTemplate = async () => {
+            if (!templateId) return;
+
+            try {
+                const { data, error } = await DocumentService.getTemplateById(templateId);
+                if (error) throw error;
+                if (!data) return;
+
+                // Form değerlerini şablondan yükle
+                setValue('category_code', data.category_code || '');
+                setValue('subject', data.subject || '');
+                setValue('receiver', data.receiver || '');
+                setValue('content', data.content || '');
+                setValue('sender_unit', data.sender_unit || '');
+                setValue('textAlign', data.text_align || 'justify');
+                setValue('receiverTextAlign', data.receiver_text_align || 'left');
+                setValue('logoUrl', data.logo_url || '');
+                setValue('rightLogoUrl', data.right_logo_url || '');
+                setValue('footerOrgName', data.footer_org_name || '');
+                setValue('footerAddress', data.footer_address || '');
+                setValue('footerContact', data.footer_contact || '');
+                setValue('footerPhone', data.footer_phone || '');
+                setValue('decision_number', data.decision_number || '');
+                setValue('headerTitle', data.header_title || 'T.C.');
+                setValue('headerOrgName', data.header_org_name || 'SENDİKA YÖNETİM SİSTEMİ');
+
+                // Görünürlük ayarları
+                setValue('showHeader', data.show_header !== undefined ? data.show_header : true);
+                setValue('showDate', data.show_date !== undefined ? data.show_date : true);
+                setValue('showSayi', data.show_sayi !== undefined ? data.show_sayi : true);
+                setValue('showKonu', data.show_konu !== undefined ? data.show_konu : true);
+                setValue('showKararNo', data.show_karar_no !== undefined ? data.show_karar_no : true);
+                setValue('showReceiver', data.show_receiver !== undefined ? data.show_receiver : true);
+                setValue('showSignatures', data.show_signatures !== undefined ? data.show_signatures : true);
+                setValue('showFooter', data.show_footer !== undefined ? data.show_footer : true);
+
+                if (data.signers && Array.isArray(data.signers)) {
+                    // Clear existing signers and add from template
+                    for (let i = signerFields.length - 1; i >= 0; i--) {
+                        removeSigner(i);
+                    }
+                    data.signers.forEach((signer: any) => {
+                        appendSigner(signer);
+                    });
+                }
+
+                toast.success('Şablon yüklendi');
+            } catch (err) {
+                console.error('Şablon yüklenirken hata:', err);
+                toast.error('Şablon yüklenemedi');
+            }
+        };
+
+        loadTemplate();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [templateId]);
+
+    // Havuza kaydet
+    const handleSaveAsTemplate = async () => {
+        if (!templateName.trim()) {
+            toast.error('Şablon adı zorunludur');
+            return;
+        }
+
+        setSavingTemplate(true);
+        try {
+            const formData = watch();
+
+            const { error } = await DocumentService.saveAsTemplate({
+                name: templateName.trim(),
+                description: templateDescription.trim() || undefined,
+                category_code: formData.category_code || undefined,
+                subject: formData.subject || undefined,
+                receiver: formData.receiver || undefined,
+                content: formData.content || undefined,
+                sender_unit: formData.sender_unit || undefined,
+                text_align: formData.textAlign,
+                receiver_text_align: formData.receiverTextAlign,
+                logo_url: formData.logoUrl || undefined,
+                right_logo_url: formData.rightLogoUrl || undefined,
+                footer_org_name: formData.footerOrgName || undefined,
+                footer_address: formData.footerAddress || undefined,
+                footer_contact: formData.footerContact || undefined,
+                footer_phone: formData.footerPhone || undefined,
+                decision_number: formData.decision_number || undefined,
+                header_title: formData.headerTitle || undefined,
+                header_org_name: formData.headerOrgName || undefined,
+                show_header: formData.showHeader,
+                show_date: formData.showDate,
+                show_sayi: formData.showSayi,
+                show_konu: formData.showKonu,
+                show_karar_no: formData.showKararNo,
+                show_receiver: formData.showReceiver,
+                show_signatures: formData.showSignatures,
+                show_footer: formData.showFooter,
+                signers: formData.signers,
+                is_public: templateIsPublic
+            });
+
+            if (error) throw error;
+
+            toast.success('Şablon havuza kaydedildi');
+            setShowSaveTemplateModal(false);
+            setTemplateName('');
+            setTemplateDescription('');
+            setTemplateIsPublic(false);
+        } catch (err) {
+            console.error('Şablon kaydedilirken hata:', err);
+            toast.error('Şablon kaydedilemedi');
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
 
     const onSubmit = async (data: DocFormData, status: 'draft' | 'sent') => {
         setLoading(true);
@@ -549,28 +696,28 @@ export default function AdvancedDocumentCreator() {
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)] -m-6 overflow-hidden">
             {/* Toolbar */}
-            <header className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shrink-0 z-10">
+            <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex justify-between items-center shrink-0 z-10">
                 <div className="flex items-center space-x-4">
-                    <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-slate-600" />
+                    <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                        <ArrowLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                     </button>
                     <div>
-                        <h1 className="text-lg font-bold text-slate-800 flex items-center">
-                            <FileText className="w-5 h-5 mr-2 text-violet-600" />
+                        <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center">
+                            <FileText className="w-5 h-5 mr-2 text-violet-600 dark:text-violet-400" />
                             Yeni Resmi Yazı
                         </h1>
-                        <span className="text-xs text-slate-500">Mevcut Durum: Yeni Kayıt</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Mevcut Durum: Yeni Kayıt</span>
                     </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
                     <button
-                        onClick={handleSubmit((d) => onSubmit(d, 'draft'))}
+                        onClick={() => setShowSaveTemplateModal(true)}
                         disabled={loading}
-                        className="px-4 py-2 text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
+                        className="px-4 py-2 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"
                     >
-                        <Save className="w-4 h-4 inline-block mr-2" />
-                        Taslak Kaydet
+                        <Archive className="w-4 h-4 inline-block mr-2" />
+                        Havuza Kaydet
                     </button>
                     <button
                         onClick={handleSubmit((d) => onSubmit(d, 'sent'))}
@@ -578,7 +725,7 @@ export default function AdvancedDocumentCreator() {
                         className="px-4 py-2 text-white bg-violet-600 rounded-lg hover:bg-violet-700 text-sm font-medium shadow-sm"
                     >
                         <Send className="w-4 h-4 inline-block mr-2" />
-                        Resmileştir ve Gönder
+                        İmzala
                     </button>
                 </div>
             </header>
@@ -770,12 +917,23 @@ export default function AdvancedDocumentCreator() {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-xs font-medium text-slate-500">Başlık (T.C.)</label>
+                                <input {...register('headerTitle')} placeholder="T.C." className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-slate-500">Kurum Adı</label>
+                                <input {...register('headerOrgName')} placeholder="Kurum Adı" className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                            </div>
+                        </div>
+
                         <div>
                             <label className="text-xs font-medium text-slate-500">Gönderen Birim</label>
                             <input {...register('sender_unit')} className="form-input w-full mt-1 text-sm bg-slate-50 border-slate-300 rounded-md" />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                             <div>
                                 <label className="text-xs font-medium text-slate-500">Tarih</label>
                                 <input type="date" {...register('date')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
@@ -783,6 +941,10 @@ export default function AdvancedDocumentCreator() {
                             <div>
                                 <label className="text-xs font-medium text-slate-500">Dosya Kodu</label>
                                 <input placeholder="302.01" {...register('category_code')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-slate-500">Karar No</label>
+                                <input placeholder="2024/001" {...register('decision_number')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
                             </div>
                         </div>
 
@@ -1229,6 +1391,94 @@ export default function AdvancedDocumentCreator() {
                         </div>
                     </div>
 
+                    {/* Section: Görünürlük Ayarları */}
+                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">Görünürlük Ayarları</h3>
+                        <p className="text-xs text-slate-500 mb-3">Belgede görmek istemediğiniz alanları kapatabilirsiniz.</p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showHeader !== false}
+                                    onChange={(e) => setValue('showHeader', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Üst Başlık</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showDate !== false}
+                                    onChange={(e) => setValue('showDate', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Tarih</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showSayi !== false}
+                                    onChange={(e) => setValue('showSayi', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Sayı</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showKonu !== false}
+                                    onChange={(e) => setValue('showKonu', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Konu</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showKararNo !== false}
+                                    onChange={(e) => setValue('showKararNo', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Karar No</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showReceiver !== false}
+                                    onChange={(e) => setValue('showReceiver', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Alıcı</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showSignatures !== false}
+                                    onChange={(e) => setValue('showSignatures', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">İmzalar</span>
+                            </label>
+
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formValues.showFooter !== false}
+                                    onChange={(e) => setValue('showFooter', e.target.checked)}
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                />
+                                <span className="text-sm text-slate-700">Alt Bilgi</span>
+                            </label>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Preview Pane (Right) */}
@@ -1365,47 +1615,60 @@ export default function AdvancedDocumentCreator() {
                         >
 
                             {/* Header */}
-                            <div className="text-center mb-8 border-b-2 border-black pb-4 relative min-h-[100px] flex items-center justify-center">
-                                {/* Left Logo */}
-                                {formValues.logoUrl && (
-                                    <img src={formValues.logoUrl} alt="Sol Logo" className="absolute left-0 top-0 h-24 w-auto object-contain" />
-                                )}
+                            {formValues.showHeader !== false && (
+                                <div className="text-center mb-8 border-b-2 border-black pb-4 relative min-h-[100px] flex items-center justify-center">
+                                    {/* Left Logo */}
+                                    {formValues.logoUrl && (
+                                        <img src={formValues.logoUrl} alt="Sol Logo" className="absolute left-0 top-0 h-24 w-auto object-contain" />
+                                    )}
 
-                                {/* Title Block */}
-                                <div className="z-10 px-4">
-                                    <h2 className="text-black font-bold text-lg uppercase">{DEFAULT_HEADER.title}</h2>
-                                    <h3 style={{ color: 'black' }} className="font-bold text-xl uppercase">{DEFAULT_HEADER.orgName}</h3>
-                                    <p style={{ color: 'black' }} className="text-sm mt-1 uppercase">{formValues.sender_unit || DEFAULT_HEADER.subUnit}</p>
+                                    {/* Title Block */}
+                                    <div className="z-10 px-4">
+                                        <h2 style={{ color: 'black' }} className="font-bold text-lg uppercase">{formValues.headerTitle || DEFAULT_HEADER.title}</h2>
+                                        <h3 style={{ color: 'black' }} className="font-bold text-xl uppercase">{formValues.headerOrgName || DEFAULT_HEADER.orgName}</h3>
+                                        <p style={{ color: 'black' }} className="text-sm mt-1 uppercase">{formValues.sender_unit || DEFAULT_HEADER.subUnit}</p>
+                                    </div>
+
+                                    {/* Right Logo */}
+                                    {formValues.rightLogoUrl && (
+                                        <img src={formValues.rightLogoUrl} alt="Sağ Logo" className="absolute right-0 top-0 h-24 w-auto object-contain" />
+                                    )}
                                 </div>
-
-                                {/* Right Logo */}
-                                {formValues.rightLogoUrl && (
-                                    <img src={formValues.rightLogoUrl} alt="Sağ Logo" className="absolute right-0 top-0 h-24 w-auto object-contain" />
-                                )}
-                            </div>
+                            )}
 
 
                             {/* Meta Data Row */}
                             <div style={{ color: 'black' }} className="flex justify-between items-start mb-8 font-sans text-[11pt]">
                                 <div className="space-y-1">
-                                    <p><span className="font-bold">Sayı:</span> {formValues.category_code ? `${formValues.category_code}-` : ''}TASLAK</p>
-                                    <p><span className="font-bold">Konu:</span> {formValues.subject}</p>
+                                    {formValues.showKararNo !== false && formValues.decision_number && (
+                                        <p><span className="font-bold">Karar No:</span> {formValues.decision_number}</p>
+                                    )}
+                                    {formValues.showKonu !== false && (
+                                        <p><span className="font-bold">Konu:</span> {formValues.subject}</p>
+                                    )}
                                 </div>
-                                <div className="text-right">
-                                    <p><span className="font-bold">Tarih:</span> {formValues.date ? new Date(formValues.date).toLocaleDateString('tr-TR') : '-'}</p>
+                                <div className="text-right space-y-1">
+                                    {formValues.showDate !== false && (
+                                        <p><span className="font-bold">Tarih:</span> {formValues.date ? new Date(formValues.date).toLocaleDateString('tr-TR') : '-'}</p>
+                                    )}
+                                    {formValues.showSayi !== false && (
+                                        <p><span className="font-bold">Sayı:</span> {formValues.category_code ? `${formValues.category_code}-` : ''}TASLAK</p>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Receiver */}
-                            <div
-                                style={{ color: 'black', textAlign: formValues.receiverTextAlign || 'left' }}
-                                className={`mb-10 font-bold uppercase tracking-wide ${formValues.receiverTextAlign === 'center' || formValues.receiverTextAlign === 'right'
-                                    ? 'pl-0'
-                                    : 'pl-16'
-                                    }`}
-                            >
-                                {formValues.receiver || '[ALICI BİLGİSİ BURAYA GELECEK]'}
-                            </div>
+                            {formValues.showReceiver !== false && (
+                                <div
+                                    style={{ color: 'black', textAlign: formValues.receiverTextAlign || 'left' }}
+                                    className={`mb-10 font-bold uppercase tracking-wide ${formValues.receiverTextAlign === 'center' || formValues.receiverTextAlign === 'right'
+                                        ? 'pl-0'
+                                        : 'pl-16'
+                                        }`}
+                                >
+                                    {formValues.receiver || '[ALICI BİLGİSİ BURAYA GELECEK]'}
+                                </div>
+                            )}
 
                             {/* Content */}
                             <div
@@ -1417,43 +1680,47 @@ export default function AdvancedDocumentCreator() {
                             />
 
                             {/* Signatures */}
-                            <div style={{ color: 'black' }} className="flex justify-end space-x-12 mt-auto pt-12 pr-4">
-                                {formValues.signers?.map((signer: Signer, idx: number) => (
-                                    <div key={idx} className="text-center min-w-[200px] relative">
-                                        <div className="relative z-10">
-                                            <p className="font-bold whitespace-nowrap">{signer.name}</p>
-                                            <p className="text-[10pt]">{signer.title}</p>
+                            {formValues.showSignatures !== false && (
+                                <div style={{ color: 'black' }} className="flex justify-end space-x-12 mt-auto pt-12 pr-4">
+                                    {formValues.signers?.map((signer: Signer, idx: number) => (
+                                        <div key={idx} className="text-center min-w-[200px] relative">
+                                            <div className="relative z-10">
+                                                <p className="font-bold whitespace-nowrap">{signer.name}</p>
+                                                <p className="text-[10pt]">{signer.title}</p>
+                                            </div>
+                                            {/* Signature Image or Space */}
+                                            <div className="h-60 flex items-start justify-center -mt-[82px] relative z-0">
+                                                {signer.signature_url ? (
+                                                    <img
+                                                        src={supabase.storage.from('official-documents').getPublicUrl(signer.signature_url).data.publicUrl}
+                                                        alt="İmza"
+                                                        className="h-full w-auto max-w-[400px] object-contain mix-blend-multiply"
+                                                    />
+                                                ) : (
+                                                    <div className="h-full w-full"></div>
+                                                )}
+                                            </div>
                                         </div>
-                                        {/* Signature Image or Space */}
-                                        <div className="h-60 flex items-start justify-center -mt-[82px] relative z-0">
-                                            {signer.signature_url ? (
-                                                <img
-                                                    src={supabase.storage.from('official-documents').getPublicUrl(signer.signature_url).data.publicUrl}
-                                                    alt="İmza"
-                                                    className="h-full w-auto max-w-[400px] object-contain mix-blend-multiply"
-                                                />
-                                            ) : (
-                                                <div className="h-full w-full"></div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
 
                             {/* Footer Info */}
-                            <div className="absolute bottom-10 left-[25mm] right-[25mm] border-t border-slate-300 pt-2 text-[8pt] text-slate-500 font-sans flex justify-between">
-                                <div>
-                                    <p>{formValues.footerOrgName || DEFAULT_HEADER.orgName}</p>
-                                    <p>Adres: {formValues.footerAddress || 'Genel Merkez Binası, Ankara'}</p>
+                            {formValues.showFooter !== false && (
+                                <div className="absolute bottom-10 left-[25mm] right-[25mm] border-t border-slate-300 pt-2 text-[8pt] text-slate-500 font-sans flex justify-between">
+                                    <div>
+                                        <p>{formValues.footerOrgName || DEFAULT_HEADER.orgName}</p>
+                                        <p>Adres: {formValues.footerAddress || 'Genel Merkez Binası, Ankara'}</p>
+                                    </div>
+                                    <div className='text-right'>
+                                        <p>Bilgi İçin: {formValues.footerContact || 'Genel Sekreterlik'}</p>
+                                        <p>Tel: {formValues.footerPhone || '0312 000 00 00'}</p>
+                                    </div>
                                 </div>
-                                <div className='text-right'>
-                                    <p>Bilgi İçin: {formValues.footerContact || 'Genel Sekreterlik'}</p>
-                                    <p>Tel: {formValues.footerPhone || '0312 000 00 00'}</p>
-                                </div>
-                            </div>
-
+                            )}
                         </div>
                     </div>
+
                 </div>
 
                 {/* Mobile Toggle */}
@@ -1466,6 +1733,88 @@ export default function AdvancedDocumentCreator() {
                     </button>
                 </div>
             </div>
+
+            {/* Save Template Modal */}
+            {showSaveTemplateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center">
+                                <Archive className="w-5 h-5 mr-2 text-indigo-600" />
+                                Havuza Kaydet
+                            </h3>
+                            <button
+                                onClick={() => setShowSaveTemplateModal(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                            Bu belgeyi şablon olarak kaydedin. İleride aynı formatta belge oluşturmak için kullanabilirsiniz.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Şablon Adı *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    placeholder="Örn: Resmi Yazışma Şablonu"
+                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-slate-700"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Açıklama (İsteğe bağlı)
+                                </label>
+                                <textarea
+                                    value={templateDescription}
+                                    onChange={(e) => setTemplateDescription(e.target.value)}
+                                    placeholder="Bu şablon ne için kullanılır?"
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-slate-700"
+                                />
+                            </div>
+
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={templateIsPublic}
+                                    onChange={(e) => setTemplateIsPublic(e.target.checked)}
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
+                                    Herkese açık şablon (diğer kullanıcılar da görebilir)
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="flex justify-end space-x-3 mt-6">
+                            <button
+                                onClick={() => setShowSaveTemplateModal(false)}
+                                disabled={savingTemplate}
+                                className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleSaveAsTemplate}
+                                disabled={savingTemplate || !templateName.trim()}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {savingTemplate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Kaydet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

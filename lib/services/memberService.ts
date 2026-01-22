@@ -5,13 +5,13 @@ import { Logger } from '@/lib/logger'
 export interface MemberDocument {
     id: string
     member_id: string
-    document_type: 'resignation_petition' | 'personnel_file' | 'other'
-    file_name: string
+    document_name: string
+    document_type: string
     file_url: string
     file_size: number
-    mime_type: string
     uploaded_by: string
-    created_at: string
+    uploaded_at: string
+    is_active: boolean
 }
 
 export const MemberService = {
@@ -54,17 +54,30 @@ export const MemberService = {
 
     // Belge yükle (Storage)
     async uploadDocument(file: File, path: string) {
-        const { data, error } = await supabase
-            .storage
-            .from('member-documents')
-            .upload(path, file)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData?.session?.access_token
 
-        if (error) throw error
-        return data.path
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('path', path)
+
+        const response = await fetch('/api/members/documents', {
+            method: 'POST',
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+            body: formData
+        })
+
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+            throw new Error(payload?.message || 'Upload failed')
+        }
+
+        return payload?.path || path
     },
 
     // Belge kaydı oluştur (Database)
-    async createDocumentRecord(document: Partial<MemberDocument>) {
+    async createDocumentRecord(document: any) {
         const { error } = await supabase
             .from('member_documents')
             .insert(document)
@@ -79,7 +92,8 @@ export const MemberService = {
             .from('member_documents')
             .select('*')
             .eq('member_id', memberId)
-            .order('created_at', { ascending: false })
+            .eq('is_active', true)
+            .order('uploaded_at', { ascending: false })
 
         if (error) throw error
         return data as MemberDocument[]
@@ -88,12 +102,23 @@ export const MemberService = {
     // Belge sil
     async deleteDocument(id: string, filePath: string) {
         // 1. Storage'dan sil
-        const { error: storageError } = await supabase
-            .storage
-            .from('member-documents')
-            .remove([filePath])
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData?.session?.access_token
 
-        if (storageError) throw storageError
+        const response = await fetch('/api/members/documents', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+            },
+            body: JSON.stringify({ path: filePath })
+        })
+
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+            throw new Error(payload?.message || 'Delete failed')
+        }
 
         // 2. DB'den sil
         const { error: dbError } = await supabase
@@ -132,10 +157,9 @@ export const MemberService = {
             await this.createDocumentRecord({
                 member_id: memberId,
                 document_type: 'resignation_petition',
-                file_name: petitionFile.name,
+                document_name: petitionFile.name,
                 file_url: publicUrlData.publicUrl,
                 file_size: petitionFile.size,
-                mime_type: petitionFile.type,
                 uploaded_by: adminUserId
             })
 
@@ -198,4 +222,3 @@ export const MemberService = {
         }
     }
 }
-

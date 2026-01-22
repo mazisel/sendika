@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Decision, DMDocument, DocumentType, BoardType } from '@/lib/types/document-management';
+import { Decision, DMDocument, DocumentType, BoardType, DocumentTemplate } from '@/lib/types/document-management';
 
 export const DocumentService = {
     // --- Decisions ---
@@ -148,5 +148,64 @@ export const DocumentService = {
     async getAttachmentUrl(path: string) {
         const { data } = supabase.storage.from('official-documents').getPublicUrl(path);
         return data.publicUrl;
+    },
+
+    // --- Document Templates (Belge Havuzu) ---
+
+    async getTemplates(filters?: { search?: string; onlyPublic?: boolean; onlyMine?: boolean; userId?: string }) {
+        let query = supabase
+            .from('dm_document_templates')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (filters?.search) {
+            query = query.or(`name.ilike.%${filters.search}%,subject.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+        }
+
+        if (filters?.onlyPublic) {
+            query = query.eq('is_public', true);
+        }
+
+        if (filters?.onlyMine && filters?.userId) {
+            query = query.eq('created_by', filters.userId);
+        }
+
+        return await query;
+    },
+
+    async getTemplateById(id: string) {
+        return await supabase
+            .from('dm_document_templates')
+            .select('*')
+            .eq('id', id)
+            .single();
+    },
+
+    async saveAsTemplate(template: Partial<DocumentTemplate>) {
+        const user = (await supabase.auth.getUser()).data.user;
+        return await supabase
+            .from('dm_document_templates')
+            .insert([{
+                ...template,
+                created_by: user?.id
+            }])
+            .select()
+            .single();
+    },
+
+    async updateTemplate(id: string, updates: Partial<DocumentTemplate>) {
+        return await supabase
+            .from('dm_document_templates')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+    },
+
+    async deleteTemplate(id: string) {
+        return await supabase
+            .from('dm_document_templates')
+            .delete()
+            .eq('id', id);
     }
 };

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Send, FileText, History, Loader2, Users, Search, Plus, Edit, Trash2, CheckCircle, XCircle, Clock, Filter, UsersRound, Zap, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { sendSms, logSms, SmsTemplateService, SmsLogService, SmsGroupService, MemberFilterService, SmsAutomationService } from '@/lib/netgsm'
+import { logSms, SmsTemplateService, SmsLogService, SmsGroupService, MemberFilterService, SmsAutomationService } from '@/lib/netgsm'
 
 type Tab = 'send' | 'templates' | 'groups' | 'automations' | 'logs'
 
@@ -146,6 +146,16 @@ export default function SmsPage() {
         send_time: '09:00',
         template_id: ''
     })
+
+    // OTP verification state
+    const [showOtpModal, setShowOtpModal] = useState(false)
+    const [otpCode, setOtpCode] = useState('')
+    const [otpLoading, setOtpLoading] = useState(false)
+    const [otpMaskedPhone, setOtpMaskedPhone] = useState('')
+    const [pendingSendData, setPendingSendData] = useState<{
+        targets: { phone: string; id?: string }[];
+        personalizedMessages: Map<string, string>;
+    } | null>(null)
 
     useEffect(() => {
         if (activeTab === 'templates') {
@@ -371,6 +381,38 @@ export default function SmsPage() {
         }
     }
 
+    const loadAllActiveMembers = async () => {
+        setLoading(true)
+        try {
+            const { data, error } = await supabase
+                .from('members')
+                .select('id, first_name, last_name, phone')
+                .eq('membership_status', 'active')
+                .not('phone', 'is', null)
+
+            if (error) throw error
+
+            const members = (data || []).map(m => ({
+                id: m.id,
+                full_name: `${m.first_name} ${m.last_name}`,
+                first_name: m.first_name,
+                last_name: m.last_name,
+                phone: m.phone || ''
+            }))
+
+            setSelectedMembers(prev => {
+                const newMembers = members.filter(m => !prev.find(p => p.id === m.id))
+                return [...prev, ...newMembers]
+            })
+            toast.success(`${members.length} aktif üye eklendi`)
+        } catch (error) {
+            console.error('Aktif üyeler yüklenirken hata:', error)
+            toast.error('Üyeler yüklenemedi')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleSaveGroup = async () => {
         if (!newGroup.name.trim()) {
             toast.error('Grup adı zorunludur')
@@ -523,32 +565,120 @@ export default function SmsPage() {
             return
         }
 
-        setSending(true)
-        let successCount = 0
-        let failCount = 0
-
+        // Prepare personalized messages
+        const personalizedMessages = new Map<string, string>()
         for (const target of targets) {
-            // Replace placeholders - for manual numbers, we can't replace name etc.
-            // So we might want to warn or just leave placeholders empty
             let personalizedMessage = message
-
             if (target.id) {
-                // Member
                 const member = selectedMembers.find(m => m.id === target.id)
                 if (member) {
                     personalizedMessage = replacePlaceholders(message, member)
                 }
             } else {
-                // Manual - Remove placeholders or leave them? 
-                // Let's replace standard placeholders with empty string or sensible default
                 personalizedMessage = message
                     .replace(/{AD}/g, '')
                     .replace(/{SOYAD}/g, '')
                     .replace(/{AD_SOYAD}/g, '')
                     .replace(/{TELEFON}/g, target.phone)
             }
+            personalizedMessages.set(target.phone, personalizedMessage)
+        }
 
-            const result = await sendSms(target.phone, personalizedMessage, scheduledDate || undefined)
+        // Request OTP
+        setOtpLoading(true)
+        try {
+            // Get session for auth header
+            const { data: { session } } = await supabase.auth.getSession()
+            const response = await fetch('/api/sms/otp/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': session?.access_token ? `Bearer ${session.access_token}` : ''
+                }
+            })
+            const result = await response.json()
+
+            if (!result.success) {
+                toast.error(result.error || 'OTP gönderilemedi')
+                setOtpLoading(false)
+                return
+            }
+
+            // Store pending data and show OTP modal
+            setPendingSendData({ targets, personalizedMessages })
+            setOtpMaskedPhone(result.maskedPhone)
+            setOtpCode('')
+            setShowOtpModal(true)
+        } catch (err) {
+            toast.error('OTP isteği başarısız')
+        } finally {
+            setOtpLoading(false)
+        }
+    }
+
+    const handleVerifyOtpAndSend = async () => {
+        if (otpCode.length !== 6) {
+            toast.error('Lütfen 6 haneli kodu girin')
+            return
+        }
+
+        setOtpLoading(true)
+        try {
+            // Get session for auth header
+            const { data: { session } } = await supabase.auth.getSession()
+            const response = await fetch('/api/sms/otp/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': session?.access_token ? `Bearer ${session.access_token}` : ''
+                },
+                body: JSON.stringify({ code: otpCode })
+            })
+            const result = await response.json()
+
+            if (!result.success) {
+                toast.error(result.error || 'OTP doğrulanamadı')
+                setOtpLoading(false)
+                return
+            }
+
+            // OTP verified, proceed with sending
+            setShowOtpModal(false)
+            await executeSendSms()
+        } catch (err) {
+            toast.error('Doğrulama hatası')
+        } finally {
+            setOtpLoading(false)
+        }
+    }
+
+    const executeSendSms = async () => {
+        if (!pendingSendData) return
+
+        const { targets, personalizedMessages } = pendingSendData
+        setSending(true)
+        let successCount = 0
+        let failCount = 0
+
+        for (const target of targets) {
+            const personalizedMessage = personalizedMessages.get(target.phone) || message
+
+            // Send SMS via API route to avoid CORS
+            let result: { success: boolean; jobId?: string; error?: string }
+            try {
+                const response = await fetch('/api/sms/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: target.phone,
+                        message: personalizedMessage,
+                        scheduledDate: scheduledDate || undefined
+                    })
+                })
+                result = await response.json()
+            } catch (err) {
+                result = { success: false, error: 'Ağ hatası oluştu' }
+            }
 
             // Get current user for logging
             const { data: { user } } = await supabase.auth.getUser()
@@ -572,6 +702,7 @@ export default function SmsPage() {
         }
 
         setSending(false)
+        setPendingSendData(null)
 
         if (failCount === 0) {
             toast.success(`${successCount} SMS başarıyla gönderildi`)
@@ -742,7 +873,7 @@ export default function SmsPage() {
                                 <>
 
                                     {/* Quick Actions: Filter & Group */}
-                                    <div className="flex gap-2 mb-4">
+                                    <div className="flex flex-wrap gap-2 mb-4">
                                         <button
                                             onClick={() => setShowFilters(!showFilters)}
                                             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${showFilters ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
@@ -763,6 +894,18 @@ export default function SmsPage() {
                                                 </option>
                                             ))}
                                         </select>
+                                        <button
+                                            onClick={loadAllActiveMembers}
+                                            disabled={loading}
+                                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                        >
+                                            {loading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Users className="w-4 h-4" />
+                                            )}
+                                            Tüm Aktif Üyeleri Ekle
+                                        </button>
                                     </div>
 
                                     {/* Filter Panel */}
@@ -1752,6 +1895,64 @@ export default function SmsPage() {
                             </table>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* OTP Verification Modal */}
+            {showOtpModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Send className="w-8 h-8 text-blue-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">SMS Onay Kodu</h3>
+                            <p className="text-gray-500 mb-4">
+                                {otpMaskedPhone} numarasına gönderilen 6 haneli kodu girin
+                            </p>
+
+                            <input
+                                type="text"
+                                maxLength={6}
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                placeholder="000000"
+                                className="w-full text-center text-3xl font-mono tracking-widest py-4 px-6 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                                autoFocus
+                            />
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowOtpModal(false)
+                                        setPendingSendData(null)
+                                        setOtpCode('')
+                                    }}
+                                    className="flex-1 py-3 px-4 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleVerifyOtpAndSend}
+                                    disabled={otpLoading || otpCode.length !== 6}
+                                    className="flex-1 py-3 px-4 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {otpLoading ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-5 h-5" />
+                                            Onayla ve Gönder
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            <p className="text-xs text-gray-400 mt-4">
+                                Kod 5 dakika içinde geçerliliğini yitirir
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -220,4 +220,8 @@ export class AdminAuth {
       return null;
     }
   }
+
+  static onAuthStateChange(callback: (event: string, session: any) => void) {
+    return supabase.auth.onAuthStateChange(callback);
+  }
 }

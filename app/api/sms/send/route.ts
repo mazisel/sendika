@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
 
         // Parse body
         const body = await req.json();
-        const { phone, message } = body;
+        console.log('SMS API received body:', body);
+        const { phone, message, scheduledDate } = body;
 
         if (!phone || !message) {
             return NextResponse.json(
@@ -21,8 +22,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Send SMS
-        const result = await sendSms(phone, message);
+        // Send SMS (with optional scheduled date)
+        const result = await sendSms(phone, message, scheduledDate);
 
         if (result.success) {
             return NextResponse.json({ success: true, jobId: result.jobId });

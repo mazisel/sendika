@@ -20,6 +20,7 @@ import MemberFilterTab, { FilterState } from '@/components/members/MemberFilterT
 import BulkUpdateTab, { Condition } from '@/components/members/BulkUpdateTab';
 import MemberDistributionTab from '@/components/members/MemberDistributionTab';
 import ExportMenu from '@/components/ExportMenu';
+import { Skeleton } from '@/components/common/Skeleton';
 
 export default function AdminMembersContent() {
   const router = useRouter();
@@ -38,9 +39,10 @@ export default function AdminMembersContent() {
   const [totalCount, setTotalCount] = useState(0);
 
   // Search & Filter State
+  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
+  const [dateFilter, setDateFilter] = useState<string>(searchParams.get('date') || 'all');
   const [advancedFilters, setAdvancedFilters] = useState<FilterState>({
     city: '', district: '', workplace: '', position: '',
     gender: '', education: '', blood_group: '', minAge: '', maxAge: '',
@@ -167,8 +169,6 @@ export default function AdminMembersContent() {
     const user = AdminAuth.getCurrentUser();
     setCurrentUser(user);
     if (user) {
-      loadMembers(1, user);
-
       // Fetch regions for filter dropdown
       const fetchRegions = async () => {
         try {
@@ -198,9 +198,9 @@ export default function AdminMembersContent() {
 
   useEffect(() => {
     if (activeTab === 'list' && currentUser) {
-      loadMembers(1); // Filtre değişince sayfa 1
+      loadMembers(1); // Filtre değişince veya kullanıcı yüklenince sayfa 1
     }
-  }, [statusFilter, dateFilter]); // Remove allMembers dependency
+  }, [statusFilter, dateFilter, currentUser]);
 
   // Handle URL parameters for filtering
   useEffect(() => {
@@ -250,7 +250,8 @@ export default function AdminMembersContent() {
       // Apply Status Filter
       if (statusFilter !== 'all') {
         if (statusFilter === 'resigned') {
-          query = query.in('membership_status', ['inactive', 'suspended', 'resigned']);
+          // Fix: Only show resigned members when 'resigned' is selected
+          query = query.eq('membership_status', 'resigned');
         } else {
           query = query.eq('membership_status', statusFilter);
         }
@@ -849,65 +850,92 @@ export default function AdminMembersContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
-                    {displayedMembers.map(member => (
-                      <tr
-                        key={member.id}
-                        className="group hover:bg-gray-50 dark:hover:bg-slate-800/60 cursor-pointer"
-                        onClick={(e) => {
-                          // Prevent triggering if checkbox or specific buttons are clicked if needed
-                          // For now, allow row click except on interaction elements if we want to be safe, 
-                          // but usually row click is fine. 
-                          // Let's filter out if the click target is a button or input
-                          if ((e.target as HTMLElement).tagName.toLowerCase() !== 'input' &&
-                            (e.target as HTMLElement).tagName.toLowerCase() !== 'button' &&
-                            !(e.target as HTMLElement).closest('button')) {
-                            setSelectedMember(member);
-                            setShowDetails(true);
-                          }
-                        }}
-                      >
-                        <td className="px-3 py-2"><input type="checkbox" checked={selectedMemberIds.has(member.id)} onChange={() => toggleSelectMember(member.id)} className="rounded" /></td>
-                        {visibleColumns.membershipNumber && <td className="px-3 py-2 text-sm">{member.membership_number}</td>}
-                        {visibleColumns.mobile && (
-                          <td className="px-3 py-2 text-center">
-                            {member.last_login_at ? (
-                              <div className="flex justify-center group relative">
-                                <Smartphone className="w-4 h-4 text-green-500" />
-                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                                  Son Giriş: {new Date(member.last_login_at).toLocaleDateString('tr-TR')}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex justify-center" title="Hiç giriş yapmadı">
-                                <Smartphone className="w-4 h-4 text-slate-300 dark:text-slate-700" />
-                              </div>
-                            )}
+                    {loading ? (
+                      [...Array(10)].map((_, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-2"><Skeleton width={16} height={16} /></td>
+                          {visibleColumns.membershipNumber && <td className="px-3 py-2"><Skeleton width={60} /></td>}
+                          {visibleColumns.mobile && <td className="px-3 py-2"><div className="flex justify-center"><Skeleton variant="circular" width={24} height={24} /></div></td>}
+                          {visibleColumns.fullName && <td className="px-3 py-2"><Skeleton width={140} /></td>}
+                          {visibleColumns.tcIdentity && <td className="px-3 py-2"><Skeleton width={100} /></td>}
+                          {visibleColumns.status && <td className="px-3 py-2"><Skeleton width={70} height={24} className="rounded-full" /></td>}
+                          {visibleColumns.contact && <td className="px-3 py-2"><div className="space-y-1"><Skeleton width={100} /><Skeleton width={140} height={12} /></div></td>}
+                          {visibleColumns.location && <td className="px-3 py-2"><Skeleton width={120} /></td>}
+                          {visibleColumns.workplace && <td className="px-3 py-2"><Skeleton width={160} /></td>}
+                          {visibleColumns.fatherName && <td className="px-3 py-2"><Skeleton width={100} /></td>}
+                          {visibleColumns.motherName && <td className="px-3 py-2"><Skeleton width={100} /></td>}
+                          {visibleColumns.institution && <td className="px-3 py-2"><Skeleton width={140} /></td>}
+                          <td className="px-3 py-2 text-right sticky right-0 bg-white dark:bg-slate-900 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                            <div className="flex justify-end gap-2">
+                              <Skeleton width={20} height={20} />
+                              <Skeleton width={20} height={20} />
+                              <Skeleton width={20} height={20} />
+                              <Skeleton width={20} height={20} />
+                            </div>
                           </td>
-                        )}
-                        {visibleColumns.fullName && <td className="px-3 py-2 text-sm font-medium">{member.first_name} {member.last_name}</td>}
-                        {visibleColumns.tcIdentity && <td className="px-3 py-2 text-sm">{member.tc_identity}</td>}
-                        {visibleColumns.status && <td className="px-3 py-2">{getStatusBadge(member.membership_status)}</td>}
-                        {visibleColumns.contact && <td className="px-3 py-2 text-sm">
-                          <div>{member.phone}</div>
-                          <div className="text-gray-400 text-xs">{member.email}</div>
-                        </td>}
-                        {visibleColumns.location && <td className="px-3 py-2 text-sm">{member.city} / {member.district}</td>}
-                        {visibleColumns.workplace && <td className="px-3 py-2 text-sm">{member.workplace}</td>}
+                        </tr>
+                      ))
+                    ) : (
+                      displayedMembers.map(member => (
+                        <tr
+                          key={member.id}
+                          className="group hover:bg-gray-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                          onClick={(e) => {
+                            // Prevent triggering if checkbox or specific buttons are clicked if needed
+                            // For now, allow row click except on interaction elements if we want to be safe, 
+                            // but usually row click is fine. 
+                            // Let's filter out if the click target is a button or input
+                            if ((e.target as HTMLElement).tagName.toLowerCase() !== 'input' &&
+                              (e.target as HTMLElement).tagName.toLowerCase() !== 'button' &&
+                              !(e.target as HTMLElement).closest('button')) {
+                              setSelectedMember(member);
+                              setShowDetails(true);
+                            }
+                          }}
+                        >
+                          <td className="px-3 py-2"><input type="checkbox" checked={selectedMemberIds.has(member.id)} onChange={() => toggleSelectMember(member.id)} className="rounded" /></td>
+                          {visibleColumns.membershipNumber && <td className="px-3 py-2 text-sm">{member.membership_number}</td>}
+                          {visibleColumns.mobile && (
+                            <td className="px-3 py-2 text-center">
+                              {member.last_login_at ? (
+                                <div className="flex justify-center group relative">
+                                  <Smartphone className="w-4 h-4 text-green-500" />
+                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                                    Son Giriş: {new Date(member.last_login_at).toLocaleDateString('tr-TR')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex justify-center" title="Hiç giriş yapmadı">
+                                  <Smartphone className="w-4 h-4 text-slate-300 dark:text-slate-700" />
+                                </div>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.fullName && <td className="px-3 py-2 text-sm font-medium">{member.first_name} {member.last_name}</td>}
+                          {visibleColumns.tcIdentity && <td className="px-3 py-2 text-sm">{member.tc_identity}</td>}
+                          {visibleColumns.status && <td className="px-3 py-2">{getStatusBadge(member.membership_status)}</td>}
+                          {visibleColumns.contact && <td className="px-3 py-2 text-sm">
+                            <div>{member.phone}</div>
+                            <div className="text-gray-400 text-xs">{member.email}</div>
+                          </td>}
+                          {visibleColumns.location && <td className="px-3 py-2 text-sm">{member.city} / {member.district}</td>}
+                          {visibleColumns.workplace && <td className="px-3 py-2 text-sm">{member.workplace}</td>}
 
-                        {visibleColumns.fatherName && <td className="px-3 py-2 text-sm">{member.father_name}</td>}
-                        {visibleColumns.motherName && <td className="px-3 py-2 text-sm">{member.mother_name}</td>}
-                        {visibleColumns.institution && <td className="px-3 py-2 text-sm">{member.institution}</td>}
+                          {visibleColumns.fatherName && <td className="px-3 py-2 text-sm">{member.father_name}</td>}
+                          {visibleColumns.motherName && <td className="px-3 py-2 text-sm">{member.mother_name}</td>}
+                          {visibleColumns.institution && <td className="px-3 py-2 text-sm">{member.institution}</td>}
 
-                        <td className="px-3 py-2 text-right sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-gray-50 dark:group-hover:bg-slate-800/60 transition-colors shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-                          <div className="flex justify-end gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowFilesModal(true); }} className="text-gray-500 hover:text-purple-600" title="Özlük Dosyası"><FileText className="w-5 h-5" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowDetails(true); }} className="text-gray-500 hover:text-blue-600" title="Detaylar"><Eye className="w-5 h-5" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowEditModal(true); }} className="text-gray-500 hover:text-green-600" title="Düzenle"><Edit className="w-5 h-5" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowResignationModal(true); }} className="text-gray-500 hover:text-red-600" title="İstifa Ettir"><LogOut className="w-5 h-5" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-3 py-2 text-right sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-gray-50 dark:group-hover:bg-slate-800/60 transition-colors shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                            <div className="flex justify-end gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowFilesModal(true); }} className="text-gray-500 hover:text-purple-600" title="Özlük Dosyası"><FileText className="w-5 h-5" /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowDetails(true); }} className="text-gray-500 hover:text-blue-600" title="Detaylar"><Eye className="w-5 h-5" /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowEditModal(true); }} className="text-gray-500 hover:text-green-600" title="Düzenle"><Edit className="w-5 h-5" /></button>
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedMember(member); setShowResignationModal(true); }} className="text-gray-500 hover:text-red-600" title="İstifa Ettir"><LogOut className="w-5 h-5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

@@ -73,6 +73,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     checkAuth();
+
+    // Listen for auth state changes (especially token expiration)
+    const { data: { subscription } } = AdminAuth.onAuthStateChange(async (event: any, session: any) => {
+      if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT') {
+        console.warn('Auth session invalid or expired:', event);
+        await AdminAuth.logout();
+        router.push('/admin/login');
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        const user = AdminAuth.getCurrentUser();
+        setCurrentUser(user);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [pathname, router]);
 
   useEffect(() => {

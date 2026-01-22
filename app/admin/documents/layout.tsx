@@ -8,7 +8,8 @@ import {
     FileInput,
     FileOutput,
     PlusCircle,
-    FileText
+    FileText,
+    Archive
 } from 'lucide-react';
 import { AdminAuth } from '@/lib/auth';
 import { PermissionManager } from '@/lib/permissions';
@@ -42,6 +43,13 @@ export default function DocumentsLayout({
             icon: PlusCircle,
             pattern: 'create',
             permission: 'documents.create'
+        },
+        {
+            name: 'Belge Havuzu',
+            href: '/admin/documents/pool',
+            icon: Archive,
+            pattern: 'pool',
+            permission: 'documents.view'
         },
         {
             name: 'Gelen Evrak',

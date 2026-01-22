@@ -310,3 +310,41 @@ html {
 .no-spinner[type='number'] {
   -moz-appearance: textfield;
 }
+
+/* Date input calendar icon styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Light theme - default black icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+}
+
+/* Dark theme - invert to white icon */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark .admin-theme input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Also handle datetime-local inputs */
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark .admin-theme input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

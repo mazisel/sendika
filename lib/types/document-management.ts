@@ -50,3 +50,39 @@ export interface DMAttachment {
     uploaded_by: string;
     created_at: string;
 }
+
+export interface DocumentTemplate {
+    id: string;
+    name: string;
+    description?: string;
+    category_code?: string;
+    subject?: string;
+    receiver?: string;
+    content?: string;
+    sender_unit?: string;
+    text_align?: 'left' | 'center' | 'right' | 'justify';
+    receiver_text_align?: 'left' | 'center' | 'right' | 'justify';
+    logo_url?: string;
+    right_logo_url?: string;
+    footer_org_name?: string;
+    footer_address?: string;
+    footer_contact?: string;
+    footer_phone?: string;
+    signers?: Array<{ name: string; title: string; user_id?: string; signature_url?: string; }>;
+    is_public?: boolean;
+    decision_number?: string;
+    header_title?: string;
+    header_org_name?: string;
+    show_header?: boolean;
+    show_date?: boolean;
+    show_sayi?: boolean;
+    show_konu?: boolean;
+    show_karar_no?: boolean;
+    show_receiver?: boolean;
+    show_signatures?: boolean;
+    show_footer?: boolean;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+}
+
