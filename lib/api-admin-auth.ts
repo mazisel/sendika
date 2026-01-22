@@ -80,7 +80,7 @@ export async function getAuthenticatedAdmin(request: NextRequest): Promise<Admin
                 authenticatedUser = {
                   id: decoded.sub,
                   email: decoded.email ?? ''
-                } as typeof authenticatedUser;
+                } as any;
                 accessToken = token ?? undefined;
               }
             }

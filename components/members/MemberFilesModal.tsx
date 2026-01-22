@@ -66,10 +66,9 @@ export default function MemberFilesModal({ member, onClose }: MemberFilesModalPr
             await MemberService.createDocumentRecord({
                 member_id: member.id,
                 document_type: 'personnel_file',
-                file_name: file.name,
+                document_name: file.name,
                 file_url: publicUrl,
                 file_size: file.size,
-                mime_type: file.type,
                 uploaded_by: currentUser?.id
             })
 
@@ -179,9 +178,9 @@ export default function MemberFilesModal({ member, onClose }: MemberFilesModalPr
                                             <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate max-w-xs">{doc.file_name}</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate max-w-xs">{doc.document_name}</p>
                                             <p className="text-xs text-gray-500 dark:text-slate-400">
-                                                {new Date(doc.created_at).toLocaleDateString('tr-TR')} • {(doc.file_size / 1024).toFixed(1)} KB
+                                                {new Date(doc.uploaded_at).toLocaleDateString('tr-TR')} • {(doc.file_size / 1024).toFixed(1)} KB
                                                 {doc.document_type === 'resignation_petition' && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-800 text-[10px] rounded-full">İstifa Dilekçesi</span>}
                                             </p>
                                         </div>
