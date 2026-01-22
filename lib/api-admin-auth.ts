@@ -46,6 +46,10 @@ export async function getAuthenticatedAdmin(request: NextRequest): Promise<Admin
       return { status: 500, error: 'Sunucu yapılandırma hatası: Service Role Key eksik.' };
     }
 
+    // Debug log for authentication issues
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    console.log(`Debug Auth: Key length: ${key.length}, Starts with: ${key.substring(0, 10)}...`);
+
     const {
       data: { user }
     } = await supabase.auth.getUser();
