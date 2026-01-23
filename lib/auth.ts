@@ -1,6 +1,9 @@
-import { supabase } from './supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AdminUser } from './types';
 import { Logger } from './logger';
+
+// Client-side auth işlemleri için cookie-tabanlı client oluştur
+const supabase = createClientComponentClient();
 
 export interface LoginCredentials {
   email: string;
@@ -32,28 +35,50 @@ export class AdminAuth {
       let dbError: any = null;
 
       try {
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select(`
-            *,
-            role_details:roles (
-              id,
-              name,
-              is_system_role,
-              permissions:role_permissions (
-                permission:permissions (
-                  key
+        // 10 saniyelik zaman aşımı tanımla
+        const dbQueryPromise = new Promise(async (resolve, reject) => {
+          try {
+            const { data, error } = await supabase
+              .from('admin_users')
+              .select(`
+                *,
+                role_details:roles (
+                  id,
+                  name,
+                  is_system_role,
+                  permissions:role_permissions (
+                    permission:permissions (
+                      key
+                    )
+                  )
                 )
-              )
-            )
-          `)
-          .eq('email', credentials.email)
-          .eq('is_active', true)
-          .single();
+              `)
+              .eq('email', credentials.email)
+              .eq('is_active', true)
+              .single();
 
-        if (error) throw error;
-        adminUser = data;
-      } catch (err) {
+            if (error) reject(error);
+            else resolve(data);
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Veritabanı bağlantısı zaman aşımına uğradı')), 10000);
+        });
+
+        adminUser = await Promise.race([dbQueryPromise, timeoutPromise]);
+
+      } catch (err: any) {
+        // Eğer zaman aşımı hatası değilse ve hata varsa, fallback dene
+        // Ancak zaman aşımıysa doğrudan hata ver
+        if (err.message === 'Veritabanı bağlantısı zaman aşımına uğradı') {
+          console.error('Login DB Timeout');
+          await supabase.auth.signOut();
+          return { success: false, error: 'Sunucu yanıt vermiyor, lütfen sayfayı yenileyip tekrar deneyin.' };
+        }
+
         console.warn('RBAC query failed, falling back to simple query:', err);
         // Fallback: Eski yapı (Sadece admin_users)
         // Tablolar veya ilişki henüz yoksa bu çalışır

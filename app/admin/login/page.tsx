@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 
@@ -11,6 +11,17 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // Zaten giriş yapmışsa yönlendir
+  useEffect(() => {
+    const checkAuth = async () => {
+      const isAuth = await AdminAuth.isAuthenticated();
+      if (isAuth) {
+        router.replace('/admin/dashboard');
+      }
+    };
+    checkAuth();
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -18,15 +29,16 @@ export default function AdminLogin() {
 
     try {
       const result = await AdminAuth.login({ email, password });
-      
+
       if (result.success) {
         router.push('/admin/dashboard');
+        // Başarılı durumda loading'i kapatma, sayfa yönlenene kadar bekleniyor görünsün
       } else {
         setError(result.error || 'Giriş başarısız');
+        setLoading(false);
       }
     } catch (error) {
       setError('Bir hata oluştu');
-    } finally {
       setLoading(false);
     }
   };
@@ -50,7 +62,7 @@ export default function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
               placeholder="oguzhanlyn@gmail.com"
             />
           </div>
@@ -65,7 +77,7 @@ export default function AdminLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
               placeholder="••••••••"
             />
           </div>
