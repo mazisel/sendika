@@ -116,8 +116,19 @@ export default function OutgoingDocumentsPage() {
                                             {doc.subject}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                                {doc.status === 'sent' ? 'Gönderildi' : doc.status}
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${doc.status === 'sent' ? 'bg-green-100 text-green-800' :
+                                                    doc.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-800' :
+                                                        doc.status === 'draft' ? 'bg-slate-100 text-slate-800' :
+                                                            doc.status === 'registered' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-slate-100 text-slate-800'
+                                                }`}>
+                                                {doc.status === 'sent' ? 'Gönderildi' :
+                                                    doc.status === 'pending_approval' ? 'İmza Bekliyor' :
+                                                        doc.status === 'draft' ? 'Taslak' :
+                                                            doc.status === 'registered' ? 'Kayıtlı' :
+                                                                doc.status === 'archived' ? 'Arşivlendi' :
+                                                                    doc.status === 'cancelled' ? 'İptal' :
+                                                                        doc.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

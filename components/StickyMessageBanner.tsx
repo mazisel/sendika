@@ -77,7 +77,7 @@ export default function StickyMessageBanner() {
             <div className="flex items-center space-x-2 overflow-hidden">
                 <MessageSquare className="w-3 h-3 text-yellow-600 dark:text-yellow-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
                 <div className="flex items-center space-x-2 overflow-hidden">
-                    <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium truncate max-w-[120px] xl:max-w-[300px]">
+                    <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium line-clamp-2 max-w-[120px] xl:max-w-[400px] leading-tight">
                         {message.message}
                     </p>
                     <div className="flex items-center space-x-1 whitespace-nowrap border-l border-slate-300 dark:border-slate-700 pl-2">

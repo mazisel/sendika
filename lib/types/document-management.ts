@@ -35,6 +35,31 @@ export interface DMDocument {
     assigned_to?: string;
     created_at: string;
     updated_at: string;
+
+    // Presentation
+    header_title?: string;
+    header_org_name?: string;
+    sender_unit?: string;
+    footer_org_name?: string;
+    footer_address?: string;
+    footer_contact?: string;
+    footer_phone?: string;
+    decision_number?: string;
+    logo_url?: string;
+    right_logo_url?: string;
+
+    // Visibility
+    show_header?: boolean;
+    show_date?: boolean;
+    show_sayi?: boolean;
+    show_konu?: boolean;
+    show_karar_no?: boolean;
+    show_receiver?: boolean;
+    show_signatures?: boolean;
+    show_footer?: boolean;
+
+    // Signers
+    signers?: any[]; // JSONB
 }
 
 export type AttachmentParentType = 'decision' | 'document';

@@ -1,4 +1,4 @@
-export type DefinitionType = 'workplace' | 'position';
+export type DefinitionType = 'workplace' | 'position' | 'title';
 
 export interface GeneralDefinition {
   id: string;
@@ -9,6 +9,8 @@ export interface GeneralDefinition {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  user_id?: string | null;
+  user?: AdminUser; // Joined
 }
 
 export interface Member {

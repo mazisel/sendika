@@ -1,0 +1,24 @@
+-- Add missing columns to dm_documents table for layout and extra metadata
+
+ALTER TABLE dm_documents
+ADD COLUMN IF NOT EXISTS header_title TEXT,
+ADD COLUMN IF NOT EXISTS header_org_name TEXT,
+ADD COLUMN IF NOT EXISTS sender_unit TEXT,
+ADD COLUMN IF NOT EXISTS footer_org_name TEXT,
+ADD COLUMN IF NOT EXISTS footer_address TEXT,
+ADD COLUMN IF NOT EXISTS footer_contact TEXT,
+ADD COLUMN IF NOT EXISTS footer_phone TEXT,
+ADD COLUMN IF NOT EXISTS decision_number TEXT,
+ADD COLUMN IF NOT EXISTS logo_url TEXT,
+ADD COLUMN IF NOT EXISTS right_logo_url TEXT,
+ADD COLUMN IF NOT EXISTS show_header BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_date BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_sayi BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_konu BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_karar_no BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_receiver BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_signatures BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS show_footer BOOLEAN DEFAULT true,
+ADD COLUMN IF NOT EXISTS signers JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS text_align TEXT DEFAULT 'justify',
+ADD COLUMN IF NOT EXISTS receiver_text_align TEXT DEFAULT 'left';

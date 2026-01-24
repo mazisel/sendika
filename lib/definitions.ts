@@ -6,7 +6,7 @@ interface DefinitionGroupMeta {
   helper?: string;
 }
 
-export const definitionTypeOrder: DefinitionType[] = ['workplace', 'position'];
+export const definitionTypeOrder: DefinitionType[] = ['workplace', 'position', 'title'];
 
 export const definitionGroups: Record<DefinitionType, DefinitionGroupMeta> = {
   workplace: {
@@ -18,6 +18,11 @@ export const definitionGroups: Record<DefinitionType, DefinitionGroupMeta> = {
     label: 'Pozisyon',
     description: 'Üyelerin görev/pozisyon seçenekleri',
     helper: 'Örn. Hemşire, Ebe, Sağlık Memuru'
+  },
+  title: {
+    label: 'Unvan',
+    description: 'İmza yetkilisi unvan seçenekleri',
+    helper: 'Örn. Genel Başkan, Genel Sekreter, Şube Başkanı'
   }
 };
 

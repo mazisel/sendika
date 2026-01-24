@@ -207,5 +207,100 @@ export const DocumentService = {
             .from('dm_document_templates')
             .delete()
             .eq('id', id);
+    },
+
+    // --- Document Defaults (Settings) ---
+
+    async getDocumentDefaults() {
+        const { data, error } = await supabase
+            .from('dm_document_defaults')
+            .select('*')
+            .single();
+
+        // Return null if no row found (initial state)
+        if (error && error.code === 'PGRST116') return { data: null, error: null };
+
+        return { data, error };
+    },
+
+    async saveDocumentDefaults(defaults: any) {
+        const user = (await supabase.auth.getUser()).data.user;
+
+        // Check if exists
+        const { data: existing } = await this.getDocumentDefaults();
+
+        if (existing) {
+            return await supabase
+                .from('dm_document_defaults')
+                .update({
+                    ...defaults,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id)
+                .select()
+                .single();
+        } else {
+            return await supabase
+                .from('dm_document_defaults')
+                .insert([{
+                    ...defaults,
+                    created_by: user?.id
+                }])
+                .select()
+                .single();
+        }
+    },
+
+    // --- Authorized Signers ---
+
+    async getAuthorizedSigners() {
+        const { data, error } = await supabase
+            .from('dm_authorized_signers')
+            .select(`
+                *,
+                user:admin_users (
+                    id,
+                    full_name,
+                    role,
+                    signature_url
+                )
+            `)
+            .order('sort_order', { ascending: true });
+
+        return { data, error };
+    },
+
+    async addAuthorizedSigner(userId: string, title?: string) {
+        const user = (await supabase.auth.getUser()).data.user;
+
+        return await supabase
+            .from('dm_authorized_signers')
+            .insert([{
+                user_id: userId,
+                title: title,
+                created_by: user?.id
+            }])
+            .select()
+            .single();
+    },
+
+    async removeAuthorizedSigner(id: string) {
+        return await supabase
+            .from('dm_authorized_signers')
+            .delete()
+            .eq('id', id);
+    },
+
+    async updateAuthorizedSignerOrder(items: { id: string, sort_order: number }[]) {
+        // Simple sequential update for now
+        // A stored procedure would be better for batch updates but this works for small lists
+        const updates = items.map(item =>
+            supabase
+                .from('dm_authorized_signers')
+                .update({ sort_order: item.sort_order })
+                .eq('id', item.id)
+        );
+
+        return await Promise.all(updates);
     }
 };

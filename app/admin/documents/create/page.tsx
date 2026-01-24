@@ -17,6 +17,7 @@ import { AdminAuth } from '@/lib/auth';
 import { StorageService } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { Member } from '@/lib/types';
+import A4Preview from '@/components/ui/A4Preview';
 
 
 // --- Types ---
@@ -86,9 +87,11 @@ export default function AdvancedDocumentCreator() {
     const [templateDescription, setTemplateDescription] = useState('');
     const [templateIsPublic, setTemplateIsPublic] = useState(false);
     const [savingTemplate, setSavingTemplate] = useState(false);
+    const [generatingEYP, setGeneratingEYP] = useState(false);
     const [previewMode, setPreviewMode] = useState(false); // Mobile toggle
     const [currentUser, setCurrentUser] = useState<any>(null); // AdminUser tipini tam import edemediğimiz için any bırakıyoruz veya Member ile değiştiriyoruz
     const [availableSigners, setAvailableSigners] = useState<any[]>([]); // İmzası olan yetkililer
+    const [userTitle, setUserTitle] = useState<string>(''); // Kullanıcının tanımlı unvanı
 
     // Preview Settings
     const [zoom, setZoom] = useState(0.8);
@@ -125,17 +128,79 @@ export default function AdvancedDocumentCreator() {
             if (user) {
                 setCurrentUser(user);
 
-                // Yetki kontrolü: Başkaları adına imza atabiliyor mu?
-                const canSignOthers = user.permissions?.includes('documents.sign.others') || user.role === 'super_admin'; // Fallback for super_admin
+                setLoading(true);
+                try {
+                    // 1. Yetkili İmzacıları Getir (Yeni Sistem)
+                    const { data: authorizedSignersData } = await DocumentService.getAuthorizedSigners();
+                    let signersList: any[] = [];
 
-                if (canSignOthers) {
-                    // İmzası olan tüm yöneticileri getir
-                    const { data } = await supabase
-                        .from('admin_users')
-                        .select('id, full_name, role_type, city, signature_url')
-                        .not('signature_url', 'is', null);
+                    if (authorizedSignersData && authorizedSignersData.length > 0) {
+                        // Normalize to simple structure
+                        signersList = authorizedSignersData.map((item: any) => ({
+                            id: item.user.id,
+                            name: item.user.full_name,
+                            title: item.title || item.user.role || 'Yönetici',
+                            signature_url: item.user.signature_url
+                        }));
+                    } else {
+                        // Fallback: Eski yöntem
+                        const canSignOthers = user.permissions?.includes('documents.sign.others') || user.role === 'super_admin';
+                        if (canSignOthers) {
+                            const { data } = await supabase
+                                .from('admin_users')
+                                .select('id, full_name, role, city, signature_url')
+                                .not('signature_url', 'is', null);
 
-                    if (data) setAvailableSigners(data);
+                            if (data) {
+                                signersList = data.map((u: any) => ({
+                                    id: u.id,
+                                    name: u.full_name,
+                                    title: 'Yönetici', // Basit fallback
+                                    signature_url: u.signature_url
+                                }));
+                            }
+                        }
+                    }
+                    setAvailableSigners(signersList);
+
+                    // 2. Kullanıcının tanımlı unvanını getir (Definition tablosundan)
+                    const { data: userDef } = await supabase
+                        .from('general_definitions')
+                        .select('label')
+                        .eq('type', 'title')
+                        .eq('user_id', user.id)
+                        .eq('is_active', true)
+                        .single();
+
+                    if (userDef) {
+                        setUserTitle(userDef.label);
+                    }
+
+                    // 3. Varsayılan Ayarları Getir (Eğer template yoksa)
+                    if (!templateId) {
+                        const { data: defaults } = await DocumentService.getDocumentDefaults();
+                        if (defaults) {
+                            setValue('headerTitle', defaults.header_title || 'T.C.');
+                            setValue('headerOrgName', defaults.header_org_name || 'SENDİKA YÖNETİM SİSTEMİ');
+                            setValue('sender_unit', defaults.sender_unit || 'GENEL MERKEZ YÖNETİM KURULU');
+                            setValue('logoUrl', defaults.logo_url || '');
+                            setValue('rightLogoUrl', defaults.right_logo_url || '');
+                            setValue('footerOrgName', defaults.footer_org_name || '');
+                            setValue('footerAddress', defaults.footer_address || '');
+                            setValue('footerContact', defaults.footer_contact || '');
+                            setValue('footerPhone', defaults.footer_phone || '');
+                            setValue('textAlign', (defaults.text_align as any) || 'justify');
+                            setValue('receiverTextAlign', (defaults.receiver_text_align as any) || 'left');
+
+                            if (defaults.signers && Array.isArray(defaults.signers) && defaults.signers.length > 0) {
+                                setValue('signers', defaults.signers);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Başlangıç verileri yüklenirken hata:', error);
+                } finally {
+                    setLoading(false);
                 }
             }
         };
@@ -148,10 +213,24 @@ export default function AdvancedDocumentCreator() {
             return;
         }
 
-        // Ünvanı belirle
+        // Önce yetkili imzacılar listesinde kendisini arasın
+        const authorizedSelf = availableSigners.find(s => s.id === currentUser.id);
+
         let title = 'Yönetici';
-        if (currentUser.role_type === 'branch_manager') title = 'Şube Başkanı';
-        else if (currentUser.role === 'super_admin') title = 'Genel Başkan';
+
+        // Öncelik: Kullanıcının tanımlı unvanı
+        if (userTitle) {
+            title = userTitle;
+        }
+        // İkinci: Yetkili imzacılar listesindeki unvan
+        else if (authorizedSelf && authorizedSelf.title) {
+            title = authorizedSelf.title;
+        }
+        // Fallback
+        else {
+            if (currentUser.role_type === 'branch_manager') title = 'Şube Başkanı';
+            else if (currentUser.role === 'super_admin') title = 'Genel Başkan';
+        }
 
         appendSigner({
             name: currentUser.full_name,
@@ -165,13 +244,14 @@ export default function AdvancedDocumentCreator() {
         const signer = availableSigners.find(s => s.id === userId);
         if (!signer) return;
 
-        let title = 'Yönetici'; // Default
-        // Basit ünvan tahmini (Geliştirilebilir)
-        if (signer.role_type === 'general_manager') title = 'Genel Merkez Yöneticisi';
+        // Uyarı: İmzası yoksa eklemesine izin verelim ama uyaralım
+        if (!signer.signature_url) {
+            toast('Dikkat: Bu kullanıcının tanımlı bir imzası yok.', { icon: '⚠️' });
+        }
 
         appendSigner({
-            name: signer.full_name,
-            title: title,
+            name: signer.name,
+            title: signer.title,
             user_id: signer.id,
             signature_url: signer.signature_url
         });
@@ -504,7 +584,7 @@ export default function AdvancedDocumentCreator() {
             footerContact: 'Genel Sekreterlik',
             footerPhone: '0312 000 00 00',
             date: new Date().toISOString().split('T')[0],
-            signers: [{ name: 'Ad Soyad', title: 'Genel Başkan' }],
+            signers: [],
             textAlign: 'justify',
             receiverTextAlign: 'left',
             logoUrl: '',
@@ -646,6 +726,143 @@ export default function AdvancedDocumentCreator() {
         }
     };
 
+    // EYP Paketi Oluştur ve Storage'a Kaydet
+    const handleCreateEYP = async (data: DocFormData) => {
+        setGeneratingEYP(true);
+        const user = AdminAuth.getCurrentUser();
+
+        if (!user) {
+            toast.error('Oturum hatası.');
+            setGeneratingEYP(false);
+            return;
+        }
+
+        try {
+            const { EYPBuilder } = await import('@/lib/eyp/package-builder');
+            const { generateDocumentPDF } = await import('@/lib/pdf-generator');
+            const { EYPService } = await import('@/lib/services/eypService');
+
+            // Belge numarası oluştur
+            const year = new Date().getFullYear();
+            const docNumber = await DocumentService.generateNextSequence(data.type, year);
+
+            // 1. Önce belgeyi veritabanına kaydet (EYP oluşturuldu ama henüz imzalanmadı)
+            const { data: savedDoc, error: docError } = await DocumentService.createDocument({
+                type: data.type,
+                status: 'pending_approval', // İmza bekliyor
+                document_number: docNumber,
+                reference_date: new Date(data.date).toISOString(),
+                sender: data.sender_unit,
+                receiver: data.receiver,
+                subject: data.subject,
+                description: data.content,
+                category_code: data.category_code,
+                created_by: user.id,
+
+                // Presentation Fields
+                header_title: data.headerTitle,
+                header_org_name: data.headerOrgName,
+                sender_unit: data.sender_unit,
+                footer_org_name: data.footerOrgName,
+                footer_address: data.footerAddress,
+                footer_contact: data.footerContact,
+                footer_phone: data.footerPhone,
+                decision_number: data.decision_number,
+                logo_url: data.logoUrl,
+                logo_url: data.logoUrl,
+                right_logo_url: data.rightLogoUrl,
+
+                text_align: data.textAlign,
+                receiver_text_align: data.receiverTextAlign,
+
+                // Visibility
+                show_header: data.showHeader,
+                show_date: data.showDate,
+                show_sayi: data.showSayi,
+                show_konu: data.showKonu,
+                show_karar_no: data.showKararNo,
+                show_receiver: data.showReceiver,
+                show_signatures: data.showSignatures,
+                show_footer: data.showFooter,
+
+                // Signers (save as JSONB)
+                signers: data.signers
+            });
+
+            if (docError || !savedDoc) {
+                throw new Error('Belge kaydedilemedi: ' + (docError?.message || 'Bilinmeyen hata'));
+            }
+
+            // 2. PDF Oluştur
+            const pdfBlob = await generateDocumentPDF(savedDoc);
+
+            // 3. Hash hesapla
+            const pdfBuffer = await pdfBlob.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 4. EYP Paketi oluştur
+            const eypBlob = await EYPBuilder.buildPackage({
+                ustYaziPdf: pdfBlob,
+                ustVeri: {
+                    senaryo: 'e-Yazışma Paketi',
+                    bellesikDosya: {
+                        dosyaAdi: 'UstYazi.pdf',
+                        dosyaImzaliAdi: 'UstYazi_imzali.pdf',
+                        mimeTuru: 'application/pdf',
+                        boyut: pdfBlob.size,
+                        ozet: {
+                            algoritma: 'SHA-256',
+                            deger: hashHex
+                        }
+                    },
+                    ustveriDili: 'TR',
+                    belgeNo: docNumber,
+                    tarih: data.date,
+                    konu: data.subject,
+                    gonderen: {
+                        id: '1234567890', // TODO: Kurum ID'si settings'den alınmalı
+                        adi: data.sender_unit || 'Sendika Yönetim',
+                        rol: 'Gonderen'
+                    },
+                    alici: [{
+                        id: '0000000000',
+                        adi: data.receiver || 'İlgili Makama',
+                        rol: 'Alici'
+                    }]
+                },
+                belgeHedef: {
+                    hedefler: [
+                        { hedef: 'urn:mail:alim@kurum.gov.tr', amac: 'Gereği' }
+                    ]
+                }
+            });
+
+            // 5. EYP'yi Storage'a yükle ve metadata kaydet
+            const uploadResult = await EYPService.uploadPackage(
+                savedDoc.id,
+                docNumber,
+                eypBlob,
+                hashHex,
+                user.id
+            );
+
+            if (!uploadResult.success) {
+                throw new Error(uploadResult.error || 'EYP yüklenemedi');
+            }
+
+            toast.success(`EYP paketi oluşturuldu ve kaydedildi: ${docNumber}`);
+            router.push(`/admin/documents/outgoing/${savedDoc.id}`);
+
+        } catch (err: any) {
+            console.error('EYP oluşturma hatası:', err);
+            toast.error('EYP oluşturulurken hata: ' + err.message);
+        } finally {
+            setGeneratingEYP(false);
+        }
+    };
+
     const onSubmit = async (data: DocFormData, status: 'draft' | 'sent') => {
         setLoading(true);
         const user = AdminAuth.getCurrentUser();
@@ -677,7 +894,32 @@ export default function AdvancedDocumentCreator() {
                 subject: data.subject,
                 description: data.content, // HTML or Plain text
                 category_code: data.category_code,
-                created_by: user.id
+                created_by: user.id,
+
+                // Presentation Fields
+                header_title: data.headerTitle,
+                header_org_name: data.headerOrgName,
+                sender_unit: data.sender_unit,
+                footer_org_name: data.footerOrgName,
+                footer_address: data.footerAddress,
+                footer_contact: data.footerContact,
+                footer_phone: data.footerPhone,
+                decision_number: data.decision_number,
+                logo_url: data.logoUrl,
+                right_logo_url: data.rightLogoUrl,
+
+                // Visibility
+                show_header: data.showHeader,
+                show_date: data.showDate,
+                show_sayi: data.showSayi,
+                show_konu: data.showKonu,
+                show_karar_no: data.showKararNo,
+                show_receiver: data.showReceiver,
+                show_signatures: data.showSignatures,
+                show_footer: data.showFooter,
+
+                // Signers (save as JSONB)
+                signers: data.signers
             });
 
             if (error) throw error;
@@ -712,16 +954,32 @@ export default function AdvancedDocumentCreator() {
 
                 <div className="flex items-center space-x-3">
                     <button
+                        onClick={handleSubmit((d) => onSubmit(d, 'draft'))}
+                        disabled={loading || generatingEYP}
+                        className="px-4 py-2 text-slate-700 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 text-sm font-medium"
+                    >
+                        <Save className="w-4 h-4 inline-block mr-2" />
+                        Taslak Kaydet
+                    </button>
+                    <button
                         onClick={() => setShowSaveTemplateModal(true)}
-                        disabled={loading}
+                        disabled={loading || generatingEYP}
                         className="px-4 py-2 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"
                     >
                         <Archive className="w-4 h-4 inline-block mr-2" />
                         Havuza Kaydet
                     </button>
                     <button
+                        onClick={handleSubmit(handleCreateEYP)}
+                        disabled={loading || generatingEYP}
+                        className="px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm disabled:opacity-50"
+                    >
+                        <FileText className="w-4 h-4 inline-block mr-2" />
+                        {generatingEYP ? 'Paket Oluşturuluyor...' : 'EYP Oluştur'}
+                    </button>
+                    <button
                         onClick={handleSubmit((d) => onSubmit(d, 'sent'))}
-                        disabled={loading}
+                        disabled={loading || generatingEYP}
                         className="px-4 py-2 text-white bg-violet-600 rounded-lg hover:bg-violet-700 text-sm font-medium shadow-sm"
                     >
                         <Send className="w-4 h-4 inline-block mr-2" />
@@ -1318,7 +1576,7 @@ export default function AdvancedDocumentCreator() {
                                     >
                                         <option value="">Yetkili Seç...</option>
                                         {availableSigners.map(s => (
-                                            <option key={s.id} value={s.id}>{s.full_name}</option>
+                                            <option key={s.id} value={s.id}>{s.name} ({s.title})</option>
                                         ))}
                                     </select>
                                 )}
@@ -1598,126 +1856,22 @@ export default function AdvancedDocumentCreator() {
 
                     {/* Scrollable Area */}
                     <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-[#e5e7eb]">
-                        {/* A4 Page Container */}
-                        <div
-                            style={{
-                                backgroundColor: 'white',
-                                color: 'black',
-                                transform: `scale(${zoom})`,
-                                transformOrigin: 'top center',
-                                paddingTop: `${margins.top}mm`,
-                                paddingBottom: `${margins.bottom}mm`,
-                                paddingLeft: `${margins.left}mm`,
-                                paddingRight: `${margins.right}mm`,
-                                height: 'max-content'
-                            }}
-                            className="w-[210mm] min-h-[297mm] shadow-[0_4px_24px_rgba(0,0,0,0.1)] text-[12pt] font-serif leading-normal relative transition-all duration-200 printable-content"
-                        >
-
-                            {/* Header */}
-                            {formValues.showHeader !== false && (
-                                <div className="text-center mb-8 border-b-2 border-black pb-4 relative min-h-[100px] flex items-center justify-center">
-                                    {/* Left Logo */}
-                                    {formValues.logoUrl && (
-                                        <img src={formValues.logoUrl} alt="Sol Logo" className="absolute left-0 top-0 h-24 w-auto object-contain" />
-                                    )}
-
-                                    {/* Title Block */}
-                                    <div className="z-10 px-4">
-                                        <h2 style={{ color: 'black' }} className="font-bold text-lg uppercase">{formValues.headerTitle || DEFAULT_HEADER.title}</h2>
-                                        <h3 style={{ color: 'black' }} className="font-bold text-xl uppercase">{formValues.headerOrgName || DEFAULT_HEADER.orgName}</h3>
-                                        <p style={{ color: 'black' }} className="text-sm mt-1 uppercase">{formValues.sender_unit || DEFAULT_HEADER.subUnit}</p>
-                                    </div>
-
-                                    {/* Right Logo */}
-                                    {formValues.rightLogoUrl && (
-                                        <img src={formValues.rightLogoUrl} alt="Sağ Logo" className="absolute right-0 top-0 h-24 w-auto object-contain" />
-                                    )}
-                                </div>
-                            )}
-
-
-                            {/* Meta Data Row */}
-                            <div style={{ color: 'black' }} className="flex justify-between items-start mb-8 font-sans text-[11pt]">
-                                <div className="space-y-1">
-                                    {formValues.showKararNo !== false && formValues.decision_number && (
-                                        <p><span className="font-bold">Karar No:</span> {formValues.decision_number}</p>
-                                    )}
-                                    {formValues.showKonu !== false && (
-                                        <p><span className="font-bold">Konu:</span> {formValues.subject}</p>
-                                    )}
-                                </div>
-                                <div className="text-right space-y-1">
-                                    {formValues.showDate !== false && (
-                                        <p><span className="font-bold">Tarih:</span> {formValues.date ? new Date(formValues.date).toLocaleDateString('tr-TR') : '-'}</p>
-                                    )}
-                                    {formValues.showSayi !== false && (
-                                        <p><span className="font-bold">Sayı:</span> {formValues.category_code ? `${formValues.category_code}-` : ''}TASLAK</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Receiver */}
-                            {formValues.showReceiver !== false && (
-                                <div
-                                    style={{ color: 'black', textAlign: formValues.receiverTextAlign || 'left' }}
-                                    className={`mb-10 font-bold uppercase tracking-wide ${formValues.receiverTextAlign === 'center' || formValues.receiverTextAlign === 'right'
-                                        ? 'pl-0'
-                                        : 'pl-16'
-                                        }`}
-                                >
-                                    {formValues.receiver || '[ALICI BİLGİSİ BURAYA GELECEK]'}
-                                </div>
-                            )}
-
-                            {/* Content */}
-                            <div
-                                style={{ color: 'black', textAlign: formValues.textAlign || 'justify' }}
-                                className="mb-16 indent-12 min-h-[200px]"
-                                dangerouslySetInnerHTML={{
-                                    __html: formatContentForPreview(formValues.content)
+                        <div className="relative transition-all duration-200 printable-content mx-auto">
+                            <A4Preview
+                                document={{
+                                    ...formValues,
+                                    signers: formValues.signers?.map((s: any) => ({
+                                        ...s,
+                                        signature_url: s.signature_url
+                                            ? supabase.storage.from('official-documents').getPublicUrl(s.signature_url).data.publicUrl
+                                            : undefined
+                                    })),
+                                    document_number: formValues.category_code ? `${formValues.category_code}-TASLAK` : 'TASLAK'
                                 }}
+                                zoom={zoom}
+                                margins={margins}
+                                readonly={true}
                             />
-
-                            {/* Signatures */}
-                            {formValues.showSignatures !== false && (
-                                <div style={{ color: 'black' }} className="flex justify-end space-x-12 mt-auto pt-12 pr-4">
-                                    {formValues.signers?.map((signer: Signer, idx: number) => (
-                                        <div key={idx} className="text-center min-w-[200px] relative">
-                                            <div className="relative z-10">
-                                                <p className="font-bold whitespace-nowrap">{signer.name}</p>
-                                                <p className="text-[10pt]">{signer.title}</p>
-                                            </div>
-                                            {/* Signature Image or Space */}
-                                            <div className="h-60 flex items-start justify-center -mt-[82px] relative z-0">
-                                                {signer.signature_url ? (
-                                                    <img
-                                                        src={supabase.storage.from('official-documents').getPublicUrl(signer.signature_url).data.publicUrl}
-                                                        alt="İmza"
-                                                        className="h-full w-auto max-w-[400px] object-contain mix-blend-multiply"
-                                                    />
-                                                ) : (
-                                                    <div className="h-full w-full"></div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Footer Info */}
-                            {formValues.showFooter !== false && (
-                                <div className="absolute bottom-10 left-[25mm] right-[25mm] border-t border-slate-300 pt-2 text-[8pt] text-slate-500 font-sans flex justify-between">
-                                    <div>
-                                        <p>{formValues.footerOrgName || DEFAULT_HEADER.orgName}</p>
-                                        <p>Adres: {formValues.footerAddress || 'Genel Merkez Binası, Ankara'}</p>
-                                    </div>
-                                    <div className='text-right'>
-                                        <p>Bilgi İçin: {formValues.footerContact || 'Genel Sekreterlik'}</p>
-                                        <p>Tel: {formValues.footerPhone || '0312 000 00 00'}</p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
 

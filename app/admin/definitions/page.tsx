@@ -21,30 +21,37 @@ import {
   Shield,
   LayoutGrid,
   MapPin,
-  Edit2
+  Edit2,
+  FileText,
+  PenTool
 } from 'lucide-react';
+import DefaultDocumentSettings from './DefaultDocumentSettings';
+import AuthorizedSignersSettings from './AuthorizedSignersSettings';
 
 type DefinitionMap = Record<DefinitionType, GeneralDefinition[]>;
 
 const createEmptyMap = (): DefinitionMap => ({
   workplace: [],
-  position: []
+  position: [],
+  title: []
 });
 
 interface FormState {
   label: string;
   description: string;
   sort_order: string;
+  user_id?: string;
 }
 
 type FormStateMap = Record<DefinitionType, FormState>;
 
 const createInitialFormState = (): FormStateMap => ({
   workplace: { label: '', description: '', sort_order: '' },
-  position: { label: '', description: '', sort_order: '' }
+  position: { label: '', description: '', sort_order: '' },
+  title: { label: '', description: '', sort_order: '' }
 });
 
-type TabType = DefinitionType | 'roles';
+type TabType = DefinitionType | 'roles' | 'document_settings' | 'authorized_signers';
 
 export default function DefinitionsPage() {
   const router = useRouter();
@@ -57,6 +64,7 @@ export default function DefinitionsPage() {
 
   // Roles State
   const [roles, setRoles] = useState<Role[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]); // For user selection
 
   // Shared State
   const [loading, setLoading] = useState(true);
@@ -82,8 +90,13 @@ export default function DefinitionsPage() {
 
   const loadAllData = async () => {
     setLoading(true);
-    await Promise.all([loadDefinitions(), loadRoles()]);
+    await Promise.all([loadDefinitions(), loadRoles(), loadUsers()]);
     setLoading(false);
+  };
+
+  const loadUsers = async () => {
+    const { data } = await supabase.from('admin_users').select('*').eq('is_active', true).order('full_name');
+    if (data) setUsers(data);
   };
 
   const loadDefinitions = async () => {
@@ -91,7 +104,10 @@ export default function DefinitionsPage() {
       setStatusMessage(null);
       const { data, error } = await supabase
         .from('general_definitions')
-        .select('*')
+        .select(`
+            *,
+            user:admin_users(id, full_name)
+        `)
         .order('type')
         .order('sort_order', { ascending: true })
         .order('label', { ascending: true });
@@ -147,9 +163,8 @@ export default function DefinitionsPage() {
       return;
     }
 
-    const sortOrder = formState[type].sort_order
-      ? Number(formState[type].sort_order)
-      : (definitions[type]?.length || 0) * 10;
+    const maxOrder = definitions[type]?.reduce((max, item) => Math.max(max, item.sort_order), 0) || 0;
+    const sortOrder = maxOrder + 1;
 
     setAddingType(type);
     setStatusMessage(null);
@@ -160,7 +175,8 @@ export default function DefinitionsPage() {
         label,
         description: formState[type].description.trim() || null,
         sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
-        is_active: true
+        is_active: true,
+        user_id: type === 'title' && formState[type].user_id ? formState[type].user_id : null
       });
 
       if (error) {
@@ -373,6 +389,34 @@ export default function DefinitionsPage() {
               {roles.length}
             </span>
           </button>
+
+          {/* Document Settings Tab */}
+          <button
+            onClick={() => setActiveTab('document_settings')}
+            className={`
+              whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2
+              ${activeTab === 'document_settings'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            <FileText className={`w-4 h-4 ${activeTab === 'document_settings' ? 'text-blue-500' : 'text-gray-400'}`} />
+            <span>Varsayılan Belge Ayarları</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('authorized_signers')}
+            className={`
+              whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2
+              ${activeTab === 'authorized_signers'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            <PenTool className={`w-4 h-4 ${activeTab === 'authorized_signers' ? 'text-blue-500' : 'text-gray-400'}`} />
+            <span>İmzacılar</span>
+          </button>
         </nav>
       </div>
 
@@ -406,13 +450,7 @@ export default function DefinitionsPage() {
                       onChange={(e) => handleFormChange(type, 'label', e.target.value)}
                       className="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
-                    <input
-                      type="number"
-                      placeholder="Sıra"
-                      value={formState[type].sort_order}
-                      onChange={(e) => handleFormChange(type, 'sort_order', e.target.value)}
-                      className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+
                     <input
                       type="text"
                       placeholder="Açıklama (opsiyonel)"
@@ -420,6 +458,21 @@ export default function DefinitionsPage() {
                       onChange={(e) => handleFormChange(type, 'description', e.target.value)}
                       className="hidden md:block w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
+
+                    {/* User Selection for Title */}
+                    {type === 'title' && (
+                      <select
+                        value={formState[type].user_id || ''}
+                        onChange={(e) => handleFormChange(type, 'user_id', e.target.value)}
+                        className="w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Kullanıcı Seç...</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.full_name}</option>
+                        ))}
+                      </select>
+                    )}
+
                     <button
                       onClick={() => handleAddDefinition(type)}
                       disabled={addingType === type || !formState[type].label.trim()}
@@ -468,6 +521,15 @@ export default function DefinitionsPage() {
                         </div>
                         {definition.description && (
                           <p className="text-sm text-slate-600 mt-1">{definition.description}</p>
+                        )}
+                        {definition.description && (
+                          <p className="text-sm text-slate-600 mt-1">{definition.description}</p>
+                        )}
+                        {/* Show bound user */}
+                        {definition.user && (
+                          <p className="text-xs text-blue-600 mt-1 flex items-center">
+                            <span className="font-semibold mr-1">Temsilci:</span> {definition.user.full_name}
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center space-x-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -570,7 +632,19 @@ export default function DefinitionsPage() {
             )}
           </section>
         )}
+        {/* Document Settings Tab Content */}
+        {activeTab === 'document_settings' && (
+          <div className="animate-fadeIn">
+            <DefaultDocumentSettings />
+          </div>
+        )}
+        {/* Authorized Signers Tab Content */}
+        {activeTab === 'authorized_signers' && (
+          <div className="animate-fadeIn">
+            <AuthorizedSignersSettings />
+          </div>
+        )}
       </div>
-    </div>
+    </div >
   );
 }
