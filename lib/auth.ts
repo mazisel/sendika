@@ -65,7 +65,7 @@ export class AdminAuth {
         });
 
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Veritabanı bağlantısı zaman aşımına uğradı')), 10000);
+          setTimeout(() => reject(new Error('Veritabanı bağlantısı zaman aşımına uğradı')), 15000);
         });
 
         adminUser = await Promise.race([dbQueryPromise, timeoutPromise]);
@@ -74,12 +74,11 @@ export class AdminAuth {
         // Eğer zaman aşımı hatası değilse ve hata varsa, fallback dene
         // Ancak zaman aşımıysa doğrudan hata ver
         if (err.message === 'Veritabanı bağlantısı zaman aşımına uğradı') {
-          console.error('Login DB Timeout');
-          await supabase.auth.signOut();
-          return { success: false, error: 'Sunucu yanıt vermiyor, lütfen sayfayı yenileyip tekrar deneyin.' };
+          console.warn('Login DB Timeout (RBAC), attempting fallback...');
+          // Don't return immediately, let it fall back to simple query
+        } else {
+          console.warn('RBAC query failed, falling back to simple query:', err);
         }
-
-        console.warn('RBAC query failed, falling back to simple query:', err);
         // Fallback: Eski yapı (Sadece admin_users)
         // Tablolar veya ilişki henüz yoksa bu çalışır
         const { data, error } = await supabase
@@ -99,8 +98,8 @@ export class AdminAuth {
       if (dbError || !adminUser) {
         console.error('Login database error:', dbError);
         // Supabase auth'dan çıkış yap
-        await supabase.auth.signOut();
-        return { success: false, error: 'Admin yetkisi bulunamadı' };
+        supabase.auth.signOut().catch(console.error); // Non-blocking
+        return { success: false, error: 'Kullanıcı bilgileri alınamadı veya yetkiniz yok (Timeout/Error)' };
       }
 
       // İzinleri düzleştir
