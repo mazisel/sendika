@@ -31,8 +31,8 @@ export default function AdminLogin() {
       const result = await AdminAuth.login({ email, password });
 
       if (result.success) {
-        router.push('/admin/dashboard');
-        // Başarılı durumda loading'i kapatma, sayfa yönlenene kadar bekleniyor görünsün
+        // Force hard navigation to clear any stale state
+        window.location.href = '/admin/dashboard';
       } else {
         setError(result.error || 'Giriş başarısız');
         setLoading(false);

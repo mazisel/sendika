@@ -81,18 +81,32 @@ export class AdminAuth {
         }
         // Fallback: Eski yapı (Sadece admin_users)
         // Tablolar veya ilişki henüz yoksa bu çalışır
-        const { data, error } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('email', credentials.email)
-          .eq('is_active', true)
-          .single();
+        try {
+          const fallbackQueryPromise = new Promise(async (resolve, reject) => {
+            const { data, error } = await supabase
+              .from('admin_users')
+              .select('*')
+              .eq('email', credentials.email)
+              .eq('is_active', true)
+              .single();
 
-        if (error) {
-          dbError = error;
-        } else {
+            // Artificial delay to prevent race condition if needed, but usually not needed here
+            if (error) reject(error);
+            else resolve(data);
+          });
+
+          const fallbackTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Fallback DB Timeout')), 5000);
+          });
+
+          const data = await Promise.race([fallbackQueryPromise, fallbackTimeoutPromise]);
           adminUser = data;
+
+        } catch (e) {
+          dbError = e;
         }
+
+
       }
 
       if (dbError || !adminUser) {

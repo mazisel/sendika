@@ -118,8 +118,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
-  const handleLogout = () => {
-    AdminAuth.logout();
+  const handleLogout = async () => {
+    await AdminAuth.logout();
     router.push('/admin/login');
   };
 

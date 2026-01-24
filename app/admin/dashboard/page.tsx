@@ -76,15 +76,23 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    const currentUser = AdminAuth.getCurrentUser();
-    if (!currentUser) {
-      router.push('/admin/login');
-      return;
-    }
-    setUser(currentUser);
-    setLoading(false);
-    loadDashboardStats(currentUser);
-    loadCityStats(currentUser);
+    const loadInitialData = async () => {
+      try {
+        const currentUser = AdminAuth.getCurrentUser();
+        if (!currentUser) {
+          router.push('/admin/login');
+          return;
+        }
+        setUser(currentUser);
+        loadDashboardStats(currentUser);
+        loadCityStats(currentUser);
+      } catch (e) {
+        console.error("Dashboard load error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitialData();
   }, [router]);
 
   const loadCityStats = async (userToUse: AdminUser | null = user) => {
