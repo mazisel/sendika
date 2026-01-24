@@ -769,7 +769,6 @@ export default function AdvancedDocumentCreator() {
                 footer_phone: data.footerPhone,
                 decision_number: data.decision_number,
                 logo_url: data.logoUrl,
-                logo_url: data.logoUrl,
                 right_logo_url: data.rightLogoUrl,
 
                 text_align: data.textAlign,

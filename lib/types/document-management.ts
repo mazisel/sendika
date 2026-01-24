@@ -47,6 +47,8 @@ export interface DMDocument {
     decision_number?: string;
     logo_url?: string;
     right_logo_url?: string;
+    text_align?: 'left' | 'center' | 'right' | 'justify';
+    receiver_text_align?: 'left' | 'center' | 'right' | 'justify';
 
     // Visibility
     show_header?: boolean;

@@ -205,7 +205,8 @@ export default function NewMemberPage() {
   const [documentInputKey, setDocumentInputKey] = useState(0);
   const [definitionOptions, setDefinitionOptions] = useState<Record<DefinitionType, GeneralDefinition[]>>({
     workplace: [],
-    position: []
+    position: [],
+    title: []
   });
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
 
@@ -352,7 +353,8 @@ export default function NewMemberPage() {
 
         const grouped: Record<DefinitionType, GeneralDefinition[]> = {
           workplace: [],
-          position: []
+          position: [],
+          title: []
         };
 
         (data || []).forEach((item) => {

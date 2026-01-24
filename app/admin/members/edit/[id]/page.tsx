@@ -152,7 +152,8 @@ export default function EditMemberPage() {
   const canEditMembershipNumber = currentUser ? PermissionManager.canEditRestrictedFields(currentUser) : false;
   const [definitionOptions, setDefinitionOptions] = useState<Record<DefinitionType, GeneralDefinition[]>>({
     workplace: [],
-    position: []
+    position: [],
+    title: []
   });
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
   const canManageDefinitions = currentUser ? PermissionManager.canManageDefinitions(currentUser) : false;
@@ -309,7 +310,8 @@ export default function EditMemberPage() {
 
         const grouped: Record<DefinitionType, GeneralDefinition[]> = {
           workplace: [],
-          position: []
+          position: [],
+          title: []
         };
 
         (data || []).forEach((item) => {
