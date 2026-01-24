@@ -49,6 +49,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isThemeInitialized, setIsThemeInitialized] = useState(false);
   const lastUpdated = useMemo(() => {
@@ -119,6 +120,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const handleLogout = async () => {
+    setLogoutLoading(true);
     try {
       await AdminAuth.logout();
     } catch (e) {
@@ -621,6 +623,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           className="fixed inset-0 z-20"
           onClick={() => setUserMenuOpen(false)}
         />
+      )}
+
+      {/* Logout Loading Overlay */}
+      {logoutLoading && (
+        <div className="fixed inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-[60] flex items-center justify-center">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Güvenli çıkış yapılıyor...</p>
+          </div>
+        </div>
       )}
     </div>
   );
