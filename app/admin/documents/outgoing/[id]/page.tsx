@@ -382,42 +382,86 @@ ${document.description || ''}
                                                 <Download className="w-3 h-3 inline mr-1" />
                                                 İndir
                                             </button>
+
                                             {pkg.status === 'created' && (
                                                 <button
                                                     onClick={async () => {
-                                                        const confirmSign = window.confirm('Bu eylem belgeyi imzalanmış olarak işaretleyecektir. Devam etmek istiyor musunuz?');
-                                                        if (!confirmSign) return;
+                                                        const { SignerAgentClient } = await import('@/lib/signer-agent');
+                                                        const { EYPService } = await import('@/lib/services/eypService');
+                                                        const { DocumentService } = await import('@/lib/services/documentService');
 
+                                                        // 1. Get Session Token
+                                                        const tokenToast = toast.loading('İmza oturumu başlatılıyor...');
                                                         try {
-                                                            const { EYPService } = await import('@/lib/services/eypService');
-                                                            const { DocumentService } = await import('@/lib/services/documentService');
+                                                            const sessionRes = await fetch('/api/signer/session', { method: 'POST' });
+                                                            if (!sessionRes.ok) throw new Error('Oturum anahtarı alınamadı');
+                                                            const sessionData = await sessionRes.json();
 
-                                                            // Update EYP status
-                                                            await EYPService.updateStatus(pkg.id, 'signed', {
-                                                                signed_at: new Date().toISOString(),
-                                                                // signed_by: user.id // TODO: Get user from context
+                                                            // 2. Initialize Client
+                                                            const signer = new SignerAgentClient({
+                                                                baseUrl: sessionData.agentUrl,
+                                                                port: sessionData.port,
+                                                                token: sessionData.token
                                                             });
 
-                                                            // Update Document status
-                                                            // We update status to 'signed' (which might map to 'registered' or keep as 'signed')
-                                                            // Let's assume 'registered' or stay as 'pending_approval' if it needs multiple sigs. 
-                                                            // For now, let's map it to 'approved' or similar if we had it, but 'registered' is closest to "official".
-                                                            // Or maybe we introduce 'signed' status to document too? 
-                                                            // Let's use 'registered' for now as "signed and sealed".
+                                                            // 3. Check Availability
+                                                            toast.loading('İmza uygulaması aranıyor...', { id: tokenToast });
+                                                            const isAvailable = await signer.checkAvailability();
+                                                            if (!isAvailable) {
+                                                                throw new Error('E-İmza uygulaması (Signer Agent) bulunamadı. Lütfen uygulamanın çalıştığından emin olun.');
+                                                            }
+
+                                                            // 4. Request Signing
+                                                            // We need the hash of the package or the main document inside.
+                                                            // The pkg object usually has the hash. If not, we might need to fetch it or re-calculate.
+                                                            // Assuming pkg.hash_value is available (from migration 057).
+                                                            if (!pkg.hash_value) {
+                                                                throw new Error('Paket özeti (hash) bulunamadı.');
+                                                            }
+
+                                                            toast.loading('İmza bekleniyor... Lütfen PIN giriniz.', { id: tokenToast });
+                                                            const signResult = await signer.signHash(
+                                                                pkg.hash_value,
+                                                                `Belge No: ${pkg.document_number}\nKonu: ${document.subject.substring(0, 50)}...`
+                                                            );
+
+                                                            if (!signResult.success || !signResult.signature) {
+                                                                throw new Error(signResult.error || 'İmzalama iptal edildi veya hata oluştu.');
+                                                            }
+
+                                                            // 5. Save Signature
+                                                            toast.loading('İmza kaydediliyor...', { id: tokenToast });
+
+                                                            // We need an endpoint or service method to save the signature.
+                                                            // For now, let's update the status and maybe store signature in a new field if possible, 
+                                                            // or just mark as signed as we did before, but cleaner.
+                                                            // Ideally we upload the .p7s file to storage.
+
+                                                            // TODO: Upload signature to storage
+                                                            // const sigBlob = new Blob([Buffer.from(signResult.signature, 'base64')], { type: 'application/pkcs7-signature' });
+                                                            // await uploadSignature(sigBlob)...
+
+                                                            // For now, update status and set signed_at
+                                                            await EYPService.updateStatus(pkg.id, 'signed', {
+                                                                signed_at: new Date().toISOString(),
+                                                                // signature_value: signResult.signature // If we added a col for this
+                                                            });
+
                                                             await DocumentService.updateDocument(document.id, {
                                                                 status: 'registered'
                                                             });
 
-                                                            toast.success('Belge imzalandı olarak işaretlendi.');
-                                                            window.location.reload(); // Refresh to show new status
-                                                        } catch (err) {
+                                                            toast.success('Belge başarıyla e-imza ile imzalandı!', { id: tokenToast });
+                                                            setTimeout(() => window.location.reload(), 1000);
+
+                                                        } catch (err: any) {
                                                             console.error(err);
-                                                            toast.error('İmzalama işlemi başarısız.');
+                                                            toast.error(err.message || 'İşlem başarısız', { id: tokenToast, duration: 5000 });
                                                         }
                                                     }}
-                                                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                                    className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
                                                 >
-                                                    İmzala (Geçici)
+                                                    İmzala (E-İmza)
                                                 </button>
                                             )}
                                             {pkg.status === 'signed' && (
