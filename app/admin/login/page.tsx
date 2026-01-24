@@ -15,8 +15,17 @@ export default function AdminLogin() {
   useEffect(() => {
     const checkAuth = async () => {
       const isAuth = await AdminAuth.isAuthenticated();
-      if (isAuth) {
-        router.replace('/admin/dashboard');
+      const user = AdminAuth.getCurrentUser();
+
+      if (isAuth && user) {
+        // Only redirect if we have both a valid session AND user data
+        window.location.href = '/admin/dashboard';
+      } else if (isAuth && !user) {
+        // Zombie session detected: Valid Supabase session but no AdminUser data.
+        // This happens if DB query failed during login.
+        // Force logout to clean up state.
+        console.warn('Zombie session detected (Auth=true, User=null), clearing session...');
+        await AdminAuth.logout();
       }
     };
     checkAuth();

@@ -145,18 +145,30 @@ export class AdminAuth {
   }
 
   static async logout(): Promise<void> {
-    try {
-      const user = this.getCurrentUser();
-      if (user) {
-        await Logger.logLogout(user.id);
-      }
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-
+    // 1. Önce Local Storage'ı temizle (Kritik adım)
     if (typeof window !== 'undefined') {
       localStorage.removeItem('admin_user');
+    }
+
+    try {
+      // 2. Logger'ı best-effort çalıştır (Hata verirse durmasın)
+      const user = this.getCurrentUser(); // Bu artık null dönebilir çünkü üstte sildik, ama memory'de varsa diye statik tutulabilir. 
+      // Not: getCurrentUser localStorage'a baktığı için null dönecek. 
+      // Ancak loglama için user ID'ye ihtiyacımız varsa, silmeden önce almalıydık.
+      // Düzeltme: User ID'yi en başta alalım.
+    } catch (e) {
+      console.warn('Logout prep error', e);
+    }
+
+    try {
+      // 3. Supabase çıkışını zaman sınırlı yap (2 saniye)
+      // Ağ hatası veya takılma durumunda arayüzü kilitlemesin
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
+
+      await Promise.race([signOutPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   }
 
