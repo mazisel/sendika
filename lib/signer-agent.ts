@@ -21,6 +21,7 @@ export class SignerAgentClient {
      * Checks if the agent is reachable.
      */
     async checkAvailability(): Promise<boolean> {
+        console.log(`[SignerAgent] Checking availability at ${this.config.baseUrl}...`);
         try {
             // Usually agents have a /health or root endpoint
             const res = await fetch(`${this.config.baseUrl}/api/status`, { // Guessing endpoint based on common patterns, user guide didn't specify.

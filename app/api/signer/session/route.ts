@@ -15,7 +15,8 @@ export async function POST(req: Request) {
 
         // Configuration
         const secret = process.env.SIGNER_AGENT_SECRET || 'DEFAULT_SECRET_CHANGE_ME';
-        const port = parseInt(process.env.SIGNER_AGENT_PORT || '51234');
+        // User requested port 51695
+        const port = parseInt(process.env.SIGNER_AGENT_PORT || '51695');
 
         // Generate Session Token (HMAC SHA256 of data)
         // The payload can be essentially anything the agent and backend agree on, 
