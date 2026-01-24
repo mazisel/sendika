@@ -119,8 +119,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const handleLogout = async () => {
-    await AdminAuth.logout();
-    router.push('/admin/login');
+    try {
+      await AdminAuth.logout();
+    } catch (e) {
+      console.error("Logout error", e);
+    } finally {
+      window.location.href = '/admin/login';
+    }
   };
 
   // Expanded menus state

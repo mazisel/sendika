@@ -53,8 +53,8 @@ export class AdminAuth {
                   )
                 )
               `)
-              .eq('email', credentials.email)
-              .eq('is_active', true)
+              .eq('id', authData.user.id) // Use ID here too for consistency if possible, but keep email for now as per logic, or switch to ID? Using ID is better if we have it.
+              //.eq('email', credentials.email) 
               .single();
 
             if (error) reject(error);
@@ -82,15 +82,14 @@ export class AdminAuth {
         // Fallback: Eski yapı (Sadece admin_users)
         // Tablolar veya ilişki henüz yoksa bu çalışır
         try {
+          console.log('Fallback query for User ID:', authData.user.id);
           const fallbackQueryPromise = new Promise(async (resolve, reject) => {
             const { data, error } = await supabase
               .from('admin_users')
               .select('*')
-              .eq('email', credentials.email)
-              .eq('is_active', true)
+              .eq('id', authData.user.id) // Query by ID is faster and safer
               .single();
 
-            // Artificial delay to prevent race condition if needed, but usually not needed here
             if (error) reject(error);
             else resolve(data);
           });
