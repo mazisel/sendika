@@ -26,7 +26,13 @@ export class AdminAuth {
       });
 
       if (authError || !authData.user) {
-        return { success: false, error: 'E-posta veya şifre hatalı' };
+        console.error('Supabase Auth Error:', authError);
+        // Debug için detaylı hata
+        let errorMessage = 'E-posta veya şifre hatalı';
+        if (authError?.message) {
+          errorMessage += ` (${authError.message})`;
+        }
+        return { success: false, error: errorMessage };
       }
 
       // Admin kullanıcı bilgilerini al (Rol detaylarıyla)

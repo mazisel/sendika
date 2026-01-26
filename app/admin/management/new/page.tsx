@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { AdminAuth } from '@/lib/auth'
@@ -9,9 +9,12 @@ import { Logger } from '@/lib/logger'
 import { ArrowLeft, Upload, User } from 'lucide-react'
 import Link from 'next/link'
 
+import { GeneralDefinition } from '@/lib/types'
+
 export default function NewManagementPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [titles, setTitles] = useState<GeneralDefinition[]>([])
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -21,6 +24,26 @@ export default function NewManagementPage() {
     bio: '',
     is_active: true
   })
+
+  useEffect(() => {
+    loadTitles()
+  }, [])
+
+  const loadTitles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('general_definitions')
+        .select('*')
+        .eq('type', 'title')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      if (error) throw error
+      setTitles(data || [])
+    } catch (error) {
+      console.error('Unvanlar yüklenirken hata:', error)
+    }
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -155,15 +178,25 @@ export default function NewManagementPage() {
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                 Ünvan *
               </label>
-              <input
-                type="text"
+              <select
                 id="title"
                 required
-                placeholder="Örn: Başkan, Genel Sekreter, Yönetim Kurulu Üyesi"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              />
+              >
+                <option value="">Seçiniz...</option>
+                {titles.map((t) => (
+                  <option key={t.id} value={t.label}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              {titles.length === 0 && (
+                <p className="mt-1 text-xs text-red-500">
+                  Kayıtlı unvan bulunamadı. Lütfen "Tanımlamalar" sayfasından unvan ekleyin.
+                </p>
+              )}
             </div>
 
             {/* Sıra */}
@@ -175,6 +208,7 @@ export default function NewManagementPage() {
                 type="number"
                 id="position_order"
                 min="0"
+                onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.position_order}
                 onChange={(e) => setFormData({ ...formData, position_order: parseInt(e.target.value) || 0 })}

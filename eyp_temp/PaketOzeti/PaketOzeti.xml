@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PaketOzeti xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Id="9CE14C62-867E-4F38-84CB-32359EE35A73" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+  <Reference URI="/BelgeHedef/BelgeHedef.xml" Type="http://eyazisma.dpt/bilesen#dahili">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>kc4+ogscYYydA8W8k3WBb8F5NMaoWv5XMdzFGUkbLgc=</DigestValue>
+  </Reference>
+  <Reference URI="/UstYazi/509-357-f5cea559-1769150834276.pdf" Type="http://eyazisma.dpt/bilesen#dahili">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>E7pCkBls6uUG56yRCuRBWJ2IuMsRE5nXFo58i4qg2Ic=</DigestValue>
+  </Reference>
+  <Reference URI="/Ustveri/Ustveri.xml" Type="http://eyazisma.dpt/bilesen#dahili">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>XGkVDlrH19EuIIKN7PpVVakEd/6v4pPH5WDzeDq7Vuk=</DigestValue>
+  </Reference>
+</PaketOzeti>

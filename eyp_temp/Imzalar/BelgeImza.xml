@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BelgeImza xmlns:tipler="urn:dpt:eyazisma:schema:xsd:Tipler-1" xmlns="urn:dpt:eyazisma:schema:xsd:BelgeImza-1">
+  <tipler:ImzaListesi>
+    <tipler:Imza>
+      <tipler:Imzalayan>
+        <tipler:Kisi>
+          <tipler:IlkAdi>Murat</tipler:IlkAdi>
+          <tipler:Soyadi>ÇETİN</tipler:Soyadi>
+          <tipler:Unvan>Genel Başkan Yardımcısı</tipler:Unvan>
+        </tipler:Kisi>
+      </tipler:Imzalayan>
+      <tipler:Makam>Genel Başkan Yardımcısı</tipler:Makam>
+      <tipler:Amac languageID="TR">İmzalama</tipler:Amac>
+      <tipler:Tarih>2026-01-22T21:00:00Z</tipler:Tarih>
+    </tipler:Imza>
+  </tipler:ImzaListesi>
+</BelgeImza>

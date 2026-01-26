@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Printer, Download, Share2, FileText, Calendar, User, Building, Paperclip, Clock } from 'lucide-react';
+import { ArrowLeft, Printer, Download, Share2, FileText, Calendar, User, Building, Paperclip, Clock, Settings } from 'lucide-react';
 import A4Preview from '@/components/ui/A4Preview';
 import { DocumentService } from '@/lib/services/documentService';
 import { DMDocument, DMAttachment } from '@/lib/types/document-management';
@@ -53,18 +53,26 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
 
     const [generatingEYP, setGeneratingEYP] = useState(false);
     const [generatingPDF, setGeneratingPDF] = useState(false);
+    const [signerPort, setSignerPort] = useState('51695'); // Default port
+    const [showPortConfig, setShowPortConfig] = useState(false);
 
     const handleDownloadEYP = async () => {
         if (!document) return;
 
         try {
             setGeneratingEYP(true);
+            console.log('[EYP] Starting EYP generation...');
+            console.log('[EYP] Document:', document);
+            
             const { EYPBuilder } = await import('@/lib/eyp/package-builder');
             const fileSaver = await import('file-saver');
             const { generateDocumentPDF } = await import('@/lib/pdf-generator');
+            console.log('[EYP] Modules loaded');
 
             // 1. Generate PDF (UstYazi)
+            console.log('[EYP] Generating PDF...');
             const pdfBlob = await generateDocumentPDF(document);
+            console.log('[EYP] PDF generated, size:', pdfBlob.size);
 
             // 2. Fetch Attachments Content
             const attachmentFiles = await Promise.all(attachments.map(async (att) => {
@@ -90,11 +98,59 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
 
             // 3. Generate Hash for PDF
             const pdfBuffer = await pdfBlob.arrayBuffer();
-            const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            let hashHex: string;
+            
+            // crypto.subtle is only available in secure contexts (HTTPS or localhost)
+            if (typeof crypto !== 'undefined' && crypto.subtle) {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                // Fallback: Use simple hash calculation for non-secure contexts
+                // Note: For production, always use HTTPS
+                console.warn('crypto.subtle not available (non-secure context). Using fallback hash.');
+                const bytes = new Uint8Array(pdfBuffer);
+                let hash = 0;
+                for (let i = 0; i < bytes.length; i++) {
+                    hash = ((hash << 5) - hash + bytes[i]) | 0;
+                }
+                // Generate a pseudo-hash (NOT cryptographically secure - only for dev)
+                hashHex = Math.abs(hash).toString(16).padStart(64, '0');
+            }
 
-            // 4. Build Package
+            // 4. Get ALL Signers Info from document
+            const imzaBilgileri = (document.signers || []).map((signer: any) => {
+                // Parse name - try to split into first/last name
+                const nameParts = (signer.name || '').trim().split(' ');
+                let ilkAdi = 'Yetkili';
+                let soyadi = '';
+                
+                if (nameParts.length > 1) {
+                    ilkAdi = nameParts[0];
+                    soyadi = nameParts.slice(1).join(' ');
+                } else if (nameParts.length === 1 && nameParts[0]) {
+                    ilkAdi = nameParts[0];
+                }
+                
+                const unvan = signer.title || 'Yetkili';
+                
+                return {
+                    ilkAdi,
+                    soyadi,
+                    unvan,
+                    makam: unvan
+                };
+            });
+            
+            console.log('[EYP] Signers info:', imzaBilgileri);
+
+            // 5. Build Package
+            console.log('[EYP] Building EYP package...');
+            console.log('[EYP] Config:', {
+                belgeNo: document.document_number,
+                tarih: document.reference_date,
+                konu: document.subject
+            });
             const eypBlob = await EYPBuilder.buildPackage({
                 ustYaziPdf: pdfBlob,
                 ustVeri: {
@@ -126,13 +182,22 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
                 },
                 belgeHedef: {
                     hedefler: [
-                        { hedef: 'urn:mail:alim@kurum.gov.tr', amac: 'Gereği' }
+                        { hedef: document.receiver || 'İlgili Makama', amac: 'Gereği' }
                     ]
                 },
+                imzaBilgileri: imzaBilgileri.length > 0 ? imzaBilgileri : undefined,
                 attachments: validAttachments
             });
 
-            fileSaver.saveAs(eypBlob, `${document.document_number.replace(/[\/\\]/g, '_')}.eyp`);
+            console.log('[EYP] EYP blob created, size:', eypBlob.size);
+            
+            if (eypBlob.size === 0) {
+                throw new Error('EYP blob is empty!');
+            }
+            
+            const fileName = `${document.document_number.replace(/[\/\\]/g, '_')}.eyp`;
+            console.log('[EYP] Saving as:', fileName);
+            fileSaver.saveAs(eypBlob, fileName);
             toast.success('EYP paketi başarıyla indirildi');
 
         } catch (error) {
@@ -384,85 +449,101 @@ ${document.description || ''}
                                             </button>
 
                                             {pkg.status === 'created' && (
-                                                <button
-                                                    onClick={async () => {
-                                                        const { SignerAgentClient } = await import('@/lib/signer-agent');
-                                                        const { EYPService } = await import('@/lib/services/eypService');
-                                                        const { DocumentService } = await import('@/lib/services/documentService');
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={async () => {
+                                                                const { SignerAgentClient } = await import('@/lib/signer-agent');
+                                                                const { EYPService } = await import('@/lib/services/eypService');
+                                                                const { DocumentService } = await import('@/lib/services/documentService');
 
-                                                        // 1. Get Session Token
-                                                        const tokenToast = toast.loading('İmza oturumu başlatılıyor...');
-                                                        try {
-                                                            const sessionRes = await fetch('/api/signer/session', { method: 'POST' });
-                                                            if (!sessionRes.ok) throw new Error('Oturum anahtarı alınamadı');
-                                                            const sessionData = await sessionRes.json();
+                                                                try {
+                                                                    const targetPort = parseInt(signerPort) || 51695;
 
-                                                            // 2. Initialize Client
-                                                            const signer = new SignerAgentClient({
-                                                                baseUrl: sessionData.agentUrl,
-                                                                port: sessionData.port,
-                                                                token: sessionData.token
-                                                            });
+                                                                    // Token Fetcher Function
+                                                                    const getToken = async () => {
+                                                                        const sessionRes = await fetch('/api/signer/session', { method: 'POST' });
+                                                                        if (!sessionRes.ok) throw new Error('Oturum anahtarı alınamadı');
+                                                                        const sessionData = await sessionRes.json();
+                                                                        return sessionData.token;
+                                                                    };
 
-                                                            // 3. Check Availability
-                                                            toast.loading('İmza uygulaması aranıyor...', { id: tokenToast });
-                                                            const isAvailable = await signer.checkAvailability();
-                                                            if (!isAvailable) {
-                                                                throw new Error('E-İmza uygulaması (Signer Agent) bulunamadı. Lütfen uygulamanın çalıştığından emin olun.');
-                                                            }
+                                                                    const signer = new SignerAgentClient({
+                                                                        baseUrl: `http://127.0.0.1:${targetPort}`,
+                                                                        port: targetPort,
+                                                                        getToken: getToken
+                                                                    });
 
-                                                            // 4. Request Signing
-                                                            // We need the hash of the package or the main document inside.
-                                                            // The pkg object usually has the hash. If not, we might need to fetch it or re-calculate.
-                                                            // Assuming pkg.hash_value is available (from migration 057).
-                                                            if (!pkg.hash_value) {
-                                                                throw new Error('Paket özeti (hash) bulunamadı.');
-                                                            }
+                                                                    // Check Availability
+                                                                    const tokenToast = toast.loading(`Uygulama aranıyor (Port: ${targetPort})...`);
+                                                                    const isAvailable = await signer.checkAvailability();
+                                                                    if (!isAvailable) {
+                                                                        throw new Error(`Signer Agent bulunamadı (Port: ${targetPort}). Lütfen portu kontrol edin veya uygulamanın çalıştığından emin olun.`);
+                                                                    }
 
-                                                            toast.loading('İmza bekleniyor... Lütfen PIN giriniz.', { id: tokenToast });
-                                                            const signResult = await signer.signHash(
-                                                                pkg.hash_value,
-                                                                `Belge No: ${pkg.document_number}\nKonu: ${document.subject.substring(0, 50)}...`
-                                                            );
+                                                                    // Request Signing
+                                                                    if (!pkg.hash_value) {
+                                                                        throw new Error('Paket özeti (hash) bulunamadı.');
+                                                                    }
 
-                                                            if (!signResult.success || !signResult.signature) {
-                                                                throw new Error(signResult.error || 'İmzalama iptal edildi veya hata oluştu.');
-                                                            }
+                                                                    toast.loading('İmza bekleniyor... Lütfen PIN giriniz.', { id: tokenToast });
+                                                                    const signResult = await signer.signHash(
+                                                                        pkg.hash_value,
+                                                                        {
+                                                                            number: pkg.document_number || document.document_number,
+                                                                            date: new Date().toISOString().split('T')[0],
+                                                                            subject: document.subject,
+                                                                            recipient: document.receiver || undefined
+                                                                        }
+                                                                    );
 
-                                                            // 5. Save Signature
-                                                            toast.loading('İmza kaydediliyor...', { id: tokenToast });
+                                                                    if (!signResult.success || !signResult.signature) {
+                                                                        throw new Error(signResult.error || 'İmzalama iptal edildi veya hata oluştu.');
+                                                                    }
 
-                                                            // We need an endpoint or service method to save the signature.
-                                                            // For now, let's update the status and maybe store signature in a new field if possible, 
-                                                            // or just mark as signed as we did before, but cleaner.
-                                                            // Ideally we upload the .p7s file to storage.
+                                                                    // Save Signature
+                                                                    toast.loading('İmza kaydediliyor...', { id: tokenToast });
 
-                                                            // TODO: Upload signature to storage
-                                                            // const sigBlob = new Blob([Buffer.from(signResult.signature, 'base64')], { type: 'application/pkcs7-signature' });
-                                                            // await uploadSignature(sigBlob)...
+                                                                    await EYPService.updateStatus(pkg.id, 'signed', {
+                                                                        signed_at: new Date().toISOString()
+                                                                    });
 
-                                                            // For now, update status and set signed_at
-                                                            await EYPService.updateStatus(pkg.id, 'signed', {
-                                                                signed_at: new Date().toISOString(),
-                                                                // signature_value: signResult.signature // If we added a col for this
-                                                            });
+                                                                    await DocumentService.updateDocument(document.id, {
+                                                                        status: 'registered'
+                                                                    });
 
-                                                            await DocumentService.updateDocument(document.id, {
-                                                                status: 'registered'
-                                                            });
+                                                                    toast.success('Belge başarıyla e-imza ile imzalandı!', { id: tokenToast });
+                                                                    setTimeout(() => window.location.reload(), 1000);
 
-                                                            toast.success('Belge başarıyla e-imza ile imzalandı!', { id: tokenToast });
-                                                            setTimeout(() => window.location.reload(), 1000);
-
-                                                        } catch (err: any) {
-                                                            console.error(err);
-                                                            toast.error(err.message || 'İşlem başarısız', { id: tokenToast, duration: 5000 });
-                                                        }
-                                                    }}
-                                                    className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
-                                                >
-                                                    İmzala (E-İmza)
-                                                </button>
+                                                                } catch (err: any) {
+                                                                    console.error(err);
+                                                                    toast.error(err.message || 'İşlem başarısız');
+                                                                }
+                                                            }}
+                                                            className="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex-1"
+                                                        >
+                                                            İmzala (E-İmza)
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setShowPortConfig(!showPortConfig)}
+                                                            className="p-1 hover:bg-slate-200 rounded text-slate-500"
+                                                            title="Port Ayarı"
+                                                        >
+                                                            <Settings className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                    {showPortConfig && (
+                                                        <div className="flex items-center gap-1 bg-white p-1 rounded border border-slate-200">
+                                                            <span className="text-[10px] text-slate-500">Port:</span>
+                                                            <input
+                                                                type="text"
+                                                                value={signerPort}
+                                                                onChange={(e) => setSignerPort(e.target.value)}
+                                                                className="w-12 text-xs border rounded px-1 h-5"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                             {pkg.status === 'signed' && (
                                                 <button
@@ -507,7 +588,7 @@ ${document.description || ''}
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 

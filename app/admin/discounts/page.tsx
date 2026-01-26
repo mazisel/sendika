@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit, Trash2, MapPin, Globe, ExternalLink } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, MapPin, Globe, ExternalLink, Clock } from 'lucide-react';
 import DiscountModal from '@/components/discounts/DiscountModal';
 import Image from 'next/image';
 
@@ -17,6 +17,7 @@ interface Discount {
     image_url: string;
     is_active: boolean;
     phone: string;
+    end_date?: string;
 }
 
 export default function AdminDiscountsPage() {
@@ -140,6 +141,12 @@ export default function AdminDiscountsPage() {
                                         <div className="flex items-center text-sm text-gray-500 dark:text-slate-500">
                                             <MapPin className="w-4 h-4 mr-2" />
                                             {discount.city} {discount.district && `/ ${discount.district}`}
+                                        </div>
+                                    )}
+                                    {discount.end_date && (
+                                        <div className="flex items-center text-sm text-amber-600 dark:text-amber-400">
+                                            <Clock className="w-4 h-4 mr-2" />
+                                            Son Geçerlilik: {new Date(discount.end_date).toLocaleDateString('tr-TR')}
                                         </div>
                                     )}
                                     {discount.website_url && (

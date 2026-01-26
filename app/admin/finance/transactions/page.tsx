@@ -406,7 +406,8 @@ export default function TransactionsPage() {
                                                         type="number"
                                                         min="0"
                                                         step="0.01"
-                                                        className="w-full px-2 py-1 border rounded outline-none text-right"
+                                                        onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
+                                                        className="w-full px-2 py-1 border rounded outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         value={entry.debit}
                                                         onChange={e => handleEntryChange(index, 'debit', parseFloat(e.target.value) || 0)}
                                                         disabled={entry.credit > 0}
@@ -417,7 +418,8 @@ export default function TransactionsPage() {
                                                         type="number"
                                                         min="0"
                                                         step="0.01"
-                                                        className="w-full px-2 py-1 border rounded outline-none text-right"
+                                                        onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
+                                                        className="w-full px-2 py-1 border rounded outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         value={entry.credit}
                                                         onChange={e => handleEntryChange(index, 'credit', parseFloat(e.target.value) || 0)}
                                                         disabled={entry.debit > 0}

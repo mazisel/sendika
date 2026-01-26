@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<NihaiOzet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Id="9CE14C62-867E-4F38-84CB-32359EE35A73" xmlns="urn:dpt:eyazisma:schema:xsd:NihaiOzet-1">
+  <Reference URI="/BelgeHedef/BelgeHedef.xml" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>kc4+ogscYYydA8W8k3WBb8F5NMaoWv5XMdzFGUkbLgc=</DigestValue>
+  </Reference>
+  <Reference URI="/Imzalar/BelgeImza.xml" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>nS9EfiwdpT2Ay32OMgPRLniPYtidzkrAAPwA2FSA4fU=</DigestValue>
+  </Reference>
+  <Reference URI="/UstYazi/509-357-f5cea559-1769150834276.pdf" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>E7pCkBls6uUG56yRCuRBWJ2IuMsRE5nXFo58i4qg2Ic=</DigestValue>
+  </Reference>
+  <Reference URI="/Ustveri/Ustveri.xml" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>XGkVDlrH19EuIIKN7PpVVakEd/6v4pPH5WDzeDq7Vuk=</DigestValue>
+  </Reference>
+  <Reference URI="/PaketOzeti/PaketOzeti.xml" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>bVuGhd1l0IU7OwEPT9ViZCyivX0Y03W2O+inPOdozh4=</DigestValue>
+  </Reference>
+  <Reference URI="/Imzalar/ImzaCades.imz" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>73ZSwCwjU5sVRy7a4LGmoy8tBWtvQQiz5qQTYKvraKg=</DigestValue>
+  </Reference>
+  <Reference URI="/package/services/metadata/core-properties/e4f10b8943654880bc081a6d355d8e37.psmdcp" Type="http://eyazisma.dpt/bilesen#dahili" xmlns="urn:dpt:eyazisma:schema:xsd:PaketOzeti-1">
+    <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+    <DigestValue>pjkViF9gyP8H9+NNWmhJxwDIfCgIV72MS81HgDBjsFo=</DigestValue>
+  </Reference>
+</NihaiOzet>

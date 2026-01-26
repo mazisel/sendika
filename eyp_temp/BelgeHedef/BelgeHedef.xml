@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BelgeHedef xmlns:tipler="urn:dpt:eyazisma:schema:xsd:Tipler-1" xmlns="urn:dpt:eyazisma:schema:xsd:BelgeHedef-1">
+  <tipler:HedefListesi>
+    <tipler:Hedef>
+      <tipler:KurumKurulus>
+        <tipler:KKK>97457263</tipler:KKK>
+        <tipler:Adi languageID="TR">Bayraklı Belediye Başkanlığı</tipler:Adi>
+        <tipler:IletisimBilgisi>
+          <tipler:Telefon>02324772000</tipler:Telefon>
+          <tipler:EPosta>iletisim@bayrakli.bel.tr</tipler:EPosta>
+          <tipler:Adres languageID="TR">Anadolu Cad. No: 125  BAYRAKLI/İZMİR</tipler:Adres>
+          <tipler:Il languageID="TR">İzmir</tipler:Il>
+          <tipler:Ilce languageID="TR">Bayraklı</tipler:Ilce>
+          <tipler:Ulke languageID="TR">Türkiye</tipler:Ulke>
+        </tipler:IletisimBilgisi>
+      </tipler:KurumKurulus>
+    </tipler:Hedef>
+  </tipler:HedefListesi>
+</BelgeHedef>

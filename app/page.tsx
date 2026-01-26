@@ -332,25 +332,25 @@ export default function HomePage() {
                       switch (type) {
                         case 'urgent':
                           return (
-                            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-lg text-white mr-4">
+                            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-lg text-white mr-4 flex-shrink-0">
                               ❗
                             </div>
                           )
                         case 'general':
                           return (
-                            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-base mr-4">
+                            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-base mr-4 flex-shrink-0">
                               📢
                             </div>
                           )
                         case 'info':
                           return (
-                            <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center text-base mr-4">
+                            <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center text-base mr-4 flex-shrink-0">
                               ✅
                             </div>
                           )
                         default:
                           return (
-                            <div className="w-9 h-9 bg-yellow-500 rounded-full flex items-center justify-center text-base mr-4">
+                            <div className="w-9 h-9 bg-yellow-500 rounded-full flex items-center justify-center text-base mr-4 flex-shrink-0">
                               ⚠️
                             </div>
                           )
@@ -393,11 +393,11 @@ export default function HomePage() {
                       >
                         <div className="flex items-start">
                           {getTypeIcon(announcement.type)}
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <h4 className={`font-semibold ${colors.title} mb-2 ${isUrgent ? 'text-lg' : ''}`}>
                               {announcement.title}
                             </h4>
-                            <p className={`${colors.content} text-sm md:text-base whitespace-pre-wrap break-words ${isUrgent ? 'mb-3' : ''}`}>
+                            <p className={`${colors.content} text-sm md:text-base whitespace-pre-wrap break-words break-all ${isUrgent ? 'mb-3' : ''}`}>
                               {announcement.content}
                             </p>
                             <div className="flex items-center justify-between mt-3 text-xs md:text-sm text-gray-500">

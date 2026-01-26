@@ -13,6 +13,7 @@ import { cityOptions as cities } from '@/lib/cities';
 import { Member } from '@/lib/types';
 import { formatDateSafe } from '@/lib/dateUtils';
 import { supabase } from '@/lib/supabase';
+import { getDistrictsByCity } from '@/lib/districts';
 
 interface EditMemberModalProps {
     member: Member;
@@ -53,6 +54,7 @@ const InputField = ({
                 onChange={handleChange}
                 required={required}
                 disabled={disabled}
+                onKeyDown={(e) => type === 'number' && ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                 className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800"
                 {...rest}
             />
@@ -69,6 +71,20 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
 
     // Form State
     const [formData, setFormData] = useState<Partial<Member>>({});
+
+    // Calculate districts based on selected city
+    const currentDistricts = formData.city ? getDistrictsByCity(formData.city) : [];
+
+    // Clear invalid district when city changes
+    useEffect(() => {
+        if (formData.city && formData.district) {
+            // Check if current district is valid for selected city
+            // currentDistricts is already derived from existing city
+            if (!currentDistricts.includes(formData.district)) {
+                setFormData(prev => ({ ...prev, district: '' }));
+            }
+        }
+    }, [formData.city]);
 
     // Definitions State
     const [workplaces, setWorkplaces] = useState<any[]>([]);
@@ -285,7 +301,7 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                         { value: 'Kadın', label: 'Kadın' }
                                     ]} />
                                     <InputField formData={formData} handleChange={handleChange} label="Doğum Tarihi" name="birth_date" type="date" icon={Calendar} />
-                                    <InputField formData={formData} handleChange={handleChange} label="Doğum Yeri" name="birth_place" icon={MapPin} />
+                                    <InputField formData={formData} handleChange={handleChange} label="Doğum Yeri" name="birth_place" icon={MapPin} options={cities.map((c: any) => ({ value: c.name, label: c.name }))} />
                                     <InputField formData={formData} handleChange={handleChange} label="Baba Adı" name="father_name" icon={User} />
                                     <InputField formData={formData} handleChange={handleChange} label="Anne Adı" name="mother_name" icon={User} />
                                     <InputField formData={formData} handleChange={handleChange} label="Medeni Durum" name="marital_status" icon={Heart} options={[
@@ -328,8 +344,8 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <InputField formData={formData} handleChange={handleChange} label="İl" name="city" icon={MapPin} disabled={!canEditBranch} options={cities.map(c => ({ value: c.name, label: c.name }))} />
-                                        <InputField formData={formData} handleChange={handleChange} label="İlçe" name="district" icon={MapPin} />
+                                        <InputField formData={formData} handleChange={handleChange} label="İl" name="city" icon={MapPin} disabled={!canEditBranch} options={cities.map((c: any) => ({ value: c.name, label: c.name }))} />
+                                        <InputField formData={formData} handleChange={handleChange} label="İlçe" name="district" icon={MapPin} options={currentDistricts.map(d => ({ value: d, label: d }))} />
                                     </div>
 
                                     <div className="col-span-2">
@@ -414,7 +430,7 @@ export default function EditMemberModal({ member, isOpen, onClose, onSuccess }: 
                                                     className="w-full h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                                                 >
                                                     <option value="">Bölge Seçiniz</option>
-                                                    {regions.map(r => (
+                                                    {regions.map((r: any) => (
                                                         <option key={r.id} value={r.id}>{r.name}</option>
                                                     ))}
                                                 </select>

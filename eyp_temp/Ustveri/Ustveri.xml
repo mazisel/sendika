@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Ustveri xmlns:tipler="urn:dpt:eyazisma:schema:xsd:Tipler-1" xmlns="urn:dpt:eyazisma:schema:xsd:Ustveri-1">
+  <tipler:BelgeId>9CE14C62-867E-4F38-84CB-32359EE35A73</tipler:BelgeId>
+  <tipler:Konu languageID="TR">İdari İzin Hk.</tipler:Konu>
+  <tipler:Tarih>2026-01-22T21:00:00Z</tipler:Tarih>
+  <tipler:BelgeNo>47</tipler:BelgeNo>
+  <tipler:GuvenlikKodu>TSD</tipler:GuvenlikKodu>
+  <tipler:MimeTuru>application/pdf</tipler:MimeTuru>
+  <tipler:OzId schemeID="GUID">2b001536-fdfe-412c-9b94-f6b54f2109d3</tipler:OzId>
+  <tipler:DagitimListesi>
+    <tipler:Dagitim>
+      <tipler:KurumKurulus>
+        <tipler:KKK>97457263</tipler:KKK>
+        <tipler:Adi languageID="TR">Bayraklı Belediye Başkanlığı</tipler:Adi>
+        <tipler:IletisimBilgisi>
+          <tipler:Telefon>02324772000</tipler:Telefon>
+          <tipler:EPosta>iletisim@bayrakli.bel.tr</tipler:EPosta>
+          <tipler:Adres languageID="TR">Anadolu Cad. No: 125  BAYRAKLI/İZMİR</tipler:Adres>
+          <tipler:Il languageID="TR">İzmir</tipler:Il>
+          <tipler:Ilce languageID="TR">Bayraklı</tipler:Ilce>
+          <tipler:Ulke languageID="TR">Türkiye</tipler:Ulke>
+        </tipler:IletisimBilgisi>
+      </tipler:KurumKurulus>
+      <tipler:Ivedilik>NRM</tipler:Ivedilik>
+      <tipler:DagitimTuru>GRG</tipler:DagitimTuru>
+      <tipler:Miat>PT0S</tipler:Miat>
+    </tipler:Dagitim>
+  </tipler:DagitimListesi>
+  <tipler:Dil>tur</tipler:Dil>
+  <tipler:Olusturan>
+    <tipler:TuzelSahis>
+      <tipler:Id schemeID="MERSIS">000949038214500</tipler:Id>
+      <tipler:Adi languageID="TR">BAĞIMSIZ YEREL YÖNETİM ÇALIŞANLARI HAK SENDİKASI</tipler:Adi>
+    </tipler:TuzelSahis>
+  </tipler:Olusturan>
+  <tipler:DosyaAdi>509-357-f5cea559-1769150834276.pdf</tipler:DosyaAdi>
+</Ustveri>

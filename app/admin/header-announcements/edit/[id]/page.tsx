@@ -47,11 +47,10 @@ export default function EditHeaderAnnouncementPage() {
         .from('announcements')
         .select('*')
         .eq('id', id)
-        .eq('type', 'urgent')
         .single()
 
       if (error) throw error
-      
+
       if (!data) {
         setError('Header duyurusu bulunamadı')
         return
@@ -75,7 +74,7 @@ export default function EditHeaderAnnouncementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!AdminAuth.isAuthenticated()) {
       router.push('/admin/login')
       return

@@ -1,7 +1,8 @@
 export interface SignerConfig {
-    port: number;
     baseUrl: string;
-    token: string;
+    port: number;
+    getToken: () => Promise<string>;
+    certificateThumbprint?: string;
 }
 
 export interface SignResult {
@@ -21,74 +22,147 @@ export class SignerAgentClient {
      * Checks if the agent is reachable.
      */
     async checkAvailability(): Promise<boolean> {
+        const url = `${this.config.baseUrl}/health`; // Try health endpoint if available, or just root
         console.log(`[SignerAgent] Checking availability at ${this.config.baseUrl}...`);
+
         try {
-            // Usually agents have a /health or root endpoint
-            const res = await fetch(`${this.config.baseUrl}/api/status`, { // Guessing endpoint based on common patterns, user guide didn't specify.
-                method: 'GET',                                             // Will try connection.
-                headers: {
-                    'Authorization': `Bearer ${this.config.token}`
-                },
-                signal: AbortSignal.timeout(1000) // Fast timeout
-            });
-            return res.ok;
-        } catch (e) {
-            // Try root if api/status fails
+            // Try standard health check first if agent supports it
             try {
-                // Just fetching root might return 404 but proves connectivity
-                await fetch(`${this.config.baseUrl}`, {
-                    mode: 'no-cors',
-                    signal: AbortSignal.timeout(1000)
+                const res = await fetch(url, {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(2000)
                 });
-                return true;
-            } catch {
-                return false;
-            }
+                if (res.ok) return true;
+            } catch { }
+
+            // Fallback: Try a no-cors request to root/sign to see if it's there
+            await fetch(`${this.config.baseUrl}/sign`, {
+                method: 'POST',
+                mode: 'no-cors',
+                signal: AbortSignal.timeout(2000)
+            });
+
+            console.log('[SignerAgent] Availability check PASSED');
+            return true;
+        } catch (e: any) {
+            console.error('[SignerAgent] Availability check FAILED:', e);
+            return false;
         }
     }
 
     /**
-     * Request the agent to sign a hash.
-     * @param hash The SHA-256 hash or data to sign.
-     * @param description Description to show to the user on the PIN screen.
+     * Signs PaketOzeti.xml using the agent (recommended method).
+     * @param paketOzetiXmlBase64 The PaketOzeti.xml content in Base64.
+     * @param documentMeta Metadata about the document being signed.
      */
-    async signHash(hash: string, description: string): Promise<SignResult> {
-        try {
-            // Endpoint structure typical for Akis/Signer agents: /api/sign
-            // Payload often matches { hash: "...", description: "..." }
+    async signPaketOzeti(
+        paketOzetiXmlBase64: string,
+        documentMeta: { number: string; date: string; subject: string; recipient?: string }
+    ): Promise<SignResult> {
+        const url = `${this.config.baseUrl}/sign`;
 
-            const response = await fetch(`${this.config.baseUrl}/api/sign`, {
+        try {
+            const token = await this.config.getToken();
+
+            console.log(`[SignerAgent] Sending PaketOzeti sign request to ${url}...`);
+
+            const payload = {
+                paketOzetiXmlBase64,
+                signatureProfile: "CAdES-DETACHED",
+                certificateThumbprint: this.config.certificateThumbprint,
+                documentMeta
+            };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.config.token}`,
-                    // 'X-Session-Token': this.config.token // Guide says "Origin whitelist yerine HMAC session token zorunlu tutulur"
+                    'X-Signing-Session': token,
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                    hash: hash,
-                    description: description,
-                    // content: "..." // If we were sending full content
-                    alg: "SHA256",
-                    format: "CAdES" // or PAdES if sending PDF
-                })
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(60000)
             });
 
-            if (!response.ok) {
-                const errText = await response.text();
-                return { success: false, error: `Agent Error: ${response.status} - ${errText}` };
-            }
-
-            const data = await response.json();
-
-            // Expected response: { signature: "Base64..." }
-            if (data.signature) {
-                return { success: true, signature: data.signature };
-            } else {
-                return { success: false, error: 'Invalid response from agent' };
-            }
+            return this.handleResponse(response);
 
         } catch (error: any) {
-            return { success: false, error: error.message || 'Connection failed' };
+            return this.handleError(error);
         }
+    }
+
+    /**
+     * Signs a pre-computed hash using the agent (alternative method).
+     * @param hashBase64 The SHA256 hash of the document in Base64.
+     * @param documentMeta Metadata about the document being signed.
+     */
+    async signHash(
+        hashBase64: string,
+        documentMeta: { number: string; date: string; subject: string; recipient?: string }
+    ): Promise<SignResult> {
+        const url = `${this.config.baseUrl}/sign`;
+
+        try {
+            const token = await this.config.getToken();
+
+            console.log(`[SignerAgent] Sending hash sign request to ${url}...`);
+
+            const payload = {
+                toBeSignedHashBase64: hashBase64,
+                signatureProfile: "CAdES-DETACHED",
+                certificateThumbprint: this.config.certificateThumbprint,
+                documentMeta
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Signing-Session': token,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload),
+                signal: AbortSignal.timeout(60000)
+            });
+
+            return this.handleResponse(response);
+
+        } catch (error: any) {
+            return this.handleError(error);
+        }
+    }
+
+    private async handleResponse(response: Response): Promise<SignResult> {
+        if (!response.ok) {
+            const errText = await response.text();
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.errorMessage) {
+                    return { success: false, error: `Agent Error: ${errJson.errorMessage}` };
+                }
+            } catch { }
+
+            console.warn(`[SignerAgent] Request failed: ${response.status} ${errText}`);
+            return { success: false, error: `Agent Error (${response.status}): ${errText}` };
+        }
+
+        const data = await response.json();
+        console.log('[SignerAgent] Sign success:', data);
+
+        if (data.signatureBase64) {
+            return { success: true, signature: data.signatureBase64 };
+        } else if (data.signature) {
+            return { success: true, signature: data.signature };
+        }
+
+        return { success: false, error: 'Invalid response: No signature found' };
+    }
+
+    private handleError(error: any): SignResult {
+        console.error(`[SignerAgent] Connection Failed:`, error);
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            return { success: false, error: 'Agent\'a ulaşılamadı. Lütfen uygulamanın açık olduğundan, portun doğru olduğundan ve CORS ayarlarının yapıldığından emin olun.' };
+        }
+        return { success: false, error: `Connection failed: ${error.message}` };
     }
 }

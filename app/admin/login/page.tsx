@@ -37,7 +37,7 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const result = await AdminAuth.login({ email, password });
+      const result = await AdminAuth.login({ email: email.trim(), password: password.trim() });
 
       if (result.success) {
         // Force hard navigation to clear any stale state

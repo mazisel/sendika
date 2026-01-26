@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MapPin, Phone, Globe, ExternalLink, Search, Filter } from 'lucide-react';
+import { MapPin, Phone, Globe, ExternalLink, Search, Filter, Clock } from 'lucide-react';
 import { cityOptions } from '@/lib/cities';
 import Link from 'next/link';
 
@@ -17,6 +17,7 @@ interface Discount {
     image_url: string;
     phone: string;
     category: string;
+    end_date?: string;
 }
 
 export default function DiscountsPage() {
@@ -157,6 +158,12 @@ export default function DiscountsPage() {
                                                 {discount.city} {discount.district && `/ ${discount.district}`}
                                             </div>
                                         )}
+                                        {discount.end_date && (
+                                            <div className="flex items-center text-sm text-amber-600 mb-3">
+                                                <Clock className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                                                Son: {new Date(discount.end_date).toLocaleDateString('tr-TR')}
+                                            </div>
+                                        )}
 
                                         <p className="text-gray-600 mb-6 line-clamp-3 text-sm leading-relaxed">
                                             {discount.description}
@@ -206,7 +213,7 @@ export default function DiscountsPage() {
                         </div>
                     )}
                 </div>
-            </section>
+            </section >
 
             {/* Footer */}
             <footer className="bg-gray-800 text-white py-12">

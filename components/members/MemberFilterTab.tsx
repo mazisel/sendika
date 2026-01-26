@@ -256,6 +256,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                         placeholder="Min"
                                         min="0"
                                         max="120"
+                                        onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                     />
                                     <input
                                         type="number"
@@ -265,6 +266,7 @@ export default function MemberFilterTab({ filters, setFilters, onSearch, onClear
                                         placeholder="Max"
                                         min="0"
                                         max="120"
+                                        onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                     />
                                 </div>
                             </div>

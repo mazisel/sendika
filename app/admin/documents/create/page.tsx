@@ -797,9 +797,24 @@ export default function AdvancedDocumentCreator() {
 
             // 3. Hash hesapla
             const pdfBuffer = await pdfBlob.arrayBuffer();
-            const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            let hashHex: string;
+
+            // crypto.subtle is only available in secure contexts (HTTPS or localhost)
+            if (typeof crypto !== 'undefined' && crypto.subtle) {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                // Fallback for non-secure contexts (development only)
+                console.warn('crypto.subtle not available. Using fallback hash.');
+                const bytes = new Uint8Array(pdfBuffer);
+                let hash = 0x811c9dc5;
+                for (let i = 0; i < bytes.length; i++) {
+                    hash ^= bytes[i];
+                    hash = Math.imul(hash, 0x01000193);
+                }
+                hashHex = Math.abs(hash).toString(16).padStart(64, '0');
+            }
 
             // 4. EYP Paketi oluştur
             const eypBlob = await EYPBuilder.buildPackage({
@@ -1806,6 +1821,7 @@ export default function AdvancedDocumentCreator() {
                                         type="number"
                                         value={margins.top}
                                         onChange={(e) => handleMarginChange('top', Number(e.target.value))}
+                                        onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                         className="w-14 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
                                     />
                                 </div>
@@ -1818,6 +1834,7 @@ export default function AdvancedDocumentCreator() {
                                             type="number"
                                             value={margins.top}
                                             onChange={(e) => handleMarginChange('top', Number(e.target.value))}
+                                            onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                             className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
                                         />
                                     </div>
@@ -1827,6 +1844,7 @@ export default function AdvancedDocumentCreator() {
                                             type="number"
                                             value={margins.bottom}
                                             onChange={(e) => handleMarginChange('bottom', Number(e.target.value))}
+                                            onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                             className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
                                         />
                                     </div>
@@ -1836,6 +1854,7 @@ export default function AdvancedDocumentCreator() {
                                             type="number"
                                             value={margins.left}
                                             onChange={(e) => handleMarginChange('left', Number(e.target.value))}
+                                            onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                             className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
                                         />
                                     </div>
@@ -1845,6 +1864,7 @@ export default function AdvancedDocumentCreator() {
                                             type="number"
                                             value={margins.right}
                                             onChange={(e) => handleMarginChange('right', Number(e.target.value))}
+                                            onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                                             className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
                                         />
                                     </div>

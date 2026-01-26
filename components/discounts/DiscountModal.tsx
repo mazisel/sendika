@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, Upload, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cityOptions } from '@/lib/cities';
+import { getDistrictsByCity } from '@/lib/districts';
 import NotificationSelector from '@/components/admin/NotificationSelector';
 import { NotificationService } from '@/lib/services/notificationService';
 import { toast } from 'react-hot-toast';
@@ -27,7 +28,8 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
         website_url: '',
         image_url: '',
         category: '',
-        is_active: true
+        is_active: true,
+        end_date: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,8 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                 website_url: discount.website_url || '',
                 image_url: discount.image_url || '',
                 category: discount.category || '',
-                is_active: discount.is_active ?? true
+                is_active: discount.is_active ?? true,
+                end_date: discount.end_date ? new Date(discount.end_date).toISOString().slice(0, 16) : ''
             });
         } else {
             setFormData({
@@ -60,7 +63,8 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                 website_url: '',
                 image_url: '',
                 category: '',
-                is_active: true
+                is_active: true,
+                end_date: ''
             });
             setNotificationChannels({ push: false, sms: false, email: false });
         }
@@ -117,16 +121,21 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
         setError(null);
 
         try {
+            const submitData = {
+                ...formData,
+                end_date: formData.end_date || null
+            };
+
             if (discount) {
                 const { error } = await supabase
                     .from('discounts')
-                    .update(formData)
+                    .update(submitData)
                     .eq('id', discount.id);
                 if (error) throw error;
             } else {
                 const { data, error } = await supabase
                     .from('discounts')
-                    .insert([formData])
+                    .insert([submitData])
                     .select()
                     .single();
                 if (error) throw error;
@@ -229,14 +238,33 @@ export default function DiscountModal({ discount, isOpen, onClose, onSuccess }: 
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">İlçe</label>
-                            <input
-                                type="text"
+                            <select
                                 name="district"
                                 value={formData.district}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
-                            />
+                                disabled={!formData.city}
+                                className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700 disabled:bg-gray-100 disabled:text-gray-400"
+                            >
+                                <option value="">Seçiniz</option>
+                                {formData.city && getDistrictsByCity(formData.city).map((d: string) => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Kampanya Bitiş Tarihi</label>
+                        <input
+                            type="datetime-local"
+                            name="end_date"
+                            value={formData.end_date}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border rounded-md dark:bg-slate-800 dark:border-slate-700"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Boş bırakılırsa süresiz geçerli olur.
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

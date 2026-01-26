@@ -117,9 +117,8 @@ export default function HeroSlider() {
         {sliders.map((slider, index) => (
           <div
             key={slider.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              index === currentSlide ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             {/* Background Image */}
             <div className="absolute inset-0">
@@ -137,18 +136,16 @@ export default function HeroSlider() {
             </div>
 
             {/* Content */}
-            <div className="relative z-10 h-full flex items-center">
+            <div className="relative z-10 h-full flex items-center justify-center">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
                 <div className="text-center">
-                  <h1 className={`text-4xl md:text-6xl font-bold mb-6 animate-fade-in ${
-                    slider.image_url ? 'text-white' : 'text-gray-900'
-                  }`}>
+                  <h1 className={`text-4xl md:text-6xl font-bold mb-6 animate-fade-in ${slider.image_url ? 'text-white' : 'text-gray-900'
+                    }`}>
                     {slider.title}
                   </h1>
                   {slider.description && (
-                    <p className={`text-xl md:text-2xl mb-8 max-w-4xl mx-auto animate-fade-in-delay ${
-                      slider.image_url ? 'text-gray-100' : 'text-gray-700'
-                    }`}>
+                    <p className={`text-xl md:text-2xl mb-8 max-w-4xl mx-auto animate-fade-in-delay ${slider.image_url ? 'text-gray-100' : 'text-gray-700'
+                      }`}>
                       {slider.description}
                     </p>
                   )}
@@ -156,11 +153,10 @@ export default function HeroSlider() {
                     {slider.button_text && slider.link_url && (
                       <a
                         href={slider.link_url}
-                        className={`font-semibold py-3 px-8 rounded-lg transition-colors inline-block ${
-                          slider.image_url 
-                            ? 'bg-white text-primary-600 hover:bg-gray-100' 
+                        className={`font-semibold py-3 px-8 rounded-lg transition-colors inline-block ${slider.image_url
+                            ? 'bg-white text-primary-600 hover:bg-gray-100'
                             : 'bg-primary-600 text-white hover:bg-primary-700'
-                        }`}
+                          }`}
                       >
                         {slider.button_text}
                       </a>
@@ -200,9 +196,8 @@ export default function HeroSlider() {
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${
-                index === currentSlide ? 'bg-white' : 'bg-white/50'
-              }`}
+              className={`w-3 h-3 rounded-full transition-colors ${index === currentSlide ? 'bg-white' : 'bg-white/50'
+                }`}
               aria-label={`Slide ${index + 1}'e git`}
             />
           ))}

@@ -156,25 +156,61 @@ export default function BudgetPage() {
     const saveBudgets = async () => {
         setSaving(true)
         try {
-            const upsertData = budgetRows.map(row => ({
-                id: row.budget_id || undefined, // undefined to let standard upsert match unique constraint? No, unique constraint is year, cost_center, account.
-                year,
-                account_id: row.account_id,
-                cost_center_id: selectedCostCenter || null,
-                amount: row.budget_amount,
-                updated_at: new Date().toISOString()
-            }))
+            // Split records into updates (existing IDs) and inserts (new items)
+            const updates = budgetRows
+                .filter(row => row.budget_id)
+                .map(row => ({
+                    id: row.budget_id,
+                    year,
+                    account_id: row.account_id,
+                    cost_center_id: selectedCostCenter || null,
+                    amount: row.budget_amount,
+                    updated_at: new Date().toISOString()
+                }))
 
-            const { error } = await supabase
-                .from('budgets')
-                .upsert(upsertData, { onConflict: 'year, cost_center_id, account_id' })
+            const inserts = budgetRows
+                .filter(row => !row.budget_id && row.budget_amount !== 0) // Only insert new if amount is set (optional optimization, but good practice. Or insert 0 is fine too?)
+                // Let's match user intent: if they see 0, they might want to save 0. But usually 0 means "no budget".
+                // However, previous logic was saving everything. Let's stick to saving everything or at least modified ones.
+                // To be safe and simple: save everything that doesn't have an ID.
+                // Wait, if I reload, I want to see 0s if I didn't set them? No, 0 is default.
+                .filter(row => !row.budget_id)
+                .map(row => ({
+                    year,
+                    account_id: row.account_id,
+                    cost_center_id: selectedCostCenter || null,
+                    amount: row.budget_amount,
+                    updated_at: new Date().toISOString()
+                }))
 
-            if (error) throw error
-            toast.success('Bütçe kaydedildi')
-            loadData() // Refresh IDs
+            const promises = []
+
+            if (updates.length > 0) {
+                promises.push(
+                    supabase.from('budgets').upsert(updates)
+                )
+            }
+
+            if (inserts.length > 0) {
+                promises.push(
+                    supabase.from('budgets').insert(inserts)
+                )
+            }
+
+            if (promises.length > 0) {
+                const results = await Promise.all(promises)
+                for (const res of results) {
+                    if (res.error) throw res.error
+                }
+                toast.success('Bütçe başarıyla kaydedildi')
+                loadData() // Refresh to get new IDs
+            } else {
+                toast('Değişiklik yok', { icon: 'ℹ️' })
+            }
+
         } catch (error: any) {
             console.error('Kaydetme hatası:', error)
-            toast.error('Kaydedilemedi')
+            toast.error('Kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'))
         } finally {
             setSaving(false)
         }
@@ -289,7 +325,9 @@ export default function BudgetPage() {
                                     <td className="px-6 py-4 text-right">
                                         <input
                                             type="number"
-                                            className="w-full text-right px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-300 transition-colors"
+                                            min="0"
+                                            onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
+                                            className="w-full text-right px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none hover:border-blue-300 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             value={row.budget_amount}
                                             onChange={(e) => handleBudgetChange(row.account_id, Number(e.target.value))}
                                         />

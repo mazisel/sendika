@@ -1295,6 +1295,7 @@ export default function NewMemberPage() {
                 value={formData.children_count}
                 onChange={handleInputChange}
                 min="0"
+                onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.children_count ? 'border-red-500' : 'border-slate-300'}`}
               />
               {errors.children_count && (
