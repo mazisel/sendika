@@ -24,7 +24,7 @@ export default function HomePage() {
         .select('*')
         .eq('is_published', true)
         .order('published_at', { ascending: false })
-        .limit(3)
+        .limit(5)
 
       if (!error && data) {
         setNews(data)

@@ -95,7 +95,15 @@ export interface DocumentTemplate {
     footer_address?: string;
     footer_contact?: string;
     footer_phone?: string;
-    signers?: Array<{ name: string; title: string; user_id?: string; signature_url?: string; }>;
+    signers?: Array<{
+        name: string;
+        title: string;
+        user_id?: string;
+        signature_url?: string;
+        signature_size_mm?: number;
+        signature_offset_x_mm?: number;
+        signature_offset_y_mm?: number;
+    }>;
     is_public?: boolean;
     decision_number?: string;
     header_title?: string;
@@ -112,4 +120,3 @@ export interface DocumentTemplate {
     created_at: string;
     updated_at: string;
 }
-

@@ -258,7 +258,7 @@ export const DocumentService = {
             .from('dm_authorized_signers')
             .select(`
                 *,
-                user:admin_users (
+                user:admin_users!dm_authorized_signers_user_id_fkey (
                     id,
                     full_name,
                     role,

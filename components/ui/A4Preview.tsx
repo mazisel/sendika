@@ -26,6 +26,9 @@ interface A4PreviewProps {
             name: string;
             title: string;
             signature_url?: string;
+            signature_size_mm?: number;
+            signature_offset_x_mm?: number;
+            signature_offset_y_mm?: number;
         }>;
         // Visibility
         show_header?: boolean;
@@ -82,6 +85,14 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
     };
 
     const formattedContent = formatContentHelper(doc.content);
+    const DEFAULT_SIGNATURE_SIZE_MM = 12;
+
+    const getSignatureSettings = (signer: any) => {
+        const size = Number.isFinite(signer?.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM;
+        const offsetX = Number.isFinite(signer?.signature_offset_x_mm) ? signer.signature_offset_x_mm : 0;
+        const offsetY = Number.isFinite(signer?.signature_offset_y_mm) ? signer.signature_offset_y_mm : 0;
+        return { size, offsetX, offsetY };
+    };
 
     return (
         <div
@@ -164,11 +175,26 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
                             <p className="font-bold whitespace-nowrap">{signer.name}</p>
                             <p className="text-[10pt] mb-2">{signer.title}</p>
                             {/* If signed show image or status */}
-                            {signer.signature_url ? (
-                                <img src={signer.signature_url} alt="İmza" className="h-12 mx-auto mix-blend-multiply" />
-                            ) : (
-                                <div className="h-12"></div>
-                            )}
+                            {(() => {
+                                const { size, offsetX, offsetY } = getSignatureSettings(signer);
+                                const signatureStyle: React.CSSProperties = {
+                                    height: `${size}mm`,
+                                    width: 'auto',
+                                    transform: `translate(${offsetX}mm, ${offsetY}mm)`,
+                                    transformOrigin: 'center',
+                                };
+
+                                return signer.signature_url ? (
+                                    <img
+                                        src={signer.signature_url}
+                                        alt="İmza"
+                                        className="mx-auto mix-blend-multiply"
+                                        style={signatureStyle}
+                                    />
+                                ) : (
+                                    <div className="mx-auto" style={{ height: `${size}mm` }} />
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>

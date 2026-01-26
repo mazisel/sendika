@@ -28,6 +28,9 @@ interface Signer {
     is_proxy?: boolean; // Vekil mi?
     user_id?: string; // Sistem kullanıcısı ise ID
     signature_url?: string; // Dijital imza URL'i
+    signature_size_mm?: number; // İmza yüksekliği (mm)
+    signature_offset_x_mm?: number; // Sağa/Sola kaydırma (mm)
+    signature_offset_y_mm?: number; // Yukarı/Aşağı kaydırma (mm)
 }
 
 interface DocFormData {
@@ -77,6 +80,8 @@ const MENTION_COMMANDS: MentionCommand[] = [
 ];
 
 export default function AdvancedDocumentCreator() {
+    const DEFAULT_SIGNATURE_SIZE_MM = 12;
+    const DEFAULT_SIGNATURE_OFFSET_MM = 0;
     const router = useRouter();
     const searchParams = useSearchParams();
     const templateId = searchParams.get('template');
@@ -193,7 +198,7 @@ export default function AdvancedDocumentCreator() {
                             setValue('receiverTextAlign', (defaults.receiver_text_align as any) || 'left');
 
                             if (defaults.signers && Array.isArray(defaults.signers) && defaults.signers.length > 0) {
-                                setValue('signers', defaults.signers);
+                                setValue('signers', defaults.signers.map((s: any) => withSignatureDefaults(s)));
                             }
                         }
                     }
@@ -206,6 +211,13 @@ export default function AdvancedDocumentCreator() {
         };
         loadInitialData();
     }, []);
+
+    const withSignatureDefaults = (signer: Signer): Signer => ({
+        ...signer,
+        signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM,
+        signature_offset_x_mm: Number.isFinite(signer.signature_offset_x_mm) ? signer.signature_offset_x_mm : DEFAULT_SIGNATURE_OFFSET_MM,
+        signature_offset_y_mm: Number.isFinite(signer.signature_offset_y_mm) ? signer.signature_offset_y_mm : DEFAULT_SIGNATURE_OFFSET_MM
+    });
 
     const handleAddSelfSignature = () => {
         if (!currentUser || !currentUser.signature_url) {
@@ -232,12 +244,12 @@ export default function AdvancedDocumentCreator() {
             else if (currentUser.role === 'super_admin') title = 'Genel Başkan';
         }
 
-        appendSigner({
+        appendSigner(withSignatureDefaults({
             name: currentUser.full_name,
             title: title,
             user_id: currentUser.id,
             signature_url: currentUser.signature_url
-        });
+        }));
     };
 
     const handleAddOtherSigner = (userId: string) => {
@@ -249,12 +261,12 @@ export default function AdvancedDocumentCreator() {
             toast('Dikkat: Bu kullanıcının tanımlı bir imzası yok.', { icon: '⚠️' });
         }
 
-        appendSigner({
+        appendSigner(withSignatureDefaults({
             name: signer.name,
             title: signer.title,
             user_id: signer.id,
             signature_url: signer.signature_url
-        });
+        }));
     };
 
     // Tablo alanları
@@ -654,7 +666,7 @@ export default function AdvancedDocumentCreator() {
                         removeSigner(i);
                     }
                     data.signers.forEach((signer: any) => {
-                        appendSigner(signer);
+                        appendSigner(withSignatureDefaults(signer));
                     });
                 }
 
@@ -679,6 +691,7 @@ export default function AdvancedDocumentCreator() {
         setSavingTemplate(true);
         try {
             const formData = watch();
+            const normalizedSigners = (formData.signers || []).map(withSignatureDefaults);
 
             const { error } = await DocumentService.saveAsTemplate({
                 name: templateName.trim(),
@@ -707,7 +720,7 @@ export default function AdvancedDocumentCreator() {
                 show_receiver: formData.showReceiver,
                 show_signatures: formData.showSignatures,
                 show_footer: formData.showFooter,
-                signers: formData.signers,
+                signers: normalizedSigners,
                 is_public: templateIsPublic
             });
 
@@ -738,6 +751,7 @@ export default function AdvancedDocumentCreator() {
         }
 
         try {
+            const normalizedSigners = (data.signers || []).map(withSignatureDefaults);
             const { EYPBuilder } = await import('@/lib/eyp/package-builder');
             const { generateDocumentPDF } = await import('@/lib/pdf-generator');
             const { EYPService } = await import('@/lib/services/eypService');
@@ -785,7 +799,7 @@ export default function AdvancedDocumentCreator() {
                 show_footer: data.showFooter,
 
                 // Signers (save as JSONB)
-                signers: data.signers
+                signers: normalizedSigners
             });
 
             if (docError || !savedDoc) {
@@ -888,6 +902,7 @@ export default function AdvancedDocumentCreator() {
         }
 
         try {
+            const normalizedSigners = (data.signers || []).map(withSignatureDefaults);
             const year = new Date().getFullYear();
 
             // Generate Sequence (Only for 'sent' typically, but let's generate for now to show)
@@ -933,7 +948,7 @@ export default function AdvancedDocumentCreator() {
                 show_footer: data.showFooter,
 
                 // Signers (save as JSONB)
-                signers: data.signers
+                signers: normalizedSigners
             });
 
             if (error) throw error;
@@ -1595,7 +1610,7 @@ export default function AdvancedDocumentCreator() {
                                     </select>
                                 )}
 
-                                <button type="button" onClick={() => appendSigner({ name: '', title: '' })} className="text-violet-600 hover:bg-violet-50 p-1 rounded" title="Manuel Ekle">
+                                <button type="button" onClick={() => appendSigner(withSignatureDefaults({ name: '', title: '' }))} className="text-violet-600 hover:bg-violet-50 p-1 rounded" title="Manuel Ekle">
                                     <Plus className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1615,6 +1630,42 @@ export default function AdvancedDocumentCreator() {
                                             {...register(`signers.${index}.title` as const)}
                                             className="text-xs border-slate-300 rounded px-2 py-1"
                                         />
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">İmza Boyutu (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    min={4}
+                                                    max={40}
+                                                    step={1}
+                                                    defaultValue={(field as any).signature_size_mm ?? DEFAULT_SIGNATURE_SIZE_MM}
+                                                    {...register(`signers.${index}.signature_size_mm` as const, { valueAsNumber: true })}
+                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Sağ/Sol (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    defaultValue={(field as any).signature_offset_x_mm ?? DEFAULT_SIGNATURE_OFFSET_MM}
+                                                    {...register(`signers.${index}.signature_offset_x_mm` as const, { valueAsNumber: true })}
+                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
+                                                />
+                                                <span className="block text-[10px] text-slate-400 mt-0.5">Sağ + / Sol -</span>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-slate-500 mb-1">Yukarı/Aşağı (mm)</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    defaultValue={(field as any).signature_offset_y_mm ?? DEFAULT_SIGNATURE_OFFSET_MM}
+                                                    {...register(`signers.${index}.signature_offset_y_mm` as const, { valueAsNumber: true })}
+                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
+                                                />
+                                                <span className="block text-[10px] text-slate-400 mt-0.5">Aşağı + / Yukarı -</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <button onClick={() => removeSigner(index)} className="text-slate-400 hover:text-red-500 mt-2">
                                         <Trash2 className="w-4 h-4" />

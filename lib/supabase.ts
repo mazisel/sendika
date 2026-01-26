@@ -2,7 +2,15 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 // Cookie-tabanlı Supabase client - tüm client component'ler için paylaşımlı
 // Bu sayede login sonrası oturum bilgisi tüm servisler tarafından görülür
-export const supabase = createClientComponentClient()
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+export const REALTIME_DISABLED = process.env.NEXT_PUBLIC_DISABLE_REALTIME === 'true'
+
+export const supabase = createClientComponentClient<Database>({
+  supabaseUrl,
+  supabaseKey,
+})
 
 // Database types will be generated here
 export type Database = {

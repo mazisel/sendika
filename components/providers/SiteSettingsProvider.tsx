@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, REALTIME_DISABLED } from '@/lib/supabase'
 
 interface SiteSettings {
     id: string
@@ -44,6 +44,8 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
 
     useEffect(() => {
         fetchSettings()
+
+        if (REALTIME_DISABLED) return
 
         // Subscribe to changes
         const channel = supabase

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabase, REALTIME_DISABLED } from '@/lib/supabase';
 import { MessageSquare } from 'lucide-react';
 
 interface StickyMessage {
@@ -18,6 +18,8 @@ export default function StickyMessageBanner() {
 
     useEffect(() => {
         loadMessage();
+
+        if (REALTIME_DISABLED) return;
 
         // Subscribe to changes
         const channel = supabase
