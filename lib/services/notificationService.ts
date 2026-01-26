@@ -9,10 +9,10 @@ interface NotificationChannels {
 
 export const NotificationService = {
     async sendContentNotification(
-        type: 'announcement' | 'header' | 'discount',
+        type: 'announcement' | 'header' | 'discount' | 'news',
         id: string,
         channels: NotificationChannels,
-        data: { title: string; message?: string }
+        data: { title: string; message?: string; imageUrl?: string }
     ) {
         if (!channels.push && !channels.sms && !channels.email) return;
 

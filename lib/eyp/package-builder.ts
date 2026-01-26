@@ -1,11 +1,11 @@
 import JSZip from 'jszip';
 import { EYPPackageConfig } from './types';
-import { 
-    generateUstVeriXml, 
-    generateBelgeHedefXml, 
-    generateContentTypesXml, 
-    generateRootRelsXml, 
-    generatePaketOzetiXml, 
+import {
+    generateUstVeriXml,
+    generateBelgeHedefXml,
+    generateContentTypesXml,
+    generateRootRelsXml,
+    generatePaketOzetiXml,
     generatePaketOzetiRelsXml,
     generateCorePropertiesXml,
     generateBelgeImzaXml,
@@ -22,15 +22,15 @@ function stringToBytes(str: string): Uint8Array {
 // SHA-256 hash hesaplama - Base64 formatında döner
 async function calculateSHA256Base64(data: Uint8Array | ArrayBuffer | Blob): Promise<string> {
     let buffer: ArrayBuffer;
-    
+
     if (data instanceof Uint8Array) {
-        buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+        buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
     } else if (data instanceof Blob) {
         buffer = await data.arrayBuffer();
     } else {
         buffer = data;
     }
-    
+
     if (typeof crypto !== 'undefined' && crypto.subtle) {
         const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
         const bytes = new Uint8Array(hashBuffer);
@@ -58,7 +58,7 @@ function generateUUID(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID().toUpperCase();
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -72,17 +72,17 @@ export class EYPBuilder {
         const paketId = generateUUID();
         const corePropsId = generateUUID().toLowerCase().replace(/-/g, '');
         console.log('[EYPBuilder] IDs generated:', { paketId, corePropsId });
-        
+
         // PDF dosya adı
-        const pdfFileName = config.ustYaziFileName || 
+        const pdfFileName = config.ustYaziFileName ||
             `${config.ustVeri.belgeNo.replace(/[\/\\]/g, '-')}-${Date.now()}.pdf`;
-        
+
         // Güncel tarih
         const now = new Date().toISOString();
         const tarihForImza = config.ustVeri.tarih + 'T00:00:00Z';
 
         // PDF'i ArrayBuffer olarak al
-        const pdfBuffer = config.ustYaziPdf instanceof Blob 
+        const pdfBuffer = config.ustYaziPdf instanceof Blob
             ? await config.ustYaziPdf.arrayBuffer()
             : config.ustYaziPdf;
         const pdfBytes = new Uint8Array(pdfBuffer);
@@ -96,13 +96,13 @@ export class EYPBuilder {
                 dosyaAdi: pdfFileName
             }
         };
-        
+
         const ustVeriXml = generateUstVeriXml(updatedUstVeri);
         const ustVeriBytes = stringToBytes(ustVeriXml);
-        
+
         const belgeHedefXml = generateBelgeHedefXml(config.belgeHedef);
         const belgeHedefBytes = stringToBytes(belgeHedefXml);
-        
+
         // BelgeImza.xml - Çoklu imzacı desteği
         // imzaBilgileri (çoklu) veya imzaBilgisi (tekli) kullan
         let imzalayanlar = config.imzaBilgileri || [];
@@ -119,7 +119,7 @@ export class EYPBuilder {
                 makam: 'Yetkili'
             }];
         }
-        
+
         const belgeImzaXml = generateBelgeImzaXml({
             imzalayanlar,
             tarih: tarihForImza
@@ -186,14 +186,14 @@ export class EYPBuilder {
             { uri: '/Ustveri/Ustveri.xml', digestValue: ustVeriHash },
             { uri: '/PaketOzeti/PaketOzeti.xml', digestValue: paketOzetiHash },
         ];
-        
+
         if (imzaBytes && imzaHash) {
             nihaiOzetRefs.push({ uri: '/Imzalar/ImzaCades.imz', digestValue: imzaHash });
         }
-        
-        nihaiOzetRefs.push({ 
-            uri: `/package/services/metadata/core-properties/${corePropsId}.psmdcp`, 
-            digestValue: corePropsHash 
+
+        nihaiOzetRefs.push({
+            uri: `/package/services/metadata/core-properties/${corePropsId}.psmdcp`,
+            digestValue: corePropsHash
         });
 
         const nihaiOzetXml = generateNihaiOzetXml({
@@ -211,7 +211,7 @@ export class EYPBuilder {
         const paketOzetiRelsBytes = stringToBytes(generatePaketOzetiRelsXml());
 
         // 7. ZIP dosyalarını oluştur - HEPSİ UINT8ARRAY OLARAK
-        
+
         // [Content_Types].xml
         zip.file('[Content_Types].xml', contentTypesBytes);
 
@@ -232,7 +232,7 @@ export class EYPBuilder {
 
         // PaketOzeti/PaketOzeti.xml
         zip.file('PaketOzeti/PaketOzeti.xml', paketOzetiBytes);
-        
+
         // PaketOzeti/_rels/PaketOzeti.xml.rels (imza varsa)
         if (imzaBytes) {
             zip.file('PaketOzeti/_rels/PaketOzeti.xml.rels', paketOzetiRelsBytes);
@@ -267,8 +267,8 @@ export class EYPBuilder {
 
         // Generate Blob
         console.log('[EYPBuilder] Generating ZIP blob...');
-        const blob = await zip.generateAsync({ 
-            type: 'blob', 
+        const blob = await zip.generateAsync({
+            type: 'blob',
             mimeType: 'application/octet-stream',
             compression: 'DEFLATE',
             compressionOptions: { level: 6 }
@@ -276,15 +276,15 @@ export class EYPBuilder {
         console.log('[EYPBuilder] ZIP generated, size:', blob.size);
         return blob;
     }
-    
+
     // PaketOzeti.xml'in hash'ini al (imzalama için)
     static async getPaketOzetiForSigning(config: EYPPackageConfig): Promise<{ xml: string; hash: string }> {
         const paketId = generateUUID();
-        const pdfFileName = config.ustYaziFileName || 
+        const pdfFileName = config.ustYaziFileName ||
             `${config.ustVeri.belgeNo.replace(/[\/\\]/g, '-')}-${Date.now()}.pdf`;
 
         // PDF'i ArrayBuffer olarak al
-        const pdfBuffer = config.ustYaziPdf instanceof Blob 
+        const pdfBuffer = config.ustYaziPdf instanceof Blob
             ? await config.ustYaziPdf.arrayBuffer()
             : config.ustYaziPdf;
         const pdfBytes = new Uint8Array(pdfBuffer);
@@ -297,10 +297,10 @@ export class EYPBuilder {
                 dosyaAdi: pdfFileName
             }
         };
-        
+
         const ustVeriXml = generateUstVeriXml(updatedUstVeri);
         const ustVeriBytes = stringToBytes(ustVeriXml);
-        
+
         const belgeHedefXml = generateBelgeHedefXml(config.belgeHedef);
         const belgeHedefBytes = stringToBytes(belgeHedefXml);
 
@@ -316,11 +316,11 @@ export class EYPBuilder {
                 { uri: '/Ustveri/Ustveri.xml', digestValue: ustVeriHash }
             ]
         };
-        
+
         const xml = generatePaketOzetiXml(paketOzetiConfig);
         const xmlBytes = stringToBytes(xml);
         const hash = await calculateSHA256Base64(xmlBytes);
-        
+
         return { xml, hash };
     }
 }
