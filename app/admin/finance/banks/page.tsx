@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { Plus, Edit, Trash2, Building2, Wallet, CreditCard, Save, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Building2, Wallet, CreditCard, Save, X, ChevronLeft } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 interface BankAccount {
@@ -167,9 +168,18 @@ export default function BankAccountsPage() {
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
-                <div>
+                <div className="flex items-center gap-4">
+                    <Link
+                        href="/admin/finance"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                        Geri
+                    </Link>
+                    <div>
                     <h1 className="text-2xl font-bold text-gray-900">Kasa & Banka Tanımları</h1>
                     <p className="text-gray-500">Nakit ve banka hesaplarını yönetin</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => {
