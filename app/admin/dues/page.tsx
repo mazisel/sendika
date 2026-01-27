@@ -315,7 +315,7 @@ function DuesContent() {
                             {period.summary ? (
                               <div className="w-32">
                                 <div className="flex justify-between text-xs mb-1">
-                                  <span className="text-gray-500 dark:text-gray-400">{period.summary.paid_members}/{period.summary.total_members}</span>
+                                  <span className="text-gray-500 dark:text-gray-400">{period.summary.paid_member_count}/{period.summary.total_members}</span>
                                   <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(period.summary.total_paid_amount)}</span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5">

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedAdmin } from '@/lib/api-admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const BUCKET_NAME = 'member-documents';
 

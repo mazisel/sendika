@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAuthenticatedAdmin } from '@/lib/api-admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 const ALLOWED_STATUSES = new Set(['draft', 'collecting', 'closed']);
 
 export async function GET(
