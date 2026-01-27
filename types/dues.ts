@@ -67,6 +67,20 @@ export interface MemberDue {
   } | null;
 }
 
+export type MemberDueRecord = MemberDue & {
+  member_due_periods?: {
+    name: string;
+    due_amount: number;
+    due_date: string;
+    penalty_rate?: number;
+    status?: string | DuePeriodStatus;
+    period_start?: string;
+    period_end?: string;
+  } | null;
+  total_due_amount?: number;
+  outstanding_amount?: number;
+};
+
 export interface MemberDuePayment {
   id: string;
   member_due_id: string;

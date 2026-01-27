@@ -33,6 +33,8 @@ export interface Member {
   position: string;
   membership_status: 'pending' | 'active' | 'inactive' | 'suspended' | 'resigned';
   membership_date?: string | null;
+  dues_enabled?: boolean | null;
+  dues_amount?: number | null;
   due_status?: 'paid' | 'unpaid' | 'partial' | null;
   emergency_contact_name: string;
   emergency_contact_phone: string;

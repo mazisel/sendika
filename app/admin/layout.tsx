@@ -23,6 +23,7 @@ import {
   Search,
   ChevronDown,
   User,
+  CircleDollarSign,
   Wallet,
   PiggyBank,
   Sun,
@@ -176,6 +177,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         description: currentUser.role_type === 'branch_manager' && currentUser.city
           ? `${currentUser.city} üyelerini yönet`
           : 'Sendika üyelerini yönet'
+      });
+    }
+
+    if (PermissionManager.canViewDues(currentUser)) {
+      baseItems.push({
+        title: 'Aidatlar',
+        href: '/admin/dues',
+        icon: CircleDollarSign,
+        description: PermissionManager.canManageDues(currentUser)
+          ? 'Aidat dönemleri ve ödemeleri yönet'
+          : 'Aidat dönemlerini görüntüle'
       });
     }
 

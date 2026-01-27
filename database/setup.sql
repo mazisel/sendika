@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS members (
     membership_number VARCHAR(50) UNIQUE,
     membership_status VARCHAR(20) DEFAULT 'pending' CHECK (membership_status IN ('pending', 'active', 'inactive', 'suspended', 'resigned')),
     membership_date DATE,
+    dues_enabled BOOLEAN DEFAULT true,
+    dues_amount NUMERIC(12,2) CHECK (dues_amount >= 0),
     emergency_contact_name VARCHAR(255),
     emergency_contact_phone VARCHAR(20),
     emergency_contact_relation VARCHAR(100),

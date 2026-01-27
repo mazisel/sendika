@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import ReactCrop, { type PercentCrop, type PixelCrop } from 'react-image-crop';
 import { useRouter } from 'next/navigation';
 import { AdminAuth } from '@/lib/auth';
 import { AdminUser } from '@/lib/types';
@@ -45,6 +46,16 @@ export default function ProfilePage() {
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [isProcessingSignature, setIsProcessingSignature] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [isEditingSignature, setIsEditingSignature] = useState(false);
+  const [isAiProcessed, setIsAiProcessed] = useState(false);
+  const [crop, setCrop] = useState<PercentCrop | undefined>(undefined);
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+  const [isCropped, setIsCropped] = useState(false);
+  const [aiProcessedFile, setAiProcessedFile] = useState<File | null>(null);
+  const cropImageRef = useRef<HTMLImageElement | null>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
+  const currentStep = !signatureFile ? 1 : !isAiProcessed ? 2 : !isCropped ? 3 : 4;
+  const showSteps = isEditingSignature || !signaturePreview;
 
   useEffect(() => {
     const user = AdminAuth.getCurrentUser();
@@ -52,6 +63,7 @@ export default function ProfilePage() {
       router.push('/admin/login');
     } else {
       setCurrentUser(user);
+      setIsEditingSignature(false);
       if (user.signature_url) {
         setSignatureUrl(user.signature_url);
         // İmzayı göster
@@ -60,6 +72,14 @@ export default function ProfilePage() {
       }
     }
   }, [router]);
+
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current);
+      }
+    };
+  }, []);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +155,17 @@ export default function ProfilePage() {
       return;
     }
 
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
     setSignatureFile(file);
+    setIsEditingSignature(true);
+    setIsAiProcessed(false);
+    setCrop(undefined);
+    setCompletedCrop(null);
+    setIsCropped(false);
+    setAiProcessedFile(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       setSignaturePreview(e.target?.result as string);
@@ -166,16 +196,28 @@ export default function ProfilePage() {
 
       if (data.image && data.image.url) {
         const newUrl = data.image.url;
-        setSignaturePreview(newUrl);
 
         // URL'den Blob'a çevirip signatureFile state'ini güncelle
         // Bu gerekli çünkü Save işlemi file state'ini kullanıyor
         const res = await fetch(newUrl);
         const blob = await res.blob();
-        const processedFile = new File([blob], "signature_transparent.png", { type: "image/png" });
-        setSignatureFile(processedFile);
+        const processedFile = new File([blob], 'signature_transparent.png', { type: 'image/png' });
 
-        setMessage({ type: 'success', text: 'Arka plan başarıyla temizlendi (AI)' });
+        if (previewObjectUrlRef.current) {
+          URL.revokeObjectURL(previewObjectUrlRef.current);
+        }
+        const objectUrl = URL.createObjectURL(processedFile);
+        previewObjectUrlRef.current = objectUrl;
+
+        setSignaturePreview(objectUrl);
+        setSignatureFile(processedFile);
+        setAiProcessedFile(processedFile);
+        setIsAiProcessed(true);
+        setCrop(undefined);
+        setCompletedCrop(null);
+        setIsCropped(false);
+
+        setMessage({ type: 'success', text: 'Arka plan başarıyla temizlendi. Şimdi imzayı kırpabilirsiniz.' });
       } else {
         throw new Error('API geçerli bir sonuç döndürmedi');
       }
@@ -186,6 +228,108 @@ export default function ProfilePage() {
     } finally {
       setIsProcessingSignature(false);
     }
+  };
+
+  const handleCropImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    if (!isAiProcessed || crop || isCropped) return;
+    const img = event.currentTarget;
+    if (!img.width || !img.height) return;
+    const initialCrop: PercentCrop = { unit: '%', x: 10, y: 10, width: 80, height: 80 };
+    setCrop(initialCrop);
+    setCompletedCrop({
+      unit: 'px',
+      x: Math.round((initialCrop.x / 100) * img.width),
+      y: Math.round((initialCrop.y / 100) * img.height),
+      width: Math.round((initialCrop.width / 100) * img.width),
+      height: Math.round((initialCrop.height / 100) * img.height),
+    });
+  };
+
+  const applyCrop = async () => {
+    if (!completedCrop || !signaturePreview || !cropImageRef.current) {
+      setMessage({ type: 'error', text: 'Lütfen önce kırpma alanı seçin.' });
+      return;
+    }
+
+    if (completedCrop.width < 8 || completedCrop.height < 8) {
+      setMessage({ type: 'error', text: 'Kırpma alanı çok küçük. Lütfen daha geniş bir alan seçin.' });
+      return;
+    }
+
+    const img = cropImageRef.current;
+    const displayWidth = img.clientWidth;
+    const displayHeight = img.clientHeight;
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+
+    if (!displayWidth || !displayHeight || !naturalWidth || !naturalHeight) {
+      setMessage({ type: 'error', text: 'Kırpma için görsel henüz hazır değil. Lütfen tekrar deneyin.' });
+      return;
+    }
+
+    const scaleX = naturalWidth / displayWidth;
+    const scaleY = naturalHeight / displayHeight;
+
+    const sx = completedCrop.x * scaleX;
+    const sy = completedCrop.y * scaleY;
+    const sw = completedCrop.width * scaleX;
+    const sh = completedCrop.height * scaleY;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(sw));
+    canvas.height = Math.max(1, Math.floor(sh));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setMessage({ type: 'error', text: 'Kırpma işlemi başlatılamadı.' });
+      return;
+    }
+
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((result) => resolve(result), 'image/png');
+    });
+
+    if (!blob) {
+      setMessage({ type: 'error', text: 'Kırpma işlemi başarısız oldu.' });
+      return;
+    }
+
+    const croppedFile = new File([blob], 'signature_cropped.png', { type: 'image/png' });
+
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(croppedFile);
+    previewObjectUrlRef.current = objectUrl;
+
+    setSignatureFile(croppedFile);
+    setSignaturePreview(objectUrl);
+    setIsCropped(true);
+    setCrop(undefined);
+    setCompletedCrop(null);
+    setMessage({ type: 'success', text: 'Kırpma uygulandı. Kaydet butonu ile yükleyebilirsiniz.' });
+  };
+
+  const resetCrop = () => {
+    if (!aiProcessedFile) {
+      setCrop(undefined);
+      setCompletedCrop(null);
+      setIsCropped(false);
+      return;
+    }
+
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(aiProcessedFile);
+    previewObjectUrlRef.current = objectUrl;
+
+    setSignatureFile(aiProcessedFile);
+    setSignaturePreview(objectUrl);
+    setCrop(undefined);
+    setCompletedCrop(null);
+    setIsCropped(false);
   };
 
   const saveSignature = async () => {
@@ -249,6 +393,12 @@ export default function ProfilePage() {
 
       setSignatureUrl(fileName);
       setMessage({ type: 'success', text: 'İmza başarıyla kaydedildi' });
+      setIsEditingSignature(false);
+      setIsAiProcessed(false);
+      setCrop(undefined);
+      setCompletedCrop(null);
+      setIsCropped(false);
+      setSignatureFile(null);
 
       // Session storage güncelle
       const updatedUser = { ...currentUser, signature_url: fileName };
@@ -266,7 +416,17 @@ export default function ProfilePage() {
 
   const clearSignature = () => {
     setSignatureFile(null);
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+      previewObjectUrlRef.current = null;
+    }
     setSignaturePreview(null);
+    setIsEditingSignature(false);
+    setIsAiProcessed(false);
+    setCrop(undefined);
+    setCompletedCrop(null);
+    setIsCropped(false);
+    setAiProcessedFile(null);
     if (currentUser?.signature_url) {
       // Eğer kayıtlı imza varsa onu geri yükle
       const { data } = supabase.storage.from('official-documents').getPublicUrl(currentUser.signature_url);
@@ -501,12 +661,32 @@ export default function ProfilePage() {
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors relative cursor-pointer">
                 {signaturePreview ? (
                   <div className="relative group">
-                    <div className="h-48 flex items-center justify-center bg-transparent pattern-grid-lg rounded-lg border border-slate-100">
-                      <img
-                        src={signaturePreview}
-                        alt="İmza Önizleme"
-                        className="max-h-full max-w-full object-contain"
-                      />
+                    <div className="h-48 flex items-center justify-center bg-transparent pattern-grid-lg rounded-lg border border-slate-100 overflow-hidden">
+                      {isAiProcessed ? (
+                        <ReactCrop
+                          crop={crop}
+                          onChange={(_crop, percentCrop) => setCrop(percentCrop)}
+                          onComplete={(pixelCrop) => setCompletedCrop(pixelCrop)}
+                          keepSelection
+                          className="max-h-48 max-w-full"
+                        >
+                          <img
+                            ref={cropImageRef}
+                            src={signaturePreview}
+                            alt="İmza Önizleme"
+                            onLoad={handleCropImageLoad}
+                            className="block max-h-48 max-w-full object-contain"
+                            draggable={false}
+                          />
+                        </ReactCrop>
+                      ) : (
+                        <img
+                          src={signaturePreview}
+                          alt="İmza Önizleme"
+                          className="block max-h-48 max-w-full object-contain"
+                          draggable={false}
+                        />
+                      )}
                     </div>
                     {signatureFile && (
                       <button
@@ -532,33 +712,141 @@ export default function ProfilePage() {
                   type="file"
                   accept="image/png, image/jpeg"
                   onChange={handleSignatureSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  className={`absolute inset-0 w-full h-full opacity-0 cursor-pointer ${!showSteps || isAiProcessed ? 'pointer-events-none' : ''}`}
                   disabled={isProcessingSignature}
                 />
               </div>
 
-              {signaturePreview && signatureFile && (
-                <div className="grid grid-cols-2 gap-4 pt-2">
+              {showSteps && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
+                    {[
+                      { id: 1, title: 'İmza Yükle', detail: 'PNG/JPG seçin' },
+                      { id: 2, title: 'AI Temizle', detail: 'Arka planı sil' },
+                      { id: 3, title: 'Kırp', detail: 'Boşlukları kaldır' },
+                      { id: 4, title: 'Kaydet', detail: 'İmzanı kaydet' },
+                    ].map((step) => {
+                      const isActive = step.id === currentStep;
+                      const isDone = step.id < currentStep;
+                      return (
+                        <div
+                          key={step.id}
+                          className={`rounded-lg border px-3 py-2 ${isActive
+                            ? 'border-blue-300 bg-blue-50 text-blue-800'
+                            : isDone
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-slate-200 bg-slate-50 text-slate-500'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide">
+                            <span>Adım {step.id}</span>
+                            {isDone && <span>✔</span>}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold">{step.title}</div>
+                          <div className="text-[11px] text-slate-500">{step.detail}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!showSteps && signaturePreview && !signatureFile && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                  <span>Kayıtlı imzanız var. Değiştirmek isterseniz adımları başlatın.</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingSignature(true)}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    İmzayı Değiştir
+                  </button>
+                </div>
+              )}
+
+              {showSteps && currentStep === 1 && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span>
+                    {signaturePreview ? 'Kayıtlı imzanız var. Yeni bir imza yüklemek için değiştirin.' : 'Devam etmek için imza görseli yükleyin.'}
+                  </span>
+                  <label
+                    className={`relative inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 ${isProcessingSignature ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg"
+                      onChange={handleSignatureSelect}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      disabled={isProcessingSignature}
+                    />
+                    {signaturePreview ? 'İmzayı Değiştir' : 'Dosya Seç'}
+                  </label>
+                </div>
+              )}
+
+              {showSteps && currentStep === 2 && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span>İmzanın arka planını yapay zeka ile temizleyin.</span>
                   <button
                     onClick={removeBackground}
                     disabled={isProcessingSignature}
-                    className="flex items-center justify-center space-x-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+                    className="flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
                   >
-                    <Eraser className="w-5 h-5" />
+                    <Eraser className="w-4 h-4" />
                     <span>Arka Planı Temizle (AI)</span>
                   </button>
+                </div>
+              )}
 
+              {showSteps && currentStep === 3 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="font-semibold text-slate-800">Adım 3: Kırpma</h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        İmzanın etrafındaki boşlukları kırpın. Çizgilere dokunmayın.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={applyCrop}
+                        disabled={!completedCrop || isProcessingSignature}
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold ${!completedCrop
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                      >
+                        Kırpmayı Uygula
+                      </button>
+                      <button
+                        onClick={resetCrop}
+                        disabled={isProcessingSignature}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold border bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                      >
+                        Sıfırla
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    İmza üzerinde sürükleyerek bir alan seçin, sonra &quot;Kırpmayı Uygula&quot;ya basın.
+                  </p>
+                </div>
+              )}
+
+              {showSteps && currentStep === 4 && (
+                <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  <span>Kırpma tamam. İmzanızı kaydedebilirsiniz.</span>
                   <button
                     onClick={saveSignature}
                     disabled={isProcessingSignature}
-                    className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                    className="flex items-center justify-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium shadow-sm hover:shadow-md"
                   >
                     {isProcessingSignature ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <Save className="w-5 h-5" />
+                      <Save className="w-4 h-4" />
                     )}
-                    <span>Değişiklikleri Kaydet</span>
+                    <span>Kaydet</span>
                   </button>
                 </div>
               )}
@@ -569,6 +857,7 @@ export default function ProfilePage() {
                   <li>Beyaz, temiz bir kağıda atılmış imza fotoğrafı en iyi sonucu verir.</li>
                   <li>Fotoğrafın aydınlık ve gölgesiz olmasına dikkat edin.</li>
                   <li>"Arka Planı Temizle" özelliği yapay zeka ile imzanızı şeffaf hale getirir.</li>
+                  <li>Temizleme sonrası imza etrafındaki boşlukları kırparak daha iyi sonuç alırsınız.</li>
                   <li>İmza belgelerinizin altına otomatik olarak eklenecektir.</li>
                 </ul>
               </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { DMDocument } from '@/lib/types/document-management';
+import { formatDocumentContent } from '@/lib/utils/documentFormatting';
 // import { formatContentForPreview } from '@/lib/utils/documentUtils';
 
 interface A4PreviewProps {
@@ -84,15 +85,10 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
         receiverTextAlign: (document as any).receiverTextAlign || document.receiver_text_align || 'left',
     };
 
-    const formattedContent = formatContentHelper(doc.content);
-    const DEFAULT_SIGNATURE_SIZE_MM = 12;
-
-    const getSignatureSettings = (signer: any) => {
-        const size = Number.isFinite(signer?.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM;
-        const offsetX = Number.isFinite(signer?.signature_offset_x_mm) ? signer.signature_offset_x_mm : 0;
-        const offsetY = Number.isFinite(signer?.signature_offset_y_mm) ? signer.signature_offset_y_mm : 0;
-        return { size, offsetX, offsetY };
-    };
+    const formattedContent = formatDocumentContent(doc.content);
+    const DEFAULT_SIGNATURE_SIZE_MM = 50;
+    const getSignatureSize = (signer: any) =>
+        Number.isFinite(signer?.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM;
 
     return (
         <div
@@ -122,8 +118,8 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
                     {/* Title Block */}
                     <div className="flex flex-col items-center">
                         <h1 className="font-bold text-[14pt] mb-1">{doc.headerTitle}</h1>
-                        <h2 className="font-bold text-[16pt] mb-1">{doc.headerOrgName}</h2>
-                        {doc.senderUnit && <p className="text-[11pt]">{doc.senderUnit}</p>}
+                        <h2 className="font-bold text-[16pt] mb-1 whitespace-pre-line">{doc.headerOrgName}</h2>
+                        {doc.senderUnit && <p className="text-[11pt] whitespace-pre-line">{doc.senderUnit}</p>}
                     </div>
 
                     {/* Right Logo */}
@@ -173,15 +169,15 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
                     {doc.signers.map((signer: any, index: number) => (
                         <div key={index} className="text-center min-w-[150px]">
                             <p className="font-bold whitespace-nowrap">{signer.name}</p>
-                            <p className="text-[10pt] mb-2">{signer.title}</p>
+                            <p className="text-[10pt] mb-0 leading-none">{signer.title}</p>
                             {/* If signed show image or status */}
                             {(() => {
-                                const { size, offsetX, offsetY } = getSignatureSettings(signer);
+                                const size = getSignatureSize(signer);
                                 const signatureStyle: React.CSSProperties = {
                                     height: `${size}mm`,
                                     width: 'auto',
-                                    transform: `translate(${offsetX}mm, ${offsetY}mm)`,
-                                    transformOrigin: 'center',
+                                    marginTop: '0px',
+                                    display: 'block',
                                 };
 
                                 return signer.signature_url ? (
@@ -192,7 +188,7 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
                                         style={signatureStyle}
                                     />
                                 ) : (
-                                    <div className="mx-auto" style={{ height: `${size}mm` }} />
+                                    <div className="mx-auto" style={{ height: `${size}mm`, marginTop: '0px' }} />
                                 );
                             })()}
                         </div>
@@ -217,51 +213,4 @@ export default function A4Preview({ document, zoom = 1, margins = { top: 25, rig
             )}
         </div>
     );
-}
-
-// Helper to format content (convert special table tags to HTML)
-function formatContentHelper(content: string) {
-    if (!content) return '';
-
-    let formatted = content;
-
-    // XSS Protection (Basic) is assumed to be handled or trusted, but let's be safe if needed. 
-    // Ideally use DOMPurify, but here we do simple replacement logic
-    formatted = formatted.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    // Parse TABLO tag
-    // Format: [[TABLO:COLS=Ad|Soyad # ROWS=Ahmet|Yılmaz;Mehmet|Demir]]
-    formatted = formatted.replace(/\[\[TABLO:(.*?)\]\]/g, (match, inner) => {
-        try {
-            const [colsPart, rowsPart] = inner.split(' # ');
-            if (!colsPart || !rowsPart) return match;
-
-            const headers = colsPart.replace('COLS=', '').split('|');
-            const rows = rowsPart.replace('ROWS=', '').split(';');
-
-            const styles = {
-                table: 'width: 100%; border-collapse: collapse; margin: 1em 0; font-family: inherit; font-size: 10pt;',
-                th: 'border: 1px solid #000; padding: 4px 8px; text-align: left; font-weight: bold;',
-                td: 'border: 1px solid #000; padding: 4px 8px; text-align: left;'
-            };
-
-            const headerCells = headers.map((h: string) => `<th style="${styles.th}">${h}</th>`).join('');
-
-            const tableRows = rows.map((rowStr: string) => {
-                const cells = rowStr.split('|');
-                const valueCells = cells.map((v: string) => `<td style="${styles.td}">${v}</td>`).join('');
-                return `<tr>${valueCells}</tr>`;
-            }).join('');
-
-            return `<table style="${styles.table}"><thead><tr>${headerCells}</tr></thead><tbody>${tableRows}</tbody></table>`;
-        } catch (e) {
-            console.error("Table parsing error:", e);
-            return match;
-        }
-    });
-
-    // Convert newlines to breaks
-    formatted = formatted.replace(/\n/g, '<br/>');
-
-    return formatted;
 }

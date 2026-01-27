@@ -29,6 +29,7 @@
     "react-dom": "^18",
     "react-hook-form": "^7.71.1",
     "react-hot-toast": "^2.6.0",
+    "react-image-crop": "^11.0.10",
     "react-markdown": "^10.1.0",
     "react-turkey-map": "^1.0.19",
     "recharts": "^3.6.0",

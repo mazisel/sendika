@@ -91,11 +91,11 @@ export default function OutgoingDocumentsPage() {
                         <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Yükleniyor...</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Yükleniyor...</td>
                                 </tr>
                             ) : filteredDocuments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Kayıtlı giden evrak bulunamadı.</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Kayıtlı giden evrak bulunamadı.</td>
                                 </tr>
                             ) : (
                                 filteredDocuments.map((doc) => (
@@ -116,11 +116,11 @@ export default function OutgoingDocumentsPage() {
                                             {doc.subject}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${doc.status === 'sent' ? 'bg-green-100 text-green-800' :
-                                                    doc.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-800' :
-                                                        doc.status === 'draft' ? 'bg-slate-100 text-slate-800' :
-                                                            doc.status === 'registered' ? 'bg-blue-100 text-blue-800' :
-                                                                'bg-slate-100 text-slate-800'
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${doc.status === 'sent' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' :
+                                                    doc.status === 'pending_approval' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200' :
+                                                        doc.status === 'draft' ? 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200' :
+                                                            doc.status === 'registered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200' :
+                                                                'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200'
                                                 }`}>
                                                 {doc.status === 'sent' ? 'Gönderildi' :
                                                     doc.status === 'pending_approval' ? 'İmza Bekliyor' :

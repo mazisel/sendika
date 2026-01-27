@@ -45,12 +45,12 @@ export default function DecisionsPage() {
 
     const getStatusBadge = (status: string) => {
         const STATUS_MAP: Record<string, { label: string, color: string }> = {
-            'draft': { label: 'Taslak', color: 'bg-gray-100 text-gray-800' },
-            'final': { label: 'Kesinleşti', color: 'bg-green-100 text-green-800' },
-            'cancelled': { label: 'İptal', color: 'bg-red-100 text-red-800' },
-            'revised': { label: 'Revize', color: 'bg-yellow-100 text-yellow-800' }
+            'draft': { label: 'Taslak', color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200' },
+            'final': { label: 'Kesinleşti', color: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' },
+            'cancelled': { label: 'İptal', color: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200' },
+            'revised': { label: 'Revize', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200' }
         };
-        const style = STATUS_MAP[status] || { label: status, color: 'bg-gray-100' };
+        const style = STATUS_MAP[status] || { label: status, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200' };
         return (
             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${style.color}`}>
                 {style.label}
@@ -138,11 +138,11 @@ export default function DecisionsPage() {
                         <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Yükleniyor...</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Yükleniyor...</td>
                                 </tr>
                             ) : filteredDecisions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Kayıt bulunamadı.</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Kayıt bulunamadı.</td>
                                 </tr>
                             ) : (
                                 filteredDecisions.map((decision) => (

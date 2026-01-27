@@ -10,7 +10,7 @@ import { MemberService } from '@/lib/services/memberService';
 import { cityOptions } from '@/lib/cities';
 import { getDistrictsByCity } from '@/lib/districts';
 import { AdminUser, DefinitionType, GeneralDefinition } from '@/lib/types';
-import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2, Activity, FileText, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, Save, User, MapPin, Phone, Mail, Briefcase, Heart, GraduationCap, Baby, AlertTriangle, Key, Hash, Upload, Trash2, Activity, FileText, Lock, Unlock, CircleDollarSign } from 'lucide-react';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 interface FormData {
@@ -49,6 +49,8 @@ interface FormData {
   notes: string;
   membership_number: string;
   membership_date: string;
+  dues_enabled: boolean;
+  dues_amount: string;
   decision_number: string;
   selected_branch_id: string; // UI only
   region: string | null; // Manual override or calculated
@@ -94,6 +96,8 @@ const initialFormData: FormData = {
   notes: '',
   membership_number: '',
   membership_date: '',
+  dues_enabled: true,
+  dues_amount: '',
   decision_number: '',
   selected_branch_id: '',
   region: null,
@@ -129,6 +133,7 @@ const fieldLabels: Record<string, string> = {
   notes: 'Notlar',
   membership_number: 'Üye Numarası',
   membership_date: 'Üye Kayıt Tarihi',
+  dues_amount: 'Aidat Tutarı',
   decision_number: 'Karar No',
 };
 
@@ -377,6 +382,8 @@ export default function NewMemberPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    const inputElement = e.target as HTMLInputElement;
+    const fieldValue = inputElement.type === 'checkbox' ? inputElement.checked : value;
 
     if (name === 'selected_branch_id') {
       const selectedBranch = branches.find(b => b.id === value);
@@ -395,7 +402,9 @@ export default function NewMemberPage() {
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: name === 'children_count' ? Math.max(0, parseInt(value) || 0) : value
+        [name]: name === 'children_count'
+          ? Math.max(0, parseInt(value) || 0)
+          : fieldValue
       }));
     }
 
@@ -652,6 +661,10 @@ export default function NewMemberPage() {
       newErrors.membership_date = 'Geçerli bir tarih seçiniz';
     }
 
+    if (formData.dues_amount && Number(formData.dues_amount) < 0) {
+      newErrors.dues_amount = 'Aidat tutarı negatif olamaz';
+    }
+
     if (currentUser?.role_type === 'branch_manager' && currentUser.city && formData.city !== currentUser.city) {
       newErrors.city = `Sadece ${currentUser.city} iline üye ekleyebilirsiniz`;
     }
@@ -711,6 +724,10 @@ export default function NewMemberPage() {
     setLoading(true);
 
     try {
+      const normalizedDuesAmount = formData.dues_amount.trim() === ''
+        ? null
+        : Number(formData.dues_amount);
+
       const memberData = {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
@@ -744,6 +761,8 @@ export default function NewMemberPage() {
         notes: formData.notes.trim(),
         membership_number: canEditMembershipNumber ? formData.membership_number.trim() : null,
         membership_date: formData.membership_date ? formData.membership_date : null,
+        dues_enabled: formData.dues_enabled,
+        dues_amount: normalizedDuesAmount,
         decision_number: formData.decision_number.trim() || null,
 
         membership_status: 'active',
@@ -1051,6 +1070,60 @@ export default function NewMemberPage() {
                 </div>
               </>
             ) : null}
+          </div>
+        </div>
+
+        {/* Aidat Ayarları */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <CircleDollarSign className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Aidat Ayarları</h3>
+              <p className="text-sm text-slate-600">Üye bazlı aidat tutarı ve takip durumu</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="dues_enabled"
+                checked={formData.dues_enabled}
+                onChange={handleInputChange}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <div>
+                <span className="block text-sm font-medium text-slate-700">Aidat takibi aktif</span>
+                <span className="block text-xs text-slate-500">
+                  Bu üye için aidat dönemlerinde otomatik kayıt oluşturulur.
+                </span>
+              </div>
+            </label>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Aylık Aidat Tutarı (₺)
+              </label>
+              <input
+                type="number"
+                name="dues_amount"
+                min="0"
+                step="0.01"
+                value={formData.dues_amount}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${errors.dues_amount ? 'border-red-500' : 'border-slate-300'
+                  }`}
+                placeholder="Dönem tutarını kullan"
+              />
+              {errors.dues_amount && (
+                <p className="mt-1 text-sm text-red-600">{errors.dues_amount}</p>
+              )}
+              <p className="mt-1 text-xs text-slate-500">
+                Boş bırakılırsa dönem tutarı uygulanır.
+              </p>
+            </div>
           </div>
         </div>
 

@@ -188,7 +188,7 @@ export default function DocumentPoolPage() {
                                             <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                                                 {template.name}
                                             </h3>
-                                            <div className="flex items-center space-x-2 text-xs text-slate-500">
+                                            <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
                                                 {template.is_public ? (
                                                     <span className="flex items-center text-green-600">
                                                         <Globe className="w-3 h-3 mr-1" />
@@ -216,14 +216,14 @@ export default function DocumentPoolPage() {
 
                                 {template.subject && (
                                     <div className="text-sm">
-                                        <span className="text-slate-500">Konu:</span>
+                                        <span className="text-slate-500 dark:text-slate-400">Konu:</span>
                                         <span className="ml-2 text-slate-700 dark:text-slate-300">
                                             {template.subject}
                                         </span>
                                     </div>
                                 )}
 
-                                <div className="flex items-center text-xs text-slate-500 space-x-4">
+                                <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 space-x-4">
                                     <span className="flex items-center">
                                         <Calendar className="w-3 h-3 mr-1" />
                                         {formatDateSafe(template.created_at)}

@@ -86,11 +86,11 @@ export default function IncomingDocumentsPage() {
                         <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Yükleniyor...</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Yükleniyor...</td>
                                 </tr>
                             ) : filteredDocuments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Kayıtlı gelen evrak bulunamadı.</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">Kayıtlı gelen evrak bulunamadı.</td>
                                 </tr>
                             ) : (
                                 filteredDocuments.map((doc) => (
@@ -111,7 +111,7 @@ export default function IncomingDocumentsPage() {
                                             {doc.subject}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                                                 {doc.status === 'registered' ? 'Kayıtlı' : doc.status}
                                             </span>
                                         </td>

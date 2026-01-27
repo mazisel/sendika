@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import {
     ArrowLeft, Send, Save, Eye, FileText,
-    Bold, Italic, AlignLeft, AlignCenter, AlignRight,
+    Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
     Plus, Trash2, Calendar, GripVertical, Upload, X, Copy,
     ZoomIn, ZoomOut, RotateCcw, Monitor, Link2, Unlink2,
     Search, Users, Table, User, Check, Archive, Loader2
@@ -80,8 +80,7 @@ const MENTION_COMMANDS: MentionCommand[] = [
 ];
 
 export default function AdvancedDocumentCreator() {
-    const DEFAULT_SIGNATURE_SIZE_MM = 12;
-    const DEFAULT_SIGNATURE_OFFSET_MM = 0;
+    const DEFAULT_SIGNATURE_SIZE_MM = 50;
     const router = useRouter();
     const searchParams = useSearchParams();
     const templateId = searchParams.get('template');
@@ -125,6 +124,7 @@ export default function AdvancedDocumentCreator() {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mentionPopupRef = useRef<HTMLDivElement>(null);
     const [isMultiSelect, setIsMultiSelect] = useState(false); // Çoklu seçim modu aktif mi?
+    const [fontSizeSelection, setFontSizeSelection] = useState('');
 
     // Load User & Signers
     useEffect(() => {
@@ -214,9 +214,7 @@ export default function AdvancedDocumentCreator() {
 
     const withSignatureDefaults = (signer: Signer): Signer => ({
         ...signer,
-        signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM,
-        signature_offset_x_mm: Number.isFinite(signer.signature_offset_x_mm) ? signer.signature_offset_x_mm : DEFAULT_SIGNATURE_OFFSET_MM,
-        signature_offset_y_mm: Number.isFinite(signer.signature_offset_y_mm) ? signer.signature_offset_y_mm : DEFAULT_SIGNATURE_OFFSET_MM
+        signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM
     });
 
     const handleAddSelfSignature = () => {
@@ -529,6 +527,41 @@ export default function AdvancedDocumentCreator() {
 
         // Form değerini güncelle
         setValue('content', value);
+    };
+
+    const applyContentMarkup = (startTag: string, endTag: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const value = formValues.content || '';
+        const selectionStart = textarea.selectionStart ?? 0;
+        const selectionEnd = textarea.selectionEnd ?? 0;
+        const hasSelection = selectionStart !== selectionEnd;
+        const selectedText = value.slice(selectionStart, selectionEnd);
+        const wrapped = `${startTag}${hasSelection ? selectedText : ''}${endTag}`;
+        const newValue = value.slice(0, selectionStart) + wrapped + value.slice(selectionEnd);
+
+        setValue('content', newValue);
+
+        setTimeout(() => {
+            textarea.focus();
+            const cursorPos = hasSelection ? selectionStart + wrapped.length : selectionStart + startTag.length;
+            textarea.setSelectionRange(cursorPos, cursorPos);
+        }, 0);
+    };
+
+    const handleApplyFormat = (type: 'bold' | 'italic' | 'underline') => {
+        if (type === 'bold') applyContentMarkup('[[B]]', '[[/B]]');
+        if (type === 'italic') applyContentMarkup('[[I]]', '[[/I]]');
+        if (type === 'underline') applyContentMarkup('[[U]]', '[[/U]]');
+    };
+
+    const handleApplyFontSize = (sizeValue: string) => {
+        if (!sizeValue) return;
+        const size = Number.parseInt(sizeValue, 10);
+        if (Number.isNaN(size)) return;
+        applyContentMarkup(`[[SIZE=${size}]]`, '[[/SIZE]]');
+        setFontSizeSelection('');
     };
 
     // Keyboard navigation for mention popup
@@ -985,7 +1018,7 @@ export default function AdvancedDocumentCreator() {
                     <button
                         onClick={handleSubmit((d) => onSubmit(d, 'draft'))}
                         disabled={loading || generatingEYP}
-                        className="px-4 py-2 text-slate-700 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 text-sm font-medium"
+                        className="px-4 py-2 text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 text-sm font-medium"
                     >
                         <Save className="w-4 h-4 inline-block mr-2" />
                         Taslak Kaydet
@@ -1021,17 +1054,17 @@ export default function AdvancedDocumentCreator() {
             <div className="flex flex-1 overflow-hidden">
 
                 {/* Editor Pane (Left) */}
-                <div className={`w-full md:w-[400px] lg:w-[450px] bg-slate-50 border-r border-slate-200 overflow-y-auto p-6 space-y-6 ${previewMode ? 'hidden md:block' : 'block'}`}>
+                <div className={`w-full md:w-[400px] lg:w-[450px] bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-6 space-y-6 ${previewMode ? 'hidden md:block' : 'block'}`}>
 
                     {/* Section: Künye */}
-                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2 mb-2">Belge Künyesi</h3>
+                    <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">Belge Künyesi</h3>
 
                         <div className="grid grid-cols-2 gap-4">
                             {/* Left Logo */}
                             <div>
                                 <div className="flex justify-between items-center min-h-[1.25rem]">
-                                    <label className="text-xs font-medium text-slate-500">Sol Logo</label>
+                                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Sol Logo</label>
                                 </div>
                                 <div className="space-y-2 mt-1">
                                     <input type="hidden" {...register('logoUrl')} />
@@ -1043,7 +1076,7 @@ export default function AdvancedDocumentCreator() {
                                                 <img
                                                     src={formValues.logoUrl}
                                                     alt="Sol Logo"
-                                                    className="h-20 w-20 object-contain bg-white border border-slate-200 rounded-lg p-1"
+                                                    className="h-20 w-20 object-contain bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-1"
                                                 />
                                                 <button
                                                     type="button"
@@ -1054,7 +1087,7 @@ export default function AdvancedDocumentCreator() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="h-20 w-20 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400">
+                                            <div className="h-20 w-20 bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500">
                                                 <span className="text-[10px] text-center px-1">Görsel Yok</span>
                                             </div>
                                         )}
@@ -1097,13 +1130,13 @@ export default function AdvancedDocumentCreator() {
                                                 />
                                                 <label
                                                     htmlFor="logo-upload"
-                                                    className="flex items-center justify-center w-full px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 cursor-pointer transition-colors text-xs font-medium text-slate-700 shadow-sm"
+                                                    className="flex items-center justify-center w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
                                                 >
                                                     <Upload className="w-3 h-3 mr-2" />
                                                     Logo Yükle
                                                 </label>
                                             </div>
-                                            <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
                                                 Maksimum 5MB.<br />JPEG, PNG
                                             </p>
                                         </div>
@@ -1114,7 +1147,7 @@ export default function AdvancedDocumentCreator() {
                             {/* Right Logo */}
                             <div>
                                 <div className="flex justify-between items-center min-h-[1.25rem]">
-                                    <label className="text-xs font-medium text-slate-500">Sağ Logo</label>
+                                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Sağ Logo</label>
                                     <button
                                         type="button"
                                         onClick={() => formValues.logoUrl && setValue('rightLogoUrl', formValues.logoUrl)}
@@ -1135,7 +1168,7 @@ export default function AdvancedDocumentCreator() {
                                                 <img
                                                     src={formValues.rightLogoUrl}
                                                     alt="Sağ Logo"
-                                                    className="h-20 w-20 object-contain bg-white border border-slate-200 rounded-lg p-1"
+                                                    className="h-20 w-20 object-contain bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-1"
                                                 />
                                                 <button
                                                     type="button"
@@ -1146,7 +1179,7 @@ export default function AdvancedDocumentCreator() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="h-20 w-20 bg-slate-50 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-slate-400">
+                                            <div className="h-20 w-20 bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500">
                                                 <span className="text-[10px] text-center px-1">Görsel Yok</span>
                                             </div>
                                         )}
@@ -1189,13 +1222,13 @@ export default function AdvancedDocumentCreator() {
                                                 />
                                                 <label
                                                     htmlFor="right-logo-upload"
-                                                    className="flex items-center justify-center w-full px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 cursor-pointer transition-colors text-xs font-medium text-slate-700 shadow-sm"
+                                                    className="flex items-center justify-center w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
                                                 >
                                                     <Upload className="w-3 h-3 mr-2" />
                                                     Logo Yükle
                                                 </label>
                                             </div>
-                                            <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">
                                                 Maksimum 5MB.<br />JPEG, PNG
                                             </p>
                                         </div>
@@ -1206,88 +1239,143 @@ export default function AdvancedDocumentCreator() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs font-medium text-slate-500">Başlık (T.C.)</label>
-                                <input {...register('headerTitle')} placeholder="T.C." className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Başlık (T.C.)</label>
+                                <input {...register('headerTitle')} placeholder="T.C." className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-500">Kurum Adı</label>
-                                <input {...register('headerOrgName')} placeholder="Kurum Adı" className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Kurum Adı</label>
+                                <textarea
+                                    {...register('headerOrgName')}
+                                    placeholder="Kurum Adı"
+                                    rows={2}
+                                    className="form-textarea w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100 resize-y"
+                                />
                             </div>
                         </div>
 
                         <div>
-                            <label className="text-xs font-medium text-slate-500">Gönderen Birim</label>
-                            <input {...register('sender_unit')} className="form-input w-full mt-1 text-sm bg-slate-50 border-slate-300 rounded-md" />
+                            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Gönderen Birim</label>
+                            <textarea
+                                {...register('sender_unit')}
+                                rows={2}
+                                className="form-textarea w-full mt-1 text-sm bg-slate-50 dark:bg-slate-900/40 border-slate-300 dark:border-slate-600 rounded-md dark:text-slate-100 resize-y"
+                            />
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
                             <div>
-                                <label className="text-xs font-medium text-slate-500">Tarih</label>
-                                <input type="date" {...register('date')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tarih</label>
+                                <input type="date" {...register('date')} className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-500">Dosya Kodu</label>
-                                <input placeholder="302.01" {...register('category_code')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Dosya Kodu</label>
+                                <input placeholder="302.01" {...register('category_code')} className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100" />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-500">Karar No</label>
-                                <input placeholder="2024/001" {...register('decision_number')} className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Karar No</label>
+                                <input placeholder="2024/001" {...register('decision_number')} className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100" />
                             </div>
                         </div>
 
                         <div>
-                            <label className="text-xs font-medium text-slate-500">Konu</label>
-                            <input {...register('subject', { required: true })} placeholder="Toplantı hk." className="form-input w-full mt-1 text-sm border-slate-300 rounded-md" />
+                            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Konu</label>
+                            <input {...register('subject', { required: true })} placeholder="Toplantı hk." className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md dark:bg-slate-900 dark:text-slate-100" />
                             {errors.subject && <span className="text-red-500 text-xs">Zorunlu alan</span>}
                         </div>
                     </div>
 
                     {/* Section: İçerik */}
-                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2 mb-2">İçerik</h3>
+                    <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">İçerik</h3>
 
                         <div>
                             <div className="flex justify-between items-end mb-1">
-                                <label className="text-xs font-medium text-slate-500">Alıcı (Hitap)</label>
-                                <div className="flex space-x-1 bg-slate-100 p-1 rounded-md">
-                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'left')} className={`p-1 rounded ${formValues.receiverTextAlign === 'left' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Alıcı (Hitap)</label>
+                                <div className="flex space-x-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-md border border-transparent dark:border-slate-700">
+                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'left')} className={`p-1 rounded ${formValues.receiverTextAlign === 'left' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignLeft className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'center')} className={`p-1 rounded ${formValues.receiverTextAlign === 'center' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'center')} className={`p-1 rounded ${formValues.receiverTextAlign === 'center' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignCenter className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'right')} className={`p-1 rounded ${formValues.receiverTextAlign === 'right' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'right')} className={`p-1 rounded ${formValues.receiverTextAlign === 'right' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignRight className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'justify')} className={`p-1 rounded ${formValues.receiverTextAlign === 'justify' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('receiverTextAlign', 'justify')} className={`p-1 rounded ${formValues.receiverTextAlign === 'justify' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-align-justify"><line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="18" y2="18" /></svg>
                                     </button>
                                 </div>
                             </div>
-                            <input {...register('receiver', { required: true })} placeholder="ANKARA VALİLİĞİNE" className="form-input w-full mt-1 text-sm border-slate-300 rounded-md font-bold" />
+                            <input {...register('receiver', { required: true })} placeholder="ANKARA VALİLİĞİNE" className="form-input w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md font-bold dark:bg-slate-900 dark:text-slate-100" />
                         </div>
 
                         <div className="relative">
                             <div className="flex justify-between items-end mb-1">
                                 <div className="flex items-center space-x-2">
-                                    <label className="text-xs font-medium text-slate-500">Metin</label>
-                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Metin</label>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                                         💡 @uye yazarak üye bilgisi ekleyebilirsiniz
                                     </span>
                                 </div>
-                                <div className="flex space-x-1 bg-slate-100 p-1 rounded-md">
-                                    <button type="button" onClick={() => setValue('textAlign', 'left')} className={`p-1 rounded ${formValues.textAlign === 'left' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                <div className="flex space-x-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-md border border-transparent dark:border-slate-700">
+                                    <button type="button" onClick={() => setValue('textAlign', 'left')} className={`p-1 rounded ${formValues.textAlign === 'left' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignLeft className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('textAlign', 'center')} className={`p-1 rounded ${formValues.textAlign === 'center' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('textAlign', 'center')} className={`p-1 rounded ${formValues.textAlign === 'center' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignCenter className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('textAlign', 'right')} className={`p-1 rounded ${formValues.textAlign === 'right' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('textAlign', 'right')} className={`p-1 rounded ${formValues.textAlign === 'right' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <AlignRight className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setValue('textAlign', 'justify')} className={`p-1 rounded ${formValues.textAlign === 'justify' ? 'bg-white shadow text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <button type="button" onClick={() => setValue('textAlign', 'justify')} className={`p-1 rounded ${formValues.textAlign === 'justify' ? 'bg-white dark:bg-slate-900 shadow text-violet-600 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-200'}`}>
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-align-justify"><line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="18" y2="18" /></svg>
                                     </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-md border border-transparent dark:border-slate-700">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleApplyFormat('bold')}
+                                        className="p-1 rounded text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        title="Kalın"
+                                    >
+                                        <Bold className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleApplyFormat('italic')}
+                                        className="p-1 rounded text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        title="İtalik"
+                                    >
+                                        <Italic className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleApplyFormat('underline')}
+                                        className="p-1 rounded text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                        title="Altı çizili"
+                                    >
+                                        <Underline className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
+                                    <span>Yazı Boyutu</span>
+                                    <select
+                                        value={fontSizeSelection}
+                                        onChange={(e) => {
+                                            setFontSizeSelection(e.target.value);
+                                            handleApplyFontSize(e.target.value);
+                                        }}
+                                        className="form-select rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-xs text-slate-700 dark:text-slate-200"
+                                    >
+                                        <option value="">Seç</option>
+                                        {[10, 11, 12, 13, 14, 16, 18, 20].map(size => (
+                                            <option key={size} value={size}>{size} pt</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -1298,7 +1386,7 @@ export default function AdvancedDocumentCreator() {
                                 onChange={handleContentChange}
                                 onKeyDown={handleContentKeyDown}
                                 rows={10}
-                                className="form-textarea w-full mt-1 text-sm border-slate-300 rounded-md p-3 leading-relaxed font-mono"
+                                className="form-textarea w-full mt-1 text-sm border-slate-300 dark:border-slate-600 rounded-md p-3 leading-relaxed font-mono dark:bg-slate-900 dark:text-slate-100"
                                 placeholder="Belge içeriğini buraya yazınız... (@uye yazarak üye bilgisi ekleyebilirsiniz)"
                             />
 
@@ -1306,7 +1394,7 @@ export default function AdvancedDocumentCreator() {
                             {showMentionPopup && (
                                 <div
                                     ref={mentionPopupRef}
-                                    className="absolute z-50 w-96 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+                                    className="absolute z-50 w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden"
                                     style={{ bottom: 'calc(100% + 8px)', left: 0 }}
                                 >
                                     {/* Header */}
@@ -1367,19 +1455,19 @@ export default function AdvancedDocumentCreator() {
                                                             setMentionSearch('');
                                                         }
                                                     }}
-                                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
-                                                        ? 'bg-violet-50 text-violet-700'
-                                                        : 'hover:bg-slate-50'
-                                                        }`}
-                                                >
-                                                    <div className="flex-shrink-0 w-8 h-8 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center">
-                                                        {cmd.icon}
-                                                    </div>
-                                                    <div className="text-left flex-1">
-                                                        <div className="text-sm font-medium text-slate-800">{cmd.label}</div>
-                                                        <div className="text-xs text-slate-500">{cmd.description}</div>
-                                                    </div>
-                                                    <div className="flex-shrink-0 text-xs text-slate-400 font-mono">
+                                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
+                                                ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200'
+                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                }`}
+                                        >
+                                            <div className="flex-shrink-0 w-8 h-8 bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-200 rounded-lg flex items-center justify-center">
+                                                {cmd.icon}
+                                            </div>
+                                            <div className="text-left flex-1">
+                                                <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{cmd.label}</div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400">{cmd.description}</div>
+                                            </div>
+                                                    <div className="flex-shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono">
                                                         {cmd.trigger}
                                                     </div>
                                                 </button>
@@ -1388,23 +1476,23 @@ export default function AdvancedDocumentCreator() {
                                     ) : mentionType === 'member' ? (
                                         /* Üye Arama */
                                         <div>
-                                            <div className="p-2 border-b border-slate-100">
+                                            <div className="p-2 border-b border-slate-100 dark:border-slate-700">
                                                 <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                                                     <input
                                                         type="text"
                                                         value={mentionSearch}
                                                         onChange={(e) => setMentionSearch(e.target.value)}
                                                         placeholder="Üye adı, sicil no veya TC ile ara..."
-                                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                                                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white dark:bg-slate-900 dark:text-slate-100"
                                                         autoFocus
                                                     />
                                                 </div>
                                             </div>
 
                                             {isMultiSelect && (
-                                                <div className="px-3 py-2 bg-violet-50 border-b border-violet-100 flex justify-between items-center transition-all animate-in slide-in-from-top-2">
-                                                    <span className="text-xs font-medium text-violet-700">
+                                                <div className="px-3 py-2 bg-violet-50 dark:bg-violet-900/30 border-b border-violet-100 dark:border-violet-800/40 flex justify-between items-center transition-all animate-in slide-in-from-top-2">
+                                                    <span className="text-xs font-medium text-violet-700 dark:text-violet-200">
                                                         {selectedMembers.length} üye seçildi
                                                     </span>
                                                     <button
@@ -1417,53 +1505,53 @@ export default function AdvancedDocumentCreator() {
                                                 </div>
                                             )}
 
-                                            <div className="max-h-48 overflow-y-auto">
-                                                {memberSearchLoading ? (
-                                                    <div className="p-4 text-center text-slate-500">
+                                                <div className="max-h-48 overflow-y-auto">
+                                                    {memberSearchLoading ? (
+                                                    <div className="p-4 text-center text-slate-500 dark:text-slate-400">
                                                         <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                                                         <span className="text-sm">Aranıyor...</span>
                                                     </div>
-                                                ) : filteredMembers.length > 0 ? (
-                                                    <div className="p-2 space-y-1">
-                                                        {filteredMembers.map((member, idx) => (
-                                                            <button
-                                                                key={member.id}
-                                                                type="button"
-                                                                onClick={() => handleMemberSelect(member)}
-                                                                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
-                                                                    ? 'bg-violet-50 border border-violet-200'
-                                                                    : 'hover:bg-slate-50'
-                                                                    } ${isMultiSelect && selectedMembers.find(m => m.id === member.id) ? 'bg-violet-100' : ''}`}
-                                                            >
-                                                                <div className="flex-shrink-0 relative">
-                                                                    <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-xs">
-                                                                        {member.first_name?.[0]}{member.last_name?.[0]}
-                                                                    </div>
+                                                    ) : filteredMembers.length > 0 ? (
+                                                        <div className="p-2 space-y-1">
+                                                            {filteredMembers.map((member, idx) => (
+                                                                <button
+                                                                    key={member.id}
+                                                                    type="button"
+                                                                    onClick={() => handleMemberSelect(member)}
+                                                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
+                                                                        ? 'bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800/60'
+                                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                                        } ${isMultiSelect && selectedMembers.find(m => m.id === member.id) ? 'bg-violet-100 dark:bg-violet-900/40' : ''}`}
+                                                                >
+                                                                    <div className="flex-shrink-0 relative">
+                                                                        <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-xs">
+                                                                            {member.first_name?.[0]}{member.last_name?.[0]}
+                                                                        </div>
                                                                     {isMultiSelect && selectedMembers.find(m => m.id === member.id) && (
                                                                         <div className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-0.5">
                                                                             <Check className="w-3 h-3" />
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-left flex-1 min-w-0">
-                                                                    <div className="text-sm font-medium text-slate-800 truncate">
-                                                                        {member.first_name} {member.last_name}
+                                                                    <div className="text-left flex-1 min-w-0">
+                                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                                                                            {member.first_name} {member.last_name}
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                                            {member.membership_number} • {member.city || '-'}
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-xs text-slate-500 truncate">
-                                                                        {member.membership_number} • {member.city || '-'}
-                                                                    </div>
-                                                                </div>
-                                                            </button>
-                                                        ))}
+                                                                </button>
+                                                            ))}
                                                     </div>
                                                 ) : mentionSearch.length >= 2 ? (
-                                                    <div className="p-4 text-center text-slate-500">
-                                                        <User className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                                                    <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+                                                        <User className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                                                         <span className="text-sm">Üye bulunamadı</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="p-4 text-center text-slate-500">
-                                                        <Search className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                                                    <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+                                                        <Search className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                                                         <span className="text-sm">En az 2 karakter yazın</span>
                                                     </div>
                                                 )}
@@ -1474,16 +1562,16 @@ export default function AdvancedDocumentCreator() {
                                         <div>
                                             {/* Seçilen Üye */}
                                             {selectedMember && (
-                                                <div className="p-3 bg-violet-50 border-b border-violet-100">
+                                                <div className="p-3 bg-violet-50 dark:bg-violet-900/30 border-b border-violet-100 dark:border-violet-800/40">
                                                     <div className="flex items-center space-x-3">
                                                         <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
                                                             {selectedMember.first_name?.[0]}{selectedMember.last_name?.[0]}
                                                         </div>
                                                         <div>
-                                                            <div className="text-sm font-medium text-slate-800">
+                                                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
                                                                 {selectedMember.first_name} {selectedMember.last_name}
                                                             </div>
-                                                            <div className="text-xs text-slate-500">
+                                                            <div className="text-xs text-slate-500 dark:text-slate-400">
                                                                 {selectedMember.membership_number}
                                                             </div>
                                                         </div>
@@ -1503,23 +1591,23 @@ export default function AdvancedDocumentCreator() {
 
                                             {/* Alan Seçimi */}
                                             <div className="p-3">
-                                                <div className="text-xs font-medium text-slate-500 mb-2">Tabloya eklenecek alanları seçin:</div>
+                                                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Tabloya eklenecek alanları seçin:</div>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     {MEMBER_FIELDS.map((field) => (
                                                         <label
                                                             key={field.key}
                                                             className={`flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer transition-all ${selectedFields.includes(field.key)
-                                                                ? 'bg-violet-50 border-violet-300 text-violet-700'
-                                                                : 'bg-white border-slate-200 hover:border-slate-300'
+                                                                ? 'bg-violet-50 dark:bg-violet-900/30 border-violet-300 dark:border-violet-800/60 text-violet-700 dark:text-violet-200'
+                                                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                                                                 }`}
                                                         >
                                                             <input
                                                                 type="checkbox"
                                                                 checked={selectedFields.includes(field.key)}
                                                                 onChange={() => toggleField(field.key)}
-                                                                className="w-4 h-4 text-violet-600 rounded border-slate-300 focus:ring-violet-500"
+                                                                className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600 focus:ring-violet-500"
                                                             />
-                                                            <span className="text-sm">{field.label}</span>
+                                                            <span className="text-sm text-slate-700 dark:text-slate-300">{field.label}</span>
                                                         </label>
                                                     ))}
                                                 </div>
@@ -1527,16 +1615,16 @@ export default function AdvancedDocumentCreator() {
 
                                             {/* Önizleme */}
                                             {selectedMember && selectedFields.length > 0 && (
-                                                <div className="p-3 border-t border-slate-100 bg-slate-50">
-                                                    <div className="text-xs font-medium text-slate-500 mb-2">Önizleme:</div>
+                                            <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
+                                                    <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Önizleme:</div>
                                                     <div className="overflow-x-auto">
-                                                        <table className="w-full text-xs border border-slate-300">
+                                                        <table className="w-full text-xs border border-slate-300 dark:border-slate-700">
                                                             <thead>
-                                                                <tr className="bg-slate-100">
+                                                                <tr className="bg-slate-100 dark:bg-slate-900/60">
                                                                     {selectedFields.map(f => {
                                                                         const field = MEMBER_FIELDS.find(mf => mf.key === f);
                                                                         return (
-                                                                            <th key={f} className="px-2 py-1 border-r border-slate-300 text-left font-medium">
+                                                                            <th key={f} className="px-2 py-1 border-r border-slate-300 dark:border-slate-700 text-left font-medium text-slate-700 dark:text-slate-300">
                                                                                 {field?.label}
                                                                             </th>
                                                                         );
@@ -1544,9 +1632,9 @@ export default function AdvancedDocumentCreator() {
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr>
+                                                                <tr className="text-slate-700 dark:text-slate-300">
                                                                     {selectedFields.map(f => (
-                                                                        <td key={f} className="px-2 py-1 border-r border-t border-slate-300">
+                                                                        <td key={f} className="px-2 py-1 border-r border-t border-slate-300 dark:border-slate-700">
                                                                             {(selectedMember as any)[f] || '-'}
                                                                         </td>
                                                                     ))}
@@ -1558,7 +1646,7 @@ export default function AdvancedDocumentCreator() {
                                             )}
 
                                             {/* Ekle Butonu */}
-                                            <div className="p-3 border-t border-slate-100">
+                                            <div className="p-3 border-t border-slate-100 dark:border-slate-700">
                                                 <button
                                                     type="button"
                                                     onClick={insertMemberTable}
@@ -1576,16 +1664,16 @@ export default function AdvancedDocumentCreator() {
                     </div>
 
                     {/* Section: İmzacılar */}
-                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <div className="flex justify-between items-center border-b pb-2 mb-2">
-                            <h3 className="text-sm font-semibold text-slate-900">İmzacılar</h3>
+                    <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
+                            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">İmzacılar</h3>
                             <div className="flex space-x-2">
                                 {/* Kendi İmzasını Ekle Butonu */}
                                 {(currentUser?.permissions?.includes('documents.sign.own') || currentUser?.role === 'super_admin') && currentUser?.signature_url && (
                                     <button
                                         type="button"
                                         onClick={handleAddSelfSignature}
-                                        className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 flex items-center"
+                                        className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center"
                                     >
                                         <User className="w-3 h-3 mr-1" />
                                         Kendimi Ekle
@@ -1595,7 +1683,7 @@ export default function AdvancedDocumentCreator() {
                                 {/* Başkasını Ekle Dropdown (Basit versiyon) */}
                                 {(currentUser?.permissions?.includes('documents.sign.others') || currentUser?.role === 'super_admin') && availableSigners.length > 0 && (
                                     <select
-                                        className="text-xs border-slate-200 rounded px-2 py-1 w-32"
+                                        className="text-xs border-slate-200 dark:border-slate-600 rounded px-2 py-1 w-32 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
                                         onChange={(e) => {
                                             if (e.target.value) {
                                                 handleAddOtherSigner(e.target.value);
@@ -1610,7 +1698,7 @@ export default function AdvancedDocumentCreator() {
                                     </select>
                                 )}
 
-                                <button type="button" onClick={() => appendSigner(withSignatureDefaults({ name: '', title: '' }))} className="text-violet-600 hover:bg-violet-50 p-1 rounded" title="Manuel Ekle">
+                                <button type="button" onClick={() => appendSigner(withSignatureDefaults({ name: '', title: '' }))} className="text-violet-600 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 p-1 rounded" title="Manuel Ekle">
                                     <Plus className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1618,56 +1706,39 @@ export default function AdvancedDocumentCreator() {
 
                         <div className="space-y-3">
                             {signerFields.map((field, index) => (
-                                <div key={field.id} className="flex items-start space-x-2 bg-slate-50 p-2 rounded-md">
+                                <div key={field.id} className="flex items-start space-x-2 bg-slate-50 dark:bg-slate-900/40 p-2 rounded-md border border-transparent dark:border-slate-700">
                                     <div className="grid gap-2 flex-1">
                                         <input
                                             placeholder="Ad Soyad"
                                             {...register(`signers.${index}.name` as const)}
-                                            className="text-xs border-slate-300 rounded px-2 py-1"
+                                            className="text-xs border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
                                         <input
                                             placeholder="Ünvan (Örn: Başkan)"
                                             {...register(`signers.${index}.title` as const)}
-                                            className="text-xs border-slate-300 rounded px-2 py-1"
+                                            className="text-xs border-slate-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-1 gap-2">
                                             <div>
-                                                <label className="block text-[10px] text-slate-500 mb-1">İmza Boyutu (mm)</label>
-                                                <input
-                                                    type="number"
-                                                    min={4}
-                                                    max={40}
-                                                    step={1}
-                                                    defaultValue={(field as any).signature_size_mm ?? DEFAULT_SIGNATURE_SIZE_MM}
-                                                    {...register(`signers.${index}.signature_size_mm` as const, { valueAsNumber: true })}
-                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] text-slate-500 mb-1">Sağ/Sol (mm)</label>
-                                                <input
-                                                    type="number"
-                                                    step={1}
-                                                    defaultValue={(field as any).signature_offset_x_mm ?? DEFAULT_SIGNATURE_OFFSET_MM}
-                                                    {...register(`signers.${index}.signature_offset_x_mm` as const, { valueAsNumber: true })}
-                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
-                                                />
-                                                <span className="block text-[10px] text-slate-400 mt-0.5">Sağ + / Sol -</span>
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] text-slate-500 mb-1">Yukarı/Aşağı (mm)</label>
-                                                <input
-                                                    type="number"
-                                                    step={1}
-                                                    defaultValue={(field as any).signature_offset_y_mm ?? DEFAULT_SIGNATURE_OFFSET_MM}
-                                                    {...register(`signers.${index}.signature_offset_y_mm` as const, { valueAsNumber: true })}
-                                                    className="w-full text-xs border-slate-300 rounded px-2 py-1"
-                                                />
-                                                <span className="block text-[10px] text-slate-400 mt-0.5">Aşağı + / Yukarı -</span>
+                                                <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">İmza Boyutu (mm)</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="range"
+                                                        min={6}
+                                                        max={100}
+                                                        step={1}
+                                                        defaultValue={(field as any).signature_size_mm ?? DEFAULT_SIGNATURE_SIZE_MM}
+                                                        {...register(`signers.${index}.signature_size_mm` as const, { valueAsNumber: true })}
+                                                        className="w-full accent-violet-600 dark:accent-violet-400"
+                                                    />
+                                                    <span className="text-[11px] text-slate-600 dark:text-slate-300 tabular-nums w-10 text-right">
+                                                        {Math.round(Number(formValues.signers?.[index]?.signature_size_mm ?? DEFAULT_SIGNATURE_SIZE_MM))}mm
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => removeSigner(index)} className="text-slate-400 hover:text-red-500 mt-2">
+                                    <button onClick={() => removeSigner(index)} className="text-slate-400 dark:text-slate-500 hover:text-red-500 mt-2">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -1675,39 +1746,39 @@ export default function AdvancedDocumentCreator() {
                         </div>
                     </div>
                     {/* Section: Alt Bilgi (Footer) */}
-                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">Alt Bilgi Ayarları</h3>
+                    <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-2">Alt Bilgi Ayarları</h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Kurum Adı</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Kurum Adı</label>
                                 <input
                                     {...register('footerOrgName')}
-                                    className="w-full text-sm border-slate-300 rounded-lg focus:ring-violet-500 focus:border-violet-500"
+                                    className="w-full text-sm border-slate-300 dark:border-slate-600 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                     placeholder="Kurum Adı"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Adres/Lokasyon</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Adres/Lokasyon</label>
                                 <input
                                     {...register('footerAddress')}
-                                    className="w-full text-sm border-slate-300 rounded-lg focus:ring-violet-500 focus:border-violet-500"
+                                    className="w-full text-sm border-slate-300 dark:border-slate-600 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                     placeholder="Adres Bilgisi"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Bilgi İçin</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Bilgi İçin</label>
                                 <input
                                     {...register('footerContact')}
-                                    className="w-full text-sm border-slate-300 rounded-lg focus:ring-violet-500 focus:border-violet-500"
+                                    className="w-full text-sm border-slate-300 dark:border-slate-600 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                     placeholder="Birim/Kişi"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1">Telefon</label>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Telefon</label>
                                 <input
                                     {...register('footerPhone')}
-                                    className="w-full text-sm border-slate-300 rounded-lg focus:ring-violet-500 focus:border-violet-500"
+                                    className="w-full text-sm border-slate-300 dark:border-slate-600 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                     placeholder="Telefon No"
                                 />
                             </div>
@@ -1715,9 +1786,9 @@ export default function AdvancedDocumentCreator() {
                     </div>
 
                     {/* Section: Görünürlük Ayarları */}
-                    <div className="space-y-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">Görünürlük Ayarları</h3>
-                        <p className="text-xs text-slate-500 mb-3">Belgede görmek istemediğiniz alanları kapatabilirsiniz.</p>
+                    <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-2">Görünürlük Ayarları</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Belgede görmek istemediğiniz alanları kapatabilirsiniz.</p>
 
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1725,9 +1796,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showHeader !== false}
                                     onChange={(e) => setValue('showHeader', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Üst Başlık</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Üst Başlık</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1735,9 +1806,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showDate !== false}
                                     onChange={(e) => setValue('showDate', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Tarih</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Tarih</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1745,9 +1816,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showSayi !== false}
                                     onChange={(e) => setValue('showSayi', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Sayı</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Sayı</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1755,9 +1826,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showKonu !== false}
                                     onChange={(e) => setValue('showKonu', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Konu</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Konu</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1765,9 +1836,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showKararNo !== false}
                                     onChange={(e) => setValue('showKararNo', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Karar No</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Karar No</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1775,9 +1846,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showReceiver !== false}
                                     onChange={(e) => setValue('showReceiver', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Alıcı</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Alıcı</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1785,9 +1856,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showSignatures !== false}
                                     onChange={(e) => setValue('showSignatures', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">İmzalar</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">İmzalar</span>
                             </label>
 
                             <label className="flex items-center space-x-2 cursor-pointer">
@@ -1795,9 +1866,9 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={formValues.showFooter !== false}
                                     onChange={(e) => setValue('showFooter', e.target.checked)}
-                                    className="w-4 h-4 text-violet-600 rounded border-slate-300"
+                                    className="w-4 h-4 text-violet-600 rounded border-slate-300 dark:border-slate-600"
                                 />
-                                <span className="text-sm text-slate-700">Alt Bilgi</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">Alt Bilgi</span>
                             </label>
                         </div>
                     </div>
@@ -1805,31 +1876,31 @@ export default function AdvancedDocumentCreator() {
                 </div>
 
                 {/* Preview Pane (Right) */}
-                <div className={`flex-1 bg-slate-200/50 flex flex-col overflow-hidden border-l border-slate-200 ${!previewMode ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`flex-1 bg-slate-200/50 dark:bg-slate-900/60 flex flex-col overflow-hidden border-l border-slate-200 dark:border-slate-800 ${!previewMode ? 'hidden md:flex' : 'flex'}`}>
 
                     {/* Preview Toolbar */}
-                    <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-[0_1px_3px_rgb(0,0,0,0.05)] z-10">
+                    <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-[0_1px_3px_rgb(0,0,0,0.05)] z-10">
 
                         {/* Zoom Controls */}
                         <div className="flex items-center space-x-2">
-                            <span className="text-xs font-medium text-slate-500 mr-1 flex items-center">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mr-1 flex items-center">
                                 <Monitor className="w-3 h-3 mr-1" />
                                 Görünüm:
                             </span>
-                            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
                                 <button
                                     onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
-                                    className="p-1 hover:bg-white rounded-md transition-all text-slate-600 active:scale-95 disabled:opacity-50"
+                                    className="p-1 hover:bg-white dark:hover:bg-slate-900 rounded-md transition-all text-slate-600 dark:text-slate-300 active:scale-95 disabled:opacity-50"
                                     title="Uzaklaştır"
                                 >
                                     <ZoomOut className="w-4 h-4" />
                                 </button>
-                                <span className="text-xs font-medium w-12 text-center text-slate-700 select-none">
+                                <span className="text-xs font-medium w-12 text-center text-slate-700 dark:text-slate-300 select-none">
                                     {Math.round(zoom * 100)}%
                                 </span>
                                 <button
                                     onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
-                                    className="p-1 hover:bg-white rounded-md transition-all text-slate-600 active:scale-95 disabled:opacity-50"
+                                    className="p-1 hover:bg-white dark:hover:bg-slate-900 rounded-md transition-all text-slate-600 dark:text-slate-300 active:scale-95 disabled:opacity-50"
                                     title="Yakınlaştır"
                                 >
                                     <ZoomIn className="w-4 h-4" />
@@ -1837,7 +1908,7 @@ export default function AdvancedDocumentCreator() {
                             </div>
                             <button
                                 onClick={() => setZoom(0.8)}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 transition-colors"
                                 title="Sıfırla"
                             >
                                 <RotateCcw className="w-4 h-4" />
@@ -1846,7 +1917,7 @@ export default function AdvancedDocumentCreator() {
 
                         {/* Margin Controls */}
                         <div className="flex items-center space-x-3 overflow-x-auto">
-                            <span className="text-xs font-medium text-slate-500 flex items-center whitespace-nowrap">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center whitespace-nowrap">
                                 <GripVertical className="w-3 h-3 mr-1" />
                                 Kenar Boşlukları (mm):
                             </span>
@@ -1856,8 +1927,8 @@ export default function AdvancedDocumentCreator() {
                                 type="button"
                                 onClick={() => setLinkMargins(!linkMargins)}
                                 className={`p-1.5 rounded-lg transition-all ${linkMargins
-                                    ? 'bg-violet-100 text-violet-600 hover:bg-violet-200'
-                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-200 hover:bg-violet-200 dark:hover:bg-violet-900/60'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 title={linkMargins ? 'Ayrı ayrı değiştir' : 'Hepsini birlikte değiştir'}
                             >
@@ -1867,56 +1938,56 @@ export default function AdvancedDocumentCreator() {
                             {linkMargins ? (
                                 /* Tek input - tüm boşlukları birlikte değiştir */
                                 <div className="flex flex-col">
-                                    <label className="text-[9px] text-slate-400 text-center">Tümü</label>
+                                    <label className="text-[9px] text-slate-400 dark:text-slate-500 text-center">Tümü</label>
                                     <input
                                         type="number"
                                         value={margins.top}
                                         onChange={(e) => handleMarginChange('top', Number(e.target.value))}
                                         onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
-                                        className="w-14 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
+                                        className="w-14 h-7 text-xs text-center border-slate-300 dark:border-slate-600 rounded focus:ring-1 focus:ring-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                     />
                                 </div>
                             ) : (
                                 /* Ayrı inputlar */
                                 <div className="flex gap-2">
                                     <div className="flex flex-col">
-                                        <label className="text-[9px] text-slate-400 text-center">Üst</label>
+                                        <label className="text-[9px] text-slate-400 dark:text-slate-500 text-center">Üst</label>
                                         <input
                                             type="number"
                                             value={margins.top}
                                             onChange={(e) => handleMarginChange('top', Number(e.target.value))}
                                             onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
-                                            className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
+                                            className="w-12 h-7 text-xs text-center border-slate-300 dark:border-slate-600 rounded focus:ring-1 focus:ring-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
                                     </div>
                                     <div className="flex flex-col">
-                                        <label className="text-[9px] text-slate-400 text-center">Alt</label>
+                                        <label className="text-[9px] text-slate-400 dark:text-slate-500 text-center">Alt</label>
                                         <input
                                             type="number"
                                             value={margins.bottom}
                                             onChange={(e) => handleMarginChange('bottom', Number(e.target.value))}
                                             onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
-                                            className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
+                                            className="w-12 h-7 text-xs text-center border-slate-300 dark:border-slate-600 rounded focus:ring-1 focus:ring-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
                                     </div>
                                     <div className="flex flex-col">
-                                        <label className="text-[9px] text-slate-400 text-center">Sol</label>
+                                        <label className="text-[9px] text-slate-400 dark:text-slate-500 text-center">Sol</label>
                                         <input
                                             type="number"
                                             value={margins.left}
                                             onChange={(e) => handleMarginChange('left', Number(e.target.value))}
                                             onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
-                                            className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
+                                            className="w-12 h-7 text-xs text-center border-slate-300 dark:border-slate-600 rounded focus:ring-1 focus:ring-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
                                     </div>
                                     <div className="flex flex-col">
-                                        <label className="text-[9px] text-slate-400 text-center">Sağ</label>
+                                        <label className="text-[9px] text-slate-400 dark:text-slate-500 text-center">Sağ</label>
                                         <input
                                             type="number"
                                             value={margins.right}
                                             onChange={(e) => handleMarginChange('right', Number(e.target.value))}
                                             onKeyDown={(e) => ['-', 'e', 'E', '+'].includes(e.key) && e.preventDefault()}
-                                            className="w-12 h-7 text-xs text-center border-slate-300 rounded focus:ring-1 focus:ring-violet-500"
+                                            className="w-12 h-7 text-xs text-center border-slate-300 dark:border-slate-600 rounded focus:ring-1 focus:ring-violet-500 bg-white dark:bg-slate-900 dark:text-slate-100"
                                         />
                                     </div>
                                 </div>
@@ -1925,7 +1996,7 @@ export default function AdvancedDocumentCreator() {
                     </div>
 
                     {/* Scrollable Area */}
-                    <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-[#e5e7eb]">
+                    <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-[#e5e7eb] dark:bg-slate-950">
                         <div className="relative transition-all duration-200 printable-content mx-auto">
                             <A4Preview
                                 document={{
@@ -1969,7 +2040,7 @@ export default function AdvancedDocumentCreator() {
                             </h3>
                             <button
                                 onClick={() => setShowSaveTemplateModal(false)}
-                                className="text-slate-400 hover:text-slate-600"
+                                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -2011,7 +2082,7 @@ export default function AdvancedDocumentCreator() {
                                     type="checkbox"
                                     checked={templateIsPublic}
                                     onChange={(e) => setTemplateIsPublic(e.target.checked)}
-                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 dark:border-slate-600 focus:ring-indigo-500"
                                 />
                                 <span className="text-sm text-slate-700 dark:text-slate-300">
                                     Herkese açık şablon (diğer kullanıcılar da görebilir)

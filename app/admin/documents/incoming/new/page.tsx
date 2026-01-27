@@ -100,7 +100,7 @@ export default function NewIncomingDocumentPage() {
             </div>
 
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg flex items-center">
                     <AlertCircle className="w-5 h-5 mr-2" />
                     {error}
                 </div>
@@ -171,16 +171,17 @@ export default function NewIncomingDocumentPage() {
                                 <input
                                     type="file"
                                     onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                    className="block w-full text-sm text-slate-500
+                                    className="block w-full text-sm text-slate-500 dark:text-slate-400
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-full file:border-0
                         file:text-sm file:font-semibold
                         file:bg-indigo-50 file:text-indigo-700
                         hover:file:bg-indigo-100
+                        dark:file:bg-indigo-900/40 dark:file:text-indigo-200 dark:hover:file:bg-indigo-900/60
                        "
                                 />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1">Sadece dijital görüntü veya tarama.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Sadece dijital görüntü veya tarama.</p>
                         </div>
                     </div>
 

@@ -89,7 +89,7 @@ export default function NewDecisionPage() {
             </div>
 
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg flex items-center">
                     <AlertCircle className="w-5 h-5 mr-2" />
                     {error}
                 </div>
@@ -141,7 +141,7 @@ export default function NewDecisionPage() {
                                 <option value="draft">Taslak</option>
                                 <option value="final">Kesinleşti (Numara Ver)</option>
                             </select>
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                 "Kesinleşti" seçilirse otomatik Karar No (Yıl/Sıra) atanır.
                             </p>
                         </div>

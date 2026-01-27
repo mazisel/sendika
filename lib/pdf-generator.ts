@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { DMDocument } from '@/lib/types/document-management';
+import { stripInlineFormatting } from '@/lib/utils/documentFormatting';
 
 export const generateDocumentPDF = async (doc: DMDocument): Promise<Blob> => {
     // Create new PDF document (A4 size, units in mm)
@@ -81,7 +82,7 @@ export const generateDocumentPDF = async (doc: DMDocument): Promise<Blob> => {
     // Basic text wrapping for description
     // Note: HTML/Rich text requires html2canvas or advanced parsing. 
     // Assuming plain text or simple content for now.
-    const content = doc.description || '';
+    const content = stripInlineFormatting(doc.description || '');
     const splitContent = pdf.splitTextToSize(content, 170); // 210 - 2*margin
     pdf.text(splitContent, margin, yPos);
 
