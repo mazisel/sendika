@@ -210,10 +210,20 @@ export default function AdvancedDocumentCreator() {
         loadInitialData();
     }, []);
 
-    const withSignatureDefaults = (signer: Signer): Signer => ({
-        ...signer,
-        signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM
-    });
+    const withSignatureDefaults = (signer: Signer): Signer => {
+        let signatureUrl = signer.signature_url;
+
+        // İmza URL'sini Supabase Public URL'e dönüştür (zaten tam URL değilse)
+        if (signatureUrl && !signatureUrl.startsWith('http')) {
+            signatureUrl = supabase.storage.from('official-documents').getPublicUrl(signatureUrl).data.publicUrl;
+        }
+
+        return {
+            ...signer,
+            signature_url: signatureUrl,
+            signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM
+        };
+    };
 
     // Özel yazdırma fonksiyonu - yeni pencerede yazdırır
     const handlePrint = () => {
