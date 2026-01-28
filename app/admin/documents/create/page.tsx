@@ -8,7 +8,7 @@ import {
     Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
     Plus, Trash2, Calendar, GripVertical, Upload, X, Copy,
     ZoomIn, ZoomOut, RotateCcw, Monitor, Link2, Unlink2,
-    Search, Users, Table, User, Check, Archive, Loader2
+    Search, Users, Table, User, Check, Archive, Loader2, Printer
 } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentService } from '@/lib/services/documentService';
@@ -197,9 +197,7 @@ export default function AdvancedDocumentCreator() {
                             setValue('textAlign', (defaults.text_align as any) || 'justify');
                             setValue('receiverTextAlign', (defaults.receiver_text_align as any) || 'left');
 
-                            if (defaults.signers && Array.isArray(defaults.signers) && defaults.signers.length > 0) {
-                                setValue('signers', defaults.signers.map((s: any) => withSignatureDefaults(s)));
-                            }
+
                         }
                     }
                 } catch (error) {
@@ -217,38 +215,118 @@ export default function AdvancedDocumentCreator() {
         signature_size_mm: Number.isFinite(signer.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM
     });
 
-    const handleAddSelfSignature = () => {
-        if (!currentUser || !currentUser.signature_url) {
-            toast.error('Profilinizde tanımlı imza bulunamadı.');
+    // Özel yazdırma fonksiyonu - yeni pencerede yazdırır
+    const handlePrint = () => {
+        const printContainer = document.querySelector('.print-pages-container');
+        if (!printContainer) {
+            toast.error('Yazdırılacak içerik bulunamadı');
             return;
         }
 
-        // Önce yetkili imzacılar listesinde kendisini arasın
-        const authorizedSelf = availableSigners.find(s => s.id === currentUser.id);
-
-        let title = 'Yönetici';
-
-        // Öncelik: Kullanıcının tanımlı unvanı
-        if (userTitle) {
-            title = userTitle;
-        }
-        // İkinci: Yetkili imzacılar listesindeki unvan
-        else if (authorizedSelf && authorizedSelf.title) {
-            title = authorizedSelf.title;
-        }
-        // Fallback
-        else {
-            if (currentUser.role_type === 'branch_manager') title = 'Şube Başkanı';
-            else if (currentUser.role === 'super_admin') title = 'Genel Başkan';
+        // Yeni pencere aç
+        const printWindow = window.open('', '_blank', 'width=794,height=1123');
+        if (!printWindow) {
+            toast.error('Yazdırma penceresi açılamadı. Pop-up engelleyicinizi kontrol edin.');
+            return;
         }
 
-        appendSigner(withSignatureDefaults({
-            name: currentUser.full_name,
-            title: title,
-            user_id: currentUser.id,
-            signature_url: currentUser.signature_url
-        }));
+        // Mevcut sayfanın tüm stylesheet linklerini al
+        const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'));
+        let stylesHTML = '';
+        styleSheets.forEach(el => {
+            stylesHTML += el.outerHTML;
+        });
+
+        // Sayfaları kopyala ve son sayfaya özel class ekle
+        const pages = printContainer.querySelectorAll('.printable-content');
+        let pagesHTML = '';
+        pages.forEach((page, index) => {
+            const clone = page.cloneNode(true) as HTMLElement;
+            // Son sayfa ise class ekle
+            if (index === pages.length - 1) {
+                clone.classList.add('last-page');
+            }
+            pagesHTML += clone.outerHTML;
+        });
+
+        // Yazdırma penceresi HTML'i
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Belge Yazdır</title>
+                ${stylesHTML}
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 0;
+                    }
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+                    html, body {
+                        width: 210mm;
+                        background: white !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    body {
+                        font-family: 'Times New Roman', serif;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .printable-content {
+                        width: 210mm !important;
+                        height: 297mm !important;
+                        margin: 0 !important;
+                        padding-top: ${margins.top}mm !important;
+                        padding-right: ${margins.right}mm !important;
+                        padding-bottom: ${margins.bottom}mm !important;
+                        padding-left: ${margins.left}mm !important;
+                        background: white !important;
+                        color: black !important;
+                        position: relative !important;
+                        overflow: hidden !important;
+                        box-shadow: none !important;
+                        /* Varsayılan: sayfa kesmesi YOK */
+                        page-break-after: auto !important;
+                        break-after: auto !important;
+                    }
+                    /* Sadece son sayfa HARİCİ sayfalara sayfa kesmesi uygula */
+                    .printable-content:not(.last-page):not(:last-of-type) {
+                        page-break-after: always !important;
+                        break-after: page !important;
+                    }
+                    /* Transform iptal */
+                    .print-pages-container {
+                        transform: none !important;
+                        gap: 0 !important;
+                    }
+                    /* Ghost container gizle */
+                    .no-print {
+                        display: none !important;
+                    }
+                </style>
+            </head>
+            <body>
+                ${pagesHTML}
+            </body>
+            </html>
+        `);
+
+        printWindow.document.close();
+
+        // Yazdırma dialogunu aç (stillerin yüklenmesi için biraz bekle)
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+        }, 1000);
     };
+
+
 
     const handleAddOtherSigner = (userId: string) => {
         const signer = availableSigners.find(s => s.id === userId);
@@ -449,11 +527,18 @@ export default function AdvancedDocumentCreator() {
 
     // Alan toggle
     const toggleField = (fieldKey: string) => {
-        setSelectedFields(prev =>
-            prev.includes(fieldKey)
+        setSelectedFields(prev => {
+            const isSelected = prev.includes(fieldKey);
+
+            if (!isSelected && prev.length >= 5) {
+                toast.error('En fazla 5 alan seçebilirsiniz.');
+                return prev;
+            }
+
+            return isSelected
                 ? prev.filter(f => f !== fieldKey)
-                : [...prev, fieldKey]
-        );
+                : [...prev, fieldKey];
+        });
     };
 
     // Textarea input handler - mention detection
@@ -476,38 +561,46 @@ export default function AdvancedDocumentCreator() {
                 const searchTerm = textAfterAt.toLowerCase();
 
                 // @uye komutu algılama
-                if (searchTerm === 'uyetablo' || searchTerm === 'üyetablo') {
-                    // @uyetablo: Çoklu seçim modu
+                // @uyetablo komutu (prefix olarak - çoklu seçim)
+                if (searchTerm.startsWith('uyetablo') || searchTerm.startsWith('üyetablo')) {
                     setMentionTriggerPos(lastAtIndex);
                     setShowMentionPopup(true);
-                    setMentionType('command');
-                    setMentionSearch(searchTerm);
-                    setIsMultiSelect(true); // Çoklu seçim aktif
-                    setSelectedMembers([]); // Seçimleri sıfırla
-                } else if (searchTerm.startsWith('uye') || searchTerm.startsWith('üye')) {
-                    setMentionTriggerPos(lastAtIndex);
-                    setShowMentionPopup(true);
+                    setIsMultiSelect(true);
 
-                    // Normal @uye: Tekli seçim modu
-                    if (searchTerm === 'uye' || searchTerm === 'üye' || searchTerm.length > 3) {
-                        setIsMultiSelect(false); // Tekli seçim
+                    // Komutun kendisini ve boşlukları temizle
+                    const memberQuery = searchTerm.replace(/^(uyetablo|üyetablo)\s*/, '');
+
+                    if (memberQuery.length > 0) {
+                        setMentionType('member');
+                        setMentionSearch(memberQuery);
+                        searchMembers(memberQuery);
+                    } else {
+                        // Sadece komut (@uyetablo)
+                        setMentionType('command');
+                        setMentionSearch(searchTerm);
                     }
+                }
+                // @uye komutu (tekli seçim)
+                else if (searchTerm.startsWith('uye') || searchTerm.startsWith('üye')) {
+                    setMentionTriggerPos(lastAtIndex);
+                    setShowMentionPopup(true);
 
-                    // Eğer @uye yazılmışsa ve devamı varsa üye araması yap (ancak @uyetablo değilse)
+                    // Sadece tam eşleşme veya boşluksuz başlangıçta tekli moda zorla
+                    // (uyetablo yukarıda yakalandığı için buraya düşmez)
+                    setIsMultiSelect(false);
+
                     const memberQuery = searchTerm.replace(/^(uye|üye)\s*/, '');
                     if (memberQuery.length > 0) {
                         setMentionType('member');
                         setMentionSearch(memberQuery);
                         searchMembers(memberQuery);
-                    } else if (searchTerm === 'uye' || searchTerm === 'üye') {
-                        // Tam olarak @uye yazıldıysa, boş arama yap
-                        setMentionType('member');
+                    } else {
+                        // Tam olarak @uye yazıldıysa
+                        setMentionType('member'); // Direkt member moduna geç (veya command kalabilir)
+                        // Kullanıcı deneyimi: @uye yazınca liste gelsin mi? 
+                        // Orijinal kodda boş arama yapılmış:
                         setMentionSearch('');
                         searchMembers('');
-                    } else {
-                        // @uyeXYZ gibi bir şeyse ve XYZ tablo değilse
-                        setMentionType('command');
-                        setMentionSearch(searchTerm);
                     }
                 } else if (searchTerm.length === 0) {
                     // Sadece @ yazıldıysa komutları göster
@@ -516,7 +609,25 @@ export default function AdvancedDocumentCreator() {
                     setMentionType('command');
                     setMentionSearch('');
                 } else {
-                    setShowMentionPopup(false);
+                    // Eşleşmeyen başka bir şey (@deneme) -> Pop-up kapa
+                    // Ancak: Komut listesinde filtreleme yapmak istiyorsak kapatmamalıyız?
+                    // Mevcut mantık: Sadece bilinen komutları destekliyor.
+                    setMentionType('command');
+                    setMentionSearch(searchTerm); // Belki başka komut vardır?
+                    // showMentionPopup(true) kalmalı mı?
+                    // Orijinal kodda kapatıyordu, biz de filtreye bırakalım veya kapatalım.
+                    // Orijinalde else -> setShowMentionPopup(false) yoktu, sadece check bitiyordu.
+                    // Ama burada explicit else var.
+                    // MENTION_COMMANDS içinde arayalım.
+                    const anyCommandMatch = MENTION_COMMANDS.some(cmd => cmd.trigger.includes(searchTerm));
+                    if (anyCommandMatch) {
+                        setMentionTriggerPos(lastAtIndex);
+                        setShowMentionPopup(true);
+                        setMentionType('command');
+                        setMentionSearch(searchTerm);
+                    } else {
+                        setShowMentionPopup(false);
+                    }
                 }
             } else {
                 setShowMentionPopup(false);
@@ -1047,6 +1158,13 @@ export default function AdvancedDocumentCreator() {
                         <Send className="w-4 h-4 inline-block mr-2" />
                         İmzala
                     </button>
+                    <button
+                        onClick={handlePrint}
+                        className="px-4 py-2 text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 text-sm font-medium"
+                    >
+                        <Printer className="w-4 h-4 inline-block mr-2" />
+                        Yazdır
+                    </button>
                 </div>
             </header>
 
@@ -1054,7 +1172,7 @@ export default function AdvancedDocumentCreator() {
             <div className="flex flex-1 overflow-hidden">
 
                 {/* Editor Pane (Left) */}
-                <div className={`w-full md:w-[400px] lg:w-[450px] bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-6 space-y-6 ${previewMode ? 'hidden md:block' : 'block'}`}>
+                <div className={`w-full md:w-1/2 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-6 space-y-6 ${previewMode ? 'hidden md:block' : 'block'}`}>
 
                     {/* Section: Künye */}
                     <div className="space-y-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -1455,18 +1573,18 @@ export default function AdvancedDocumentCreator() {
                                                             setMentionSearch('');
                                                         }
                                                     }}
-                                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
-                                                ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200'
-                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            <div className="flex-shrink-0 w-8 h-8 bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-200 rounded-lg flex items-center justify-center">
-                                                {cmd.icon}
-                                            </div>
-                                            <div className="text-left flex-1">
-                                                <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{cmd.label}</div>
-                                                <div className="text-xs text-slate-500 dark:text-slate-400">{cmd.description}</div>
-                                            </div>
+                                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
+                                                        ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-200'
+                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                        }`}
+                                                >
+                                                    <div className="flex-shrink-0 w-8 h-8 bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-200 rounded-lg flex items-center justify-center">
+                                                        {cmd.icon}
+                                                    </div>
+                                                    <div className="text-left flex-1">
+                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{cmd.label}</div>
+                                                        <div className="text-xs text-slate-500 dark:text-slate-400">{cmd.description}</div>
+                                                    </div>
                                                     <div className="flex-shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono">
                                                         {cmd.trigger}
                                                     </div>
@@ -1505,44 +1623,44 @@ export default function AdvancedDocumentCreator() {
                                                 </div>
                                             )}
 
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    {memberSearchLoading ? (
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {memberSearchLoading ? (
                                                     <div className="p-4 text-center text-slate-500 dark:text-slate-400">
                                                         <div className="animate-spin w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                                                         <span className="text-sm">Aranıyor...</span>
                                                     </div>
-                                                    ) : filteredMembers.length > 0 ? (
-                                                        <div className="p-2 space-y-1">
-                                                            {filteredMembers.map((member, idx) => (
-                                                                <button
-                                                                    key={member.id}
-                                                                    type="button"
-                                                                    onClick={() => handleMemberSelect(member)}
-                                                                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
-                                                                        ? 'bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800/60'
-                                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                                                                        } ${isMultiSelect && selectedMembers.find(m => m.id === member.id) ? 'bg-violet-100 dark:bg-violet-900/40' : ''}`}
-                                                                >
-                                                                    <div className="flex-shrink-0 relative">
-                                                                        <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-xs">
-                                                                            {member.first_name?.[0]}{member.last_name?.[0]}
-                                                                        </div>
+                                                ) : filteredMembers.length > 0 ? (
+                                                    <div className="p-2 space-y-1">
+                                                        {filteredMembers.map((member, idx) => (
+                                                            <button
+                                                                key={member.id}
+                                                                type="button"
+                                                                onClick={() => handleMemberSelect(member)}
+                                                                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${idx === selectedMemberIndex
+                                                                    ? 'bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800/60'
+                                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                                    } ${isMultiSelect && selectedMembers.find(m => m.id === member.id) ? 'bg-violet-100 dark:bg-violet-900/40' : ''}`}
+                                                            >
+                                                                <div className="flex-shrink-0 relative">
+                                                                    <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full flex items-center justify-center font-semibold text-xs">
+                                                                        {member.first_name?.[0]}{member.last_name?.[0]}
+                                                                    </div>
                                                                     {isMultiSelect && selectedMembers.find(m => m.id === member.id) && (
                                                                         <div className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-0.5">
                                                                             <Check className="w-3 h-3" />
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                    <div className="text-left flex-1 min-w-0">
-                                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
-                                                                            {member.first_name} {member.last_name}
-                                                                        </div>
-                                                                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                                                            {member.membership_number} • {member.city || '-'}
-                                                                        </div>
+                                                                <div className="text-left flex-1 min-w-0">
+                                                                    <div className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                                                                        {member.first_name} {member.last_name}
                                                                     </div>
-                                                                </button>
-                                                            ))}
+                                                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                                        {member.membership_number} • {member.city || '-'}
+                                                                    </div>
+                                                                </div>
+                                                            </button>
+                                                        ))}
                                                     </div>
                                                 ) : mentionSearch.length >= 2 ? (
                                                     <div className="p-4 text-center text-slate-500 dark:text-slate-400">
@@ -1615,7 +1733,7 @@ export default function AdvancedDocumentCreator() {
 
                                             {/* Önizleme */}
                                             {selectedMember && selectedFields.length > 0 && (
-                                            <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
+                                                <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
                                                     <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Önizleme:</div>
                                                     <div className="overflow-x-auto">
                                                         <table className="w-full text-xs border border-slate-300 dark:border-slate-700">
@@ -1668,17 +1786,7 @@ export default function AdvancedDocumentCreator() {
                         <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2 mb-2">
                             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">İmzacılar</h3>
                             <div className="flex space-x-2">
-                                {/* Kendi İmzasını Ekle Butonu */}
-                                {(currentUser?.permissions?.includes('documents.sign.own') || currentUser?.role === 'super_admin') && currentUser?.signature_url && (
-                                    <button
-                                        type="button"
-                                        onClick={handleAddSelfSignature}
-                                        className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200 px-2 py-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center"
-                                    >
-                                        <User className="w-3 h-3 mr-1" />
-                                        Kendimi Ekle
-                                    </button>
-                                )}
+
 
                                 {/* Başkasını Ekle Dropdown (Basit versiyon) */}
                                 {(currentUser?.permissions?.includes('documents.sign.others') || currentUser?.role === 'super_admin') && availableSigners.length > 0 && (

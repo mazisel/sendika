@@ -16,13 +16,30 @@ const getLogoUrl = (url: string | undefined): string | undefined => {
     return supabase.storage.from('images').getPublicUrl(url).data.publicUrl;
 };
 
+interface DefaultSettingsFormData {
+    header_title: string;
+    header_org_name: string;
+    sender_unit: string;
+    logo_url: string;
+    right_logo_url: string;
+    footer_org_name: string;
+    footer_address: string;
+    footer_contact: string;
+    footer_phone: string;
+    text_align: string;
+    receiver_text_align: string;
+    signers: { name: string; title: string }[];
+}
+
+
 export default function DefaultDocumentSettings() {
     const [loading, setLoading] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
-    const { register, control, handleSubmit, setValue, watch, formState: { errors } } = useForm({
+    const { register, control, handleSubmit, setValue, watch, formState: { errors } } = useForm<DefaultSettingsFormData>({
         defaultValues: {
+
             header_title: 'T.C.',
             header_org_name: 'SENDİKA YÖNETİM SİSTEMİ',
             sender_unit: 'GENEL MERKEZ YÖNETİM KURULU',
@@ -34,7 +51,7 @@ export default function DefaultDocumentSettings() {
             footer_phone: '0312 000 00 00',
             text_align: 'justify',
             receiver_text_align: 'left',
-            signers: [{ name: 'Ad Soyad', title: 'Unvan' }]
+            signers: []
         }
     });
 
