@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DMDocument } from '@/lib/types/document-management';
 import { formatDocumentContent } from '@/lib/utils/documentFormatting';
 // import { formatContentForPreview } from '@/lib/utils/documentUtils';
@@ -53,12 +53,13 @@ interface A4PreviewProps {
     readonly?: boolean;
 }
 
-export default function A4Preview({ document: docProp, zoom = 1, margins = { top: 25, right: 25, bottom: 25, left: 25 }, readonly = true }: A4PreviewProps) {
+function A4PreviewComponent({ document: docProp, zoom = 1, margins = { top: 25, right: 25, bottom: 25, left: 25 }, readonly = true }: A4PreviewProps) {
     const [pages, setPages] = useState<React.ReactNode[][]>([]);
     const ghostRef = useRef<HTMLDivElement>(null);
+    const calculateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Normalize properties
-    const doc = {
+    const doc = useMemo(() => ({
         ...docProp,
         content: docProp.content || docProp.description || '',
         date: docProp.date || docProp.reference_date || new Date().toISOString(),
@@ -84,9 +85,9 @@ export default function A4Preview({ document: docProp, zoom = 1, margins = { top
 
         textAlign: (docProp as any).textAlign || docProp.text_align || 'justify',
         receiverTextAlign: (docProp as any).receiverTextAlign || docProp.receiver_text_align || 'left',
-    };
+    }), [docProp]);
 
-    const formattedContent = formatDocumentContent(doc.content);
+    const formattedContent = useMemo(() => formatDocumentContent(doc.content), [doc.content]);
     const DEFAULT_SIGNATURE_SIZE_MM = 50;
     const getSignatureSize = (signer: any) =>
         Number.isFinite(signer?.signature_size_mm) ? signer.signature_size_mm : DEFAULT_SIGNATURE_SIZE_MM;
@@ -99,9 +100,24 @@ export default function A4Preview({ document: docProp, zoom = 1, margins = { top
     // We will use a multiplier derived from a reference element or standard constant.
     const MM_TO_PX = 3.7795275591;
 
+    // Debounced calculation to prevent rapid recalculations
     useEffect(() => {
-        calculatePages();
-    }, [formattedContent, doc, margins]); // Recalculate on content/layout change only, NOT zoom
+        // Clear any pending calculation
+        if (calculateTimeoutRef.current) {
+            clearTimeout(calculateTimeoutRef.current);
+        }
+
+        // Debounce the calculation by 300ms
+        calculateTimeoutRef.current = setTimeout(() => {
+            calculatePages();
+        }, 300);
+
+        return () => {
+            if (calculateTimeoutRef.current) {
+                clearTimeout(calculateTimeoutRef.current);
+            }
+        };
+    }, [formattedContent, doc.showHeader, doc.showFooter, doc.showSignatures, doc.showReceiver, margins]);
 
     const calculatePages = () => {
         if (!ghostRef.current) return;
@@ -468,3 +484,6 @@ export default function A4Preview({ document: docProp, zoom = 1, margins = { top
         </>
     );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders
+export default React.memo(A4PreviewComponent);
