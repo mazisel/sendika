@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Control } from 'react-hook-form';
 import {
@@ -769,6 +769,40 @@ export default function AdvancedDocumentCreator() {
 
     // Valid values for preview
     const formValues = watch();
+
+    // Memoize document for A4Preview to prevent infinite re-renders
+    const previewDocument = useMemo(() => ({
+        ...formValues,
+        document_number: formValues.category_code ? `${formValues.category_code}-TASLAK` : 'TASLAK'
+    }), [
+        formValues.category_code,
+        formValues.subject,
+        formValues.receiver,
+        formValues.content,
+        formValues.date,
+        formValues.signers,
+        formValues.type,
+        formValues.sender_unit,
+        formValues.textAlign,
+        formValues.receiverTextAlign,
+        formValues.logoUrl,
+        formValues.rightLogoUrl,
+        formValues.headerTitle,
+        formValues.headerOrgName,
+        formValues.footerOrgName,
+        formValues.footerAddress,
+        formValues.footerContact,
+        formValues.footerPhone,
+        formValues.showHeader,
+        formValues.showDate,
+        formValues.showSayi,
+        formValues.showKonu,
+        formValues.showKararNo,
+        formValues.showReceiver,
+        formValues.showSignatures,
+        formValues.showFooter,
+        formValues.decision_number
+    ]);
 
     // Signers Field Array
     const { fields: signerFields, append: appendSigner, remove: removeSigner } = useFieldArray({
@@ -2117,16 +2151,7 @@ export default function AdvancedDocumentCreator() {
                     <div className="flex-1 overflow-auto p-8 relative flex justify-center bg-[#e5e7eb] dark:bg-slate-950">
                         <div className="relative transition-all duration-200 printable-content mx-auto">
                             <A4Preview
-                                document={{
-                                    ...formValues,
-                                    signers: formValues.signers?.map((s: any) => ({
-                                        ...s,
-                                        signature_url: s.signature_url
-                                            ? supabase.storage.from('official-documents').getPublicUrl(s.signature_url).data.publicUrl
-                                            : undefined
-                                    })),
-                                    document_number: formValues.category_code ? `${formValues.category_code}-TASLAK` : 'TASLAK'
-                                }}
+                                document={previewDocument}
                                 zoom={zoom}
                                 margins={margins}
                                 readonly={true}
