@@ -301,34 +301,65 @@ export default function AdminMembersContent() {
   };
 
   const loadAllMembers = async () => {
-    if (allMembers.length > 0) return; // Already loaded
+    console.log('[DEBUG loadAllMembers] Starting...');
+    console.log('[DEBUG loadAllMembers] allMembers.length:', allMembers.length);
+
+    if (allMembers.length > 0) {
+      console.log('[DEBUG loadAllMembers] Already loaded, skipping');
+      return; // Already loaded
+    }
     try {
       setLoading(true);
       let query = supabase.from('members').select('*');
 
       // Permission Check
+      console.log('[DEBUG loadAllMembers] currentUser:', currentUser);
+      console.log('[DEBUG loadAllMembers] canViewMembers:', currentUser ? PermissionManager.canViewMembers(currentUser) : 'no user');
+
       if (!currentUser || !PermissionManager.canViewMembers(currentUser)) {
+        console.warn('[DEBUG loadAllMembers] Permission denied or no user');
         setAllMembers([]);
         setLoading(false);
         return;
       }
 
       const isSuperAdmin = currentUser?.role === 'super_admin';
+      console.log('[DEBUG loadAllMembers] isSuperAdmin:', isSuperAdmin);
+      console.log('[DEBUG loadAllMembers] role_type:', currentUser?.role_type);
+      console.log('[DEBUG loadAllMembers] city:', currentUser?.city);
+      console.log('[DEBUG loadAllMembers] region:', currentUser?.region);
 
       if (!isSuperAdmin) {
         if (currentUser && currentUser.role_type === 'branch_manager' && currentUser.city) {
           query = query.eq('city', currentUser.city);
+          console.log('[DEBUG loadAllMembers] Filtering by city:', currentUser.city);
         } else if (currentUser && currentUser.role_type === 'regional_manager' && currentUser.region) {
           query = query.eq('region', currentUser.region);
+          console.log('[DEBUG loadAllMembers] Filtering by region:', currentUser.region);
         }
       }
+
+      console.log('[DEBUG loadAllMembers] Executing query...');
       const { data, error } = await query.order('created_at', { ascending: false });
-      if (error) throw error;
+
+      console.log('[DEBUG loadAllMembers] Query completed');
+      console.log('[DEBUG loadAllMembers] Error:', error);
+      console.log('[DEBUG loadAllMembers] Data count:', data?.length ?? 0);
+
+      if (error) {
+        console.error('[DEBUG loadAllMembers] Supabase error:', error.message, error.code, error.details);
+        throw error;
+      }
+
       setAllMembers(data || []);
-    } catch (error) {
-      console.error(error);
+      console.log('[DEBUG loadAllMembers] Members set successfully:', data?.length ?? 0);
+    } catch (error: any) {
+      console.error('[DEBUG loadAllMembers] Catch block error:', error);
+      console.error('[DEBUG loadAllMembers] Error message:', error?.message);
+      console.error('[DEBUG loadAllMembers] Error stack:', error?.stack);
     } finally {
       setLoading(false);
+      console.log('[DEBUG loadAllMembers] Finished');
     }
   };
 
@@ -350,143 +381,132 @@ export default function AdminMembersContent() {
     let filtered = [...allMembers];
     const f = advancedFilters;
 
-    // Debug: Log initial state
-    console.log('Starting advanced search with', filtered.length, 'members');
-    console.log('Filters:', f);
-
     // Apply advanced filters
     if (f.city) {
       filtered = filtered.filter(m => m.city === f.city);
-      console.log('After city filter:', filtered.length);
     }
     if (f.district) {
       filtered = filtered.filter(m => m.district === f.district);
-      console.log('After district filter:', filtered.length);
     }
     if (f.workplace) {
-      filtered = filtered.filter(m => m.workplace?.toLowerCase().includes(f.workplace.toLowerCase()));
-      console.log('After workplace filter:', filtered.length);
+      const searchVal = f.workplace.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.workplace?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.position) {
-      filtered = filtered.filter(m => m.position?.toLowerCase().includes(f.position.toLowerCase()));
-      console.log('After position filter:', filtered.length);
+      const searchVal = f.position.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.position?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.gender) {
       // Handle gender mapping: UI uses 'Erkek'/'Kadın', DB uses 'male'/'female'
       const genderMap: Record<string, string> = { 'Erkek': 'male', 'Kadın': 'female' };
       const dbGender = genderMap[f.gender] || f.gender;
       filtered = filtered.filter(m => m.gender === dbGender);
-      console.log('After gender filter:', filtered.length, '(looking for', dbGender, ')');
     }
     if (f.education) {
       filtered = filtered.filter(m => m.education_level === f.education);
-      console.log('After education filter:', filtered.length);
     }
     if (f.blood_group) {
       filtered = filtered.filter(m => m.blood_group === f.blood_group);
-      console.log('After blood_group filter:', filtered.length);
     }
     if (f.region) {
-      filtered = filtered.filter(m => m.region === f.region);
-      console.log('After region filter:', filtered.length);
+      // Try matching by region name - regions array contains {id, name}
+      filtered = filtered.filter(m => {
+        // If m.region is a number, we need to find the region name that matches
+        if (typeof m.region === 'number' || !isNaN(Number(m.region))) {
+          return String(m.region) === f.region;
+        }
+        return m.region === f.region;
+      });
     }
     if (f.maritalStatus) {
       filtered = filtered.filter(m => m.marital_status === f.maritalStatus);
-      console.log('After maritalStatus filter:', filtered.length);
     }
     if (f.tcIdentity) {
       filtered = filtered.filter(m => m.tc_identity.includes(f.tcIdentity));
-      console.log('After tcIdentity filter:', filtered.length);
     }
     if (f.firstName) {
-      filtered = filtered.filter(m => m.first_name.toLowerCase().includes(f.firstName.toLowerCase()));
-      console.log('After firstName filter:', filtered.length);
+      const searchVal = f.firstName.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.first_name.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.lastName) {
-      filtered = filtered.filter(m => m.last_name.toLowerCase().includes(f.lastName.toLowerCase()));
-      console.log('After lastName filter:', filtered.length);
+      const searchVal = f.lastName.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.last_name.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.fatherName) {
-      filtered = filtered.filter(m => m.father_name?.toLowerCase().includes(f.fatherName.toLowerCase()));
-      console.log('After fatherName filter:', filtered.length);
+      const searchVal = f.fatherName.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.father_name?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.motherName) {
-      filtered = filtered.filter(m => m.mother_name?.toLowerCase().includes(f.motherName.toLowerCase()));
-      console.log('After motherName filter:', filtered.length);
+      const searchVal = f.motherName.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.mother_name?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.birthPlace) {
       filtered = filtered.filter(m => m.birth_place === f.birthPlace);
-      console.log('After birthPlace filter:', filtered.length);
     }
     if (f.membershipNumber) {
       filtered = filtered.filter(m => m.membership_number?.toLowerCase().includes(f.membershipNumber.toLowerCase()));
-      console.log('After membershipNumber filter:', filtered.length);
     }
     if (f.institution) {
-      filtered = filtered.filter(m => m.institution?.toLowerCase().includes(f.institution.toLowerCase()));
-      console.log('After institution filter:', filtered.length);
+      const searchVal = f.institution.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.institution?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.institutionRegNo) {
       filtered = filtered.filter(m => m.institution_register_no?.includes(f.institutionRegNo));
-      console.log('After institutionRegNo filter:', filtered.length);
     }
     if (f.retirementRegNo) {
       filtered = filtered.filter(m => m.retirement_register_no?.includes(f.retirementRegNo));
-      console.log('After retirementRegNo filter:', filtered.length);
     }
     if (f.email) {
       filtered = filtered.filter(m => m.email?.toLowerCase().includes(f.email.toLowerCase()));
-      console.log('After email filter:', filtered.length);
     }
     if (f.phone) {
-      filtered = filtered.filter(m => m.phone?.includes(f.phone));
-      console.log('After phone filter:', filtered.length);
+      // Remove non-digit characters for robust search
+      const cleanSearchPhone = f.phone.replace(/\D/g, '');
+      filtered = filtered.filter(m => {
+        if (!m.phone) return false;
+        const cleanMemberPhone = m.phone.replace(/\D/g, '');
+        return cleanMemberPhone.includes(cleanSearchPhone);
+      });
+    }
+    if (f.address) {
+      const searchVal = f.address.toLocaleLowerCase('tr-TR');
+      filtered = filtered.filter(m => m.address?.toLocaleLowerCase('tr-TR').includes(searchVal));
     }
     if (f.membershipStatus) {
-      console.log('Filtering by membershipStatus:', f.membershipStatus);
-      console.log('Sample member status values:', filtered.slice(0, 3).map(m => m.membership_status));
       filtered = filtered.filter(m => m.membership_status === f.membershipStatus);
-      console.log('After membershipStatus filter:', filtered.length);
     }
 
     // Membership date range
     if (f.membershipStartDate) {
       filtered = filtered.filter(m => m.membership_date && m.membership_date >= f.membershipStartDate);
-      console.log('After membershipStartDate filter:', filtered.length);
     }
     if (f.membershipEndDate) {
       filtered = filtered.filter(m => m.membership_date && m.membership_date <= f.membershipEndDate);
-      console.log('After membershipEndDate filter:', filtered.length);
     }
 
     // Resignation filters
     if (f.resignationReason) {
       filtered = filtered.filter(m => m.resignation_reason === f.resignationReason);
-      console.log('After resignationReason filter:', filtered.length);
     }
     if (f.resignationStartDate) {
       filtered = filtered.filter(m => m.resignation_date && m.resignation_date >= f.resignationStartDate);
-      console.log('After resignationStartDate filter:', filtered.length);
     }
     if (f.resignationEndDate) {
       filtered = filtered.filter(m => m.resignation_date && m.resignation_date <= f.resignationEndDate);
-      console.log('After resignationEndDate filter:', filtered.length);
     }
 
     // Due status
     if (f.dueStatus) {
       filtered = filtered.filter(m => m.due_status === f.dueStatus);
-      console.log('After dueStatus filter:', filtered.length);
     }
 
-    // Work city and district
-    if (f.workCity) {
+    // Work city and district - these use the same city/district fields
+    // They should NOT be applied if city/district filters are already set (to avoid conflict)
+    if (f.workCity && !f.city) {
       filtered = filtered.filter(m => m.city === f.workCity);
-      console.log('After workCity filter:', filtered.length);
     }
-    if (f.workDistrict) {
+    if (f.workDistrict && !f.district) {
       filtered = filtered.filter(m => m.district === f.workDistrict);
-      console.log('After workDistrict filter:', filtered.length);
     }
 
     // Age range filter
@@ -498,17 +518,16 @@ export default function AdminMembersContent() {
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+
         if (f.minAge && age < parseInt(f.minAge)) return false;
         if (f.maxAge && age > parseInt(f.maxAge)) return false;
         return true;
       });
-      console.log('After age filter:', filtered.length);
     }
 
     // Birth date filter
     if (f.birthDate) {
       filtered = filtered.filter(m => m.birth_date === f.birthDate);
-      console.log('After birthDate filter:', filtered.length);
     }
 
     setDetailedSearchResults(filtered);

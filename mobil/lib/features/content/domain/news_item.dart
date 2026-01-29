@@ -1,3 +1,5 @@
+import 'content_attachment.dart';
+
 class NewsItem {
   NewsItem({
     required this.id,
@@ -6,6 +8,7 @@ class NewsItem {
     this.excerpt,
     this.imageUrl,
     this.publishedAt,
+    this.attachments = const [],
   });
 
   final String id;
@@ -14,6 +17,7 @@ class NewsItem {
   final String? excerpt;
   final String? imageUrl;
   final DateTime? publishedAt;
+  final List<ContentAttachment> attachments;
 
   factory NewsItem.fromJson(Map<String, dynamic> json) {
     return NewsItem(
@@ -25,6 +29,7 @@ class NewsItem {
       publishedAt: json['published_at'] != null
           ? DateTime.tryParse(json['published_at'].toString())
           : null,
+      attachments: ContentAttachment.listFromRaw(json['attachments']),
     );
   }
 
@@ -32,10 +37,15 @@ class NewsItem {
     if (excerpt != null && excerpt!.isNotEmpty) {
       return excerpt!;
     }
-    if (content.isEmpty) {
+    final cleaned = plainText;
+    if (cleaned.isEmpty) {
       return '';
     }
+    return cleaned.length > 140 ? '${cleaned.substring(0, 140)}...' : cleaned;
+  }
+
+  String get plainText {
     final plain = content.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
-    return plain.length > 140 ? '${plain.substring(0, 140)}...' : plain;
+    return plain.replaceAll(RegExp(r'\\s+'), ' ').trim();
   }
 }

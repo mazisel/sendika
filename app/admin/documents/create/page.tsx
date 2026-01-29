@@ -214,8 +214,20 @@ export default function AdvancedDocumentCreator() {
         let signatureUrl = signer.signature_url;
 
         // İmza URL'sini Supabase Public URL'e dönüştür (zaten tam URL değilse)
-        if (signatureUrl && !signatureUrl.startsWith('http')) {
-            signatureUrl = supabase.storage.from('official-documents').getPublicUrl(signatureUrl).data.publicUrl;
+        if (signatureUrl) {
+            if (!signatureUrl.startsWith('http')) {
+                // Remove leading slash if present
+                const cleanPath = signatureUrl.startsWith('/') ? signatureUrl.substring(1) : signatureUrl;
+
+                // If it's just a filename or relative path, assume it's in official-documents
+                if (!cleanPath.includes('official-documents')) {
+                    const { data } = supabase.storage.from('official-documents').getPublicUrl(cleanPath);
+                    signatureUrl = data.publicUrl;
+                } else {
+                    // If it somehow already has part of the path but is relative (unlikely but safe)
+                    signatureUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${cleanPath}`;
+                }
+            }
         }
 
         return {

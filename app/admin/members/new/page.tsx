@@ -728,6 +728,25 @@ export default function NewMemberPage() {
         ? null
         : Number(formData.dues_amount);
 
+      const formatPhoneNumber = (phone: string) => {
+        if (!phone) return null;
+        let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
+        // If it starts with 0, remove it
+        if (cleaned.startsWith('0')) {
+          cleaned = cleaned.substring(1);
+        }
+        // If it's a valid Turkish mobile number length (10 digits), add +90
+        if (cleaned.length === 10) {
+          return `+90${cleaned}`;
+        }
+        // If it's already 12 digits (90...), add +
+        if (cleaned.length === 12 && cleaned.startsWith('90')) {
+          return `+${cleaned}`;
+        }
+        // Fallback: return cleaned or original if not recognized
+        return `+${cleaned}`;
+      };
+
       const memberData = {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
@@ -736,7 +755,7 @@ export default function NewMemberPage() {
         gender: formData.gender,
         city: formData.city.trim(),
         district: formData.district.trim(),
-        phone: formData.phone.trim() || null,
+        phone: formatPhoneNumber(formData.phone.trim()),
         email: formData.email.trim() || null,
         address: formData.address.trim(),
 
@@ -819,7 +838,8 @@ export default function NewMemberPage() {
 
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
-          throw new Error(payload?.message || 'Şifre oluşturulurken bir hata oluştu.');
+          const detailedError = payload?.details || payload?.message || 'Şifre oluşturulurken bir hata oluştu.';
+          throw new Error(detailedError);
         }
       }
 

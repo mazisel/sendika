@@ -29,10 +29,6 @@ export async function POST(req: NextRequest) {
         // Find user by phone (manual filter as listUsers doesn't support phone filter directly in all versions efficiently)
         // Optimization: In large user bases, use listUsers with specific query if available or try createUser and catch error.
 
-        // Strategy: Try to update user by phone. If not found, create.
-        // Actually, getUserById is easy, but we only have phone.
-        // Let's iterate or try create.
-
         let targetUser = users.find(u => u.phone === phone);
         let authUserId = targetUser?.id;
 
@@ -47,24 +43,77 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ success: false, error: 'Kullanıcı güncellenemedi: ' + updateError.message }, { status: 500 });
             }
         } else {
-            // Create new user
-            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                phone: phone,
-                password: password,
-                email: `${phone}@placeholder.sendika.app`, // Dummy email if required
-                email_confirm: true,
-                phone_confirm: true,
-                user_metadata: { member_id: memberId, full_name: memberName }
-            });
+            // Create new user, handle potential duplication race conditions or pagination misses
+            try {
+                const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                    phone: phone,
+                    password: password,
+                    email: `${phone}@placeholder.sendika.app`, // Dummy email if required
+                    email_confirm: true,
+                    phone_confirm: true,
+                    user_metadata: { member_id: memberId, full_name: memberName }
+                });
 
-            if (createError) {
-                return NextResponse.json({ success: false, error: 'Kullanıcı oluşturulamadı: ' + createError.message }, { status: 500 });
+                if (createError) throw createError;
+                authUserId = newUser.user.id;
+            } catch (createError: any) {
+                // If creation failed because user exists, try to find them by paging through users
+                if (createError?.message?.includes('already been registered') || createError?.code === 'unique_violation' || createError?.status === 422) {
+                    console.log('User exists, searching via pagination...');
+                    let foundUser = null;
+                    let page = 1;
+                    const PER_PAGE = 50;
+                    let hasMore = true;
+
+                    while (hasMore && !foundUser && page <= 10) { // Limit to 10 pages for safety
+                        const { data: { users: pageUsers }, error: listPageError } = await supabaseAdmin.auth.admin.listUsers({
+                            page: page,
+                            perPage: PER_PAGE
+                        });
+
+                        if (listPageError || !pageUsers || pageUsers.length === 0) {
+                            hasMore = false;
+                            break;
+                        }
+
+                        // Check for match by phone OR the generated placeholder email
+                        foundUser = pageUsers.find(u => u.phone === phone || u.email === `${phone}@placeholder.sendika.app`);
+
+                        if (foundUser) break;
+
+                        if (pageUsers.length < PER_PAGE) hasMore = false;
+                        page++;
+                    }
+
+                    if (foundUser) {
+                        authUserId = foundUser.id;
+                        // Update the found user's password
+                        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+                            foundUser.id,
+                            { password: password, user_metadata: { member_id: memberId, full_name: memberName } }
+                        );
+                        if (updateError) throw updateError;
+                    } else {
+                        throw new Error('Kullanıcı kayıtlı görünüyor ancak sistemde bulunamadı (Pagination limit exceeded).');
+                    }
+                } else {
+                    throw createError;
+                }
             }
-            authUserId = newUser.user.id;
+        }
+
+        // Sync password to members table for custom auth flow (verify_member_credentials)
+        const { error: rpcError } = await supabaseAdmin.rpc('set_member_password', {
+            p_member_id: memberId,
+            p_new_password: password
+        });
+
+        if (rpcError) {
+            console.error('Member password sync error:', rpcError);
+            // We don't block the process but logging is important
         }
 
         // Send SMS
-        // We send the RAW password here because we just set it.
         const message = `Sayın ${memberName}, mobil uygulama giriş şifreniz: ${password}`;
         const smsResult = await sendSms(phone, message);
 

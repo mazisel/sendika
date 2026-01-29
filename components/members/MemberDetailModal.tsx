@@ -160,6 +160,25 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
         }
     };
 
+    const formatPhoneNumber = (phone: string) => {
+        if (!phone) return null;
+        let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
+        // If it starts with 0, remove it
+        if (cleaned.startsWith('0')) {
+            cleaned = cleaned.substring(1);
+        }
+        // If it's a valid Turkish mobile number length (10 digits), add +90
+        if (cleaned.length === 10) {
+            return `+90${cleaned}`;
+        }
+        // If it's already 12 digits (90...), add +
+        if (cleaned.length === 12 && cleaned.startsWith('90')) {
+            return `+${cleaned}`;
+        }
+        // Fallback: return cleaned or original if not recognized
+        return `+${cleaned}`;
+    };
+
     const handleGenerateMobilePassword = async () => {
         if (!member.phone) {
             setActionError('Üyenin telefon numarası bulunmuyor.');
@@ -183,7 +202,7 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                 body: JSON.stringify({
                     memberId: member.id,
                     memberName: `${member.first_name} ${member.last_name}`,
-                    phone: member.phone,
+                    phone: formatPhoneNumber(member.phone),
                     password: code
                 })
             });
@@ -667,20 +686,22 @@ export default function MemberDetailModal({ member, isOpen, onClose, onEdit, onR
                                                     </div>
                                                 </div>
 
-                                                <button
-                                                    onClick={handleGenerateMobilePassword}
-                                                    disabled={generatingPassword || !member.phone}
-                                                    className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
-                                                >
-                                                    {generatingPassword ? (
-                                                        <RefreshCw className="w-3 h-3 animate-spin" />
-                                                    ) : (
-                                                        <>
-                                                            <RefreshCw className="w-3 h-3" />
-                                                            <span>Yeni Şifre Oluştur & Gönder</span>
-                                                        </>
-                                                    )}
-                                                </button>
+                                                <div className="flex gap-2 mt-3">
+                                                    <button
+                                                        onClick={handleGenerateMobilePassword}
+                                                        disabled={generatingPassword || !member.phone}
+                                                        className="flex-1 h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {generatingPassword ? (
+                                                            <RefreshCw className="w-3 h-3 animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <RefreshCw className="w-3 h-3" />
+                                                                <span>Yeni Şifre & Gönder</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
 

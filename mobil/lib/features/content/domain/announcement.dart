@@ -1,3 +1,5 @@
+import 'content_attachment.dart';
+
 class Announcement {
   Announcement({
     required this.id,
@@ -7,6 +9,7 @@ class Announcement {
     required this.isActive,
     this.startDate,
     this.endDate,
+    this.attachments = const [],
   });
 
   final String id;
@@ -16,6 +19,7 @@ class Announcement {
   final bool isActive;
   final DateTime? startDate;
   final DateTime? endDate;
+  final List<ContentAttachment> attachments;
 
   factory Announcement.fromJson(Map<String, dynamic> json) {
     return Announcement(
@@ -32,6 +36,7 @@ class Announcement {
       endDate: json['end_date'] != null
           ? DateTime.tryParse(json['end_date'].toString())
           : null,
+      attachments: ContentAttachment.listFromRaw(json['attachments']),
     );
   }
 
@@ -41,4 +46,9 @@ class Announcement {
     'warning' => 'Uyarı',
     _ => 'Genel',
   };
+
+  String get plainText {
+    final plain = content.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
+    return plain.replaceAll(RegExp(r'\\s+'), ' ').trim();
+  }
 }

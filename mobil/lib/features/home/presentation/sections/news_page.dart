@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../widgets/news_card.dart';
+import '../../../content/presentation/news_detail_page.dart';
 import '../../../content/providers/content_providers.dart';
 
 class NewsPage extends ConsumerWidget {
@@ -38,7 +39,15 @@ class NewsPage extends ConsumerWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
-                  return NewsCard(item: items[index]);
+                  final item = items[index];
+                  return NewsCard(
+                    item: item,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => NewsDetailPage(item: item),
+                      ),
+                    ),
+                  );
                 },
               ),
       ),

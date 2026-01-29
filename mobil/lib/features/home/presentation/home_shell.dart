@@ -6,6 +6,7 @@ import '../../content/providers/content_providers.dart';
 import 'sections/announcements_page.dart';
 import 'sections/digital_id_page.dart';
 import 'sections/news_page.dart';
+import '../../profile/presentation/profile_page.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -28,6 +29,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         await ref.read(announcementsFutureProvider.future);
         break;
       case 2:
+        await ref.read(authControllerProvider.notifier).refreshMember();
+        break;
+      case 3:
         await ref.read(authControllerProvider.notifier).refreshMember();
         break;
     }
@@ -124,9 +128,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ],
           ),
         ),
-        child: IndexedStack(
-          index: _currentIndex,
-          children: const [NewsPage(), AnnouncementsPage(), DigitalIdPage()],
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 72),
+          child: IndexedStack(
+            index: _currentIndex,
+            children: const [
+              NewsPage(),
+              AnnouncementsPage(),
+              DigitalIdPage(),
+              ProfilePage(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: NavigationBar(
@@ -153,6 +165,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: Icon(Icons.qr_code_2_outlined),
             selectedIcon: Icon(Icons.qr_code_2),
             label: 'Dijital Kimlik',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profil',
           ),
         ],
       ),

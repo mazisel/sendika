@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../widgets/announcement_card.dart';
+import '../../../content/presentation/announcement_detail_page.dart';
 import '../../../content/providers/content_providers.dart';
 
 class AnnouncementsPage extends ConsumerWidget {
@@ -38,7 +39,16 @@ class AnnouncementsPage extends ConsumerWidget {
                 ),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
-                  return AnnouncementCard(announcement: items[index]);
+                  final announcement = items[index];
+                  return AnnouncementCard(
+                    announcement: announcement,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AnnouncementDetailPage(announcement: announcement),
+                      ),
+                    ),
+                  );
                 },
               ),
       ),

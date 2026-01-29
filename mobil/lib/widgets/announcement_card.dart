@@ -4,9 +4,14 @@ import 'package:intl/intl.dart';
 import '../features/content/domain/announcement.dart';
 
 class AnnouncementCard extends StatelessWidget {
-  const AnnouncementCard({super.key, required this.announcement});
+  const AnnouncementCard({
+    super.key,
+    required this.announcement,
+    this.onTap,
+  });
 
   final Announcement announcement;
+  final VoidCallback? onTap;
 
   Color _badgeColor(ColorScheme scheme) {
     return switch (announcement.type) {
@@ -41,57 +46,63 @@ class AnnouncementCard extends StatelessWidget {
       elevation: 1.5,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _badgeColor(scheme),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    announcement.badgeLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _badgeTextColor(scheme),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _badgeColor(scheme),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      announcement.badgeLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _badgeTextColor(scheme),
+                      ),
                     ),
                   ),
-                ),
-                const Spacer(),
-                if (dateText.isNotEmpty)
-                  Text(
-                    dateText,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              announcement.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              announcement.content,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
-                  ),
-            ),
-          ],
+                  const Spacer(),
+                  if (dateText.isNotEmpty)
+                    Text(
+                      dateText,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                announcement.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                announcement.plainText,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.72),
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -116,7 +116,12 @@ export async function POST(
     if (error) {
       console.error('Üye şifresi belirlenirken hata:', error);
       return NextResponse.json(
-        { message: 'Şifre belirlenemedi. Lütfen tekrar deneyiniz.' },
+        {
+          message: 'Şifre belirlenemedi. Lütfen tekrar deneyiniz.',
+          details: error.message,
+          code: error.code,
+          hint: error.details
+        },
         { status: 500 }
       );
     }
